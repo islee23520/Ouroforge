@@ -68,6 +68,7 @@ pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
 pub mod asset_generation_proposal;
+pub mod asset_import;
 pub mod audio_generation;
 pub mod evolve_campaign;
 pub mod generative_intake;
