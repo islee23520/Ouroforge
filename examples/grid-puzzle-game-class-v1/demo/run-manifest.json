@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "authoring-loop-run-v1",
+  "fixtureScoped": true,
+  "runId": "grid-puzzle-game-class-v1-demo",
+  "gameClass": "grid-puzzle",
+  "loopShape": [
+    "seed",
+    "build",
+    "observe",
+    "verify",
+    "journal",
+    "evolve"
+  ],
+  "stages": [
+    {
+      "id": "seed",
+      "artifactRef": "examples/game-runtime/grid-puzzle-scene-v1.json"
+    },
+    {
+      "id": "build",
+      "artifactRef": "examples/game-runtime/grid-puzzle-scene-v1.json"
+    },
+    {
+      "id": "observe",
+      "artifactRef": "examples/grid-puzzle-game-class-v1/demo/verdict.json"
+    },
+    {
+      "id": "verify",
+      "artifactRef": "examples/grid-puzzle-game-class-v1/demo/verdict.json"
+    },
+    {
+      "id": "journal",
+      "artifactRef": "docs/grid-puzzle-game-class-v1-demo.md"
+    },
+    {
+      "id": "evolve",
+      "artifactRef": "examples/grid-puzzle-game-class-v1/demo/rung-record.json"
+    }
+  ],
+  "boundary": "Fixture-scoped loop evidence only; no generated run output is committed."
+}

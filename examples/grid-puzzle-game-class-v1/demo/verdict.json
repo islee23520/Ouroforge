@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "four-gate-verdict-v1",
+  "fixtureScoped": true,
+  "runId": "grid-puzzle-game-class-v1-demo",
+  "gameClass": "grid-puzzle",
+  "scenarioId": "grid-puzzle-sokoban-micro-v1",
+  "verdict": "pass",
+  "gates": [
+    {
+      "id": "mechanical",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/grid-puzzle-scene-v1.json"
+      ],
+      "finding": "Declared intended solution reaches the win state; blocked push does not falsely win."
+    },
+    {
+      "id": "runtime",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/grid-puzzle-scene-v1.json"
+      ],
+      "finding": "Deterministic grid-puzzle state machine evaluates the declared solution to 'won'."
+    },
+    {
+      "id": "visual",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/grid-puzzle-scene-v1.json"
+      ],
+      "finding": "Scene includes wall, floor, player, crate, and target entities with valid legend mapping."
+    },
+    {
+      "id": "semantic",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/grid-puzzle-scene-v1.json"
+      ],
+      "finding": "Grid-puzzle game-class contract verified: one player, one target, win condition all-targets-covered, intended solution replayable."
+    }
+  ],
+  "trustedValidationRef": "cargo test grid_puzzle_game_class_demo_contract",
+  "boundary": "Fixture-scoped verdict shape; no production-readiness claim."
+}

@@ -355,14 +355,14 @@ impl VisualRegressionScreen {
         // A matched or regressed screen must carry replayable evidence; missing,
         // unsupported, malformed, mismatched, and blocked screens may not.
         match self.outcome {
-            VisualComparisonOutcome::Unchanged | VisualComparisonOutcome::Changed => {
-                if self.evidence_refs.is_empty() {
-                    return Err(anyhow!(
-                        "visual regression scale screen `{}` is missing evidence for outcome `{}`",
-                        self.screen_id,
-                        outcome_token(self.outcome)
-                    ));
-                }
+            VisualComparisonOutcome::Unchanged | VisualComparisonOutcome::Changed
+                if self.evidence_refs.is_empty() =>
+            {
+                return Err(anyhow!(
+                    "visual regression scale screen `{}` is missing evidence for outcome `{}`",
+                    self.screen_id,
+                    outcome_token(self.outcome)
+                ));
             }
             _ => {}
         }

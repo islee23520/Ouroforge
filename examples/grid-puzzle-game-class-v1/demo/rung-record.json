@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "complexity-ladder-gates-v1",
+  "ladderId": "grid-puzzle-game-class-v1-demo",
+  "boundary": "Rust/local owns trusted state, gate evaluation, and evidence; generation is proposal-only; browser surfaces are read-only for inspection.",
+  "rungs": [
+    {
+      "order": 1,
+      "rungId": "grid-puzzle-sokoban-micro-v1",
+      "gameClass": "grid-puzzle",
+      "requiredCapabilities": [
+        "deterministic-grid-state",
+        "pushable-mechanics",
+        "win-condition-evaluation"
+      ],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "examples/grid-puzzle-game-class-v1/demo/run-manifest.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "examples/grid-puzzle-game-class-v1/demo/verdict.json",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "docs/grid-puzzle-game-class-v1-demo.md",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    }
+  ]
+}
