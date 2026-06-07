@@ -72,6 +72,7 @@ pub mod evolve_campaign;
 pub mod generative_intake;
 pub mod audio_generation;
 pub use evolve_campaign::*;
+pub mod economy_system;
 pub mod meta_progression;
 pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;

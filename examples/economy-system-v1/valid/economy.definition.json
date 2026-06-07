@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "economy-system-v1",
+  "profileId": "demo-profile",
+  "currencies": ["coins", "gems", "energy"],
+  "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+}
