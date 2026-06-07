@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.asset-generation-proposal.v1",
+  "briefId": "demo-hero-idle-v1",
+  "title": "Demo hero idle sprite",
+  "description": "A 32x32 top-down hero idle sprite for the asset generation and QA demo.",
+  "assetKind": "sprite",
+  "assetId": "demo-hero-idle",
+  "format": "png",
+  "width": 32,
+  "height": 32,
+  "license": {
+    "license": "CC-BY-4.0",
+    "attribution": "Demo asset; base study CC-BY-4.0 by Example Artist",
+    "source": "generator=asset-generation-proposal-v1; prompt=demo hero idle 32x32; upstream=none",
+    "allowedSource": true
+  }
+}
