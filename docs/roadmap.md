@@ -1387,6 +1387,69 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Long-Form Game Systems v1 governance refresh
+
+Long-Form Game Systems v1 is recorded as **complete for Era G Milestone 39**
+under #1, on merged evidence, as a conservative, additive, local-only milestone.
+It adds the systems a longer-form game needs — meta-progression/unlocks,
+economy/currency, save/profile and run-history at scale, UI/UX flow with
+onboarding and accessibility, and an optional narrative/dialogue/event system —
+each as a **Milestone 24 ladder rung** proven by a loop-produced, evidence-backed
+demo. Each system is a trusted Rust/local **data system on the existing runtime**;
+it adds no new engine, runtime, writer, or save service.
+
+The merged evidence chain is the scope/contract gate #1656
+(`docs/long-form-systems-v1.md`, PR #1707) — defines each system as a gated rung
+and the Rust-trusted-state vs JS-runtime-UI boundary; Meta-Progression and
+Unlocks v1 #1657 (`crates/ouroforge-core/src/meta_progression.rs`, PR #1711) —
+deterministic cross-run progression counters and threshold-gated, monotonic
+unlocks, with restore validation that rejects an unlock not justified by its
+counters; Economy and Currency v1 #1658
+(`crates/ouroforge-core/src/economy_system.rs`, PR #1716) — an integrity-checked
+currency ledger with checked earn/spend and a fail-closed non-negative invariant;
+Save/Profile and Run-History at Scale v1 #1659
+(`crates/ouroforge-core/src/save_profile_scale.rs`, PR #1725) — a multi-profile
+save store with a chained per-profile history digest (reusing the in-tree
+SHA-256 hasher) and a `save-profile-v0` migration path; UI/UX Flow, Onboarding
+and Accessibility v1 #1660 (`examples/game-runtime/uiux-flow.js` plus the trusted
+contract `crates/ouroforge-core/src/uiux_flow.rs`, PR #1733) — a deterministic,
+probe-observable in-game flow with reachable screens and declared accessibility
+options, wired into the existing runtime and exposed read-only; the optional
+Narrative/Dialogue/Event System v1 #1661
+(`crates/ouroforge-core/src/narrative_system.rs`, PR #1736) — a data-driven
+dialogue graph and flag-conditioned events with deterministic fixpoint
+evaluation and fail-closed restore validation; the Long-Form Game Systems Demo v1
+#1662 (`docs/long-form-systems-v1-demo.md`, PR #1739) — a deterministic,
+fixture-scoped slice composing the systems and recording each as a **satisfied**
+Milestone 24 rung with passing four-gate and loop-coverage evidence via the
+complexity-ladder contract; and Scenario Coverage v37 #1663
+(`docs/scenario-coverage-v37.md`, PR #1740) — an enumerated, state/shape-only
+regression suite over all five systems plus a backward-compatibility guarantee
+that an existing single-run save/restore remains valid. #1 and #23 remain open
+governance anchors.
+
+The boundaries stay explicit and reaffirmed. Growth stays **demand-driven**:
+each system is a Milestone 24 rung claimed only on loop-produced, four-gate +
+loop-coverage evidence, never breadth for its own sake. **UX and narrative tone
+remain human decisions** — the contracts assert structure (determinism,
+reachability, accessibility presence, deterministic dialogue/event firing), never
+that a UI "looks good" or a story is good or fun. Trusted state is Rust/local and
+changes only through validated, fail-closed logic; the in-game UI is the
+deterministic JS runtime and is read-only with respect to trusted state, exposed
+through the existing `window.__OUROFORGE__` probe; generation stays proposal-only
+through the existing review/apply/trust-gradient path; generated assets/content
+require license/provenance and the function-specific QA gate before promotion.
+Existing contracts remain backward-compatible (the v0→v1 save migration preserves
+prior saves), and generated runs/profiles/saves/artifacts remain ignored unless
+explicitly fixture-scoped. Shipping/hosted/cloud/live-ops stays **DEFER until a
+#1508 Layer-3 GO** (Layer-3 distributed orchestration / Elixir remains NO-GO
+under ADR #92). No production-readiness, quality, fun, or Godot replacement/parity
+claim is introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+G rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
