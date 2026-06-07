@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "scenario-coverage-v30-generative-front-door-matrix-v1",
+  "issue": 1597,
+  "intake": {
+    "valid": "examples/generative-front-door/generative-intake-brief-v1.json",
+    "invalid": "examples/generative-front-door/generative-intake-brief-invalid.json"
+  },
+  "promotion": {
+    "pass": "examples/generative-front-door/generative-promotion-pass-brief-v1.json",
+    "gateFail": "examples/generative-front-door/generative-promotion-gate-fail-brief-v1.json",
+    "oversolution": "examples/generative-front-door/generative-promotion-oversolution-brief-v1.json"
+  },
+  "accessibility": {
+    "verified": "examples/generative-front-door/generative-accessibility-verified-brief-v1.json",
+    "unverified": "examples/generative-front-door/generative-accessibility-unverified-brief-v1.json"
+  },
+  "backwardCompat": {
+    "trustGradientDoc": "docs/trust-gradient-audit-v1.md"
+  },
+  "wordingAudit": {
+    "doc": "docs/scenario-coverage-v30.md",
+    "anchors": [
+      "#1",
+      "#23",
+      "fixture-scoped",
+      "read-only",
+      "proposal-only"
+    ]
+  }
+}
