@@ -71,6 +71,7 @@ pub mod asset_generation_proposal;
 pub mod audio_generation;
 pub mod evolve_campaign;
 pub mod generative_intake;
+pub mod audio_qa;
 pub use evolve_campaign::*;
 pub mod economy_system;
 pub mod meta_progression;

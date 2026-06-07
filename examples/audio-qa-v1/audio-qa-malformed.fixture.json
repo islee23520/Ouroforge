@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "audio-qa-v1",
+  "checkId": "audio-qa-malformed-v1",
+  "status": "pass",
+  "assetRef": "audio-generation/brief-malformed-sfx-v1",
+  "format": "flac",
+  "kind": "sfx",
+  "channels": 1,
+  "durationMs": 450,
+  "license": {
+    "licenseId": "CC0-1.0",
+    "holder": "Ouroforge local fixtures",
+    "source": "audio-generation-v1"
+  },
+  "provenanceRefs": ["audio-generation/brief-malformed-sfx-v1#provenance"],
+  "loudness": {
+    "integratedLufs": -16.0,
+    "truePeakDbtp": -2.0,
+    "minLufs": -23.0,
+    "maxLufs": -9.0,
+    "maxTruePeakDbtp": -1.0
+  },
+  "baselineRefs": [],
+  "staleBaselineRefs": [],
+  "maxLoudnessDriftLu": 2.0,
+  "verdict": "Malformed audio-QA check: unsupported audio format must fail closed.",
+  "blockedReasons": [],
+  "boundary": "Read-only audio-QA check evidence; no auto-apply, no auto-merge, no quality/taste judgement; Rust/local owned, browser read-only."
+}
