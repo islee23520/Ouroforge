@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "scenario-coverage-v38",
+  "suite": "Production-Scale QA Matrix Regression Suite",
+  "milestone": "Era G Milestone 40",
+  "scenarios": [
+    { "id": "matrix-aggregation-complete", "system": "matrix", "kind": "aggregation", "expect": "complete-full-coverage" },
+    { "id": "matrix-cross-variant-regression", "system": "matrix", "kind": "regression", "expect": "detected" },
+    { "id": "matrix-malformed-fail-closed", "system": "matrix", "kind": "fail-closed", "expect": "rejected" },
+    { "id": "visual-baseline-match", "system": "visual", "kind": "match", "expect": "no-regression" },
+    { "id": "visual-planted-diff", "system": "visual", "kind": "regression", "expect": "detected" },
+    { "id": "visual-missing-baseline", "system": "visual", "kind": "missing-baseline", "expect": "surfaced" },
+    { "id": "perf-budget-pass", "system": "performance", "kind": "budget", "expect": "pass" },
+    { "id": "perf-planted-regression", "system": "performance", "kind": "regression", "expect": "regressed" },
+    { "id": "perf-soak-unstable", "system": "performance", "kind": "soak", "expect": "unstable" },
+    { "id": "verdict-consolidated-pass", "system": "verdict", "kind": "consolidated", "expect": "pass" },
+    { "id": "verdict-failure-propagates", "system": "verdict", "kind": "consolidated", "expect": "fail" },
+    { "id": "verdict-inconclusive", "system": "verdict", "kind": "consolidated", "expect": "inconclusive" },
+    { "id": "verdict-crash-accessibility-checks", "system": "verdict", "kind": "checks", "expect": "composed" },
+    { "id": "backcompat-per-artifact-gates", "system": "backcompat", "kind": "golden", "expect": "valid" }
+  ]
+}
