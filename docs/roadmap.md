@@ -1271,6 +1271,63 @@ Technical work still requires its own scoped issue/PR sequence; visibility,
 announcement, release, package publication, support, and security guarantees
 remain separate maintainer actions.
 
+### Asset Generation and Asset-QA v1 governance refresh
+
+Asset Generation and Asset-QA v1 is recorded as **complete for Era G Milestone
+36** under #1, on merged evidence, as a conservative, additive, local-only
+milestone. It gives the loop a **verified visual-asset function** (sprites,
+tilesets, UI art) without asset slop or license risk: a generated asset is a
+**proposal carrying license/provenance**, routed through the existing
+review/apply/trust-gradient path, and is promoted only after a function-specific
+**asset-QA gate** passes. The function is a composition of surfaces that already
+exist — it adds no new engine, runtime, or writer.
+
+The merged evidence chain is the scope/design gate #1634
+(`docs/asset-pipeline-design.md`, PR #1703); the Asset Generation Proposal Model
+v1 #1635 (`crates/ouroforge-core/src/asset_generation_proposal.rs`, PR #1709) —
+generation emits a `MutationProposal` carrying an `AssetLicenseProvenance`
+record, proposal-only (proposed / pending / unverified), failing closed on a
+missing/unrecognized license, a missing required attribution, an off-list source,
+or a malformed/oversize descriptor; the Asset-QA Gate v1 #1636
+(`crates/ouroforge-evaluator/src/asset_qa_gate.rs`, PR #1714) — style-consistency,
+format/resolution validity, visual-regression vs baseline, and license/provenance
+completeness, composing additively with the existing four gates under
+`declared-gate-and` (`undeclaredGatePolicy: neutral`), reusing the visual gate and
+failing closed (a missing/non-comparable baseline is explicit `insufficient-data`,
+never a silent pass); the Asset Import and Atlas Path v1 #1637
+(`crates/ouroforge-core/src/asset_import.rs`, PR #1720) — validate-then-load
+reusing the existing `ProjectAssetManifest` loader and atlas-integrity validation,
+where every generated asset must have passed asset-QA before import; the Asset
+Generation and QA Demo v1 #1638 (`docs/asset-pipeline-v1-demo.md`, PR #1727) — a
+deterministic, fixture-scoped walkthrough where an asset is generated, blocked by
+asset-QA when style-inconsistent, and promotable only when it passes, with
+promotion routed through the gate; and Scenario Coverage v34 #1639
+(`docs/scenario-coverage-v34.md`, PR #1730) — an enumerated, state/shape-only
+regression suite over the proposal, asset-QA, and import behaviors plus a
+four-gate backward-compatibility guarantee. #1 and #23 remain open governance
+anchors.
+
+The boundaries stay explicit and reaffirmed. **License/provenance and the
+asset-QA gate are mandatory before any asset promotion; the gate fails closed.**
+No unlicensed, uncredited, or unverified-style generated asset is ever promoted.
+Generation stays proposal-only through the existing review/apply/trust-gradient
+path, never a direct trusted write, auto-apply, self-approval, or reviewer bypass;
+browser/Studio surfaces remain read-only. **Taste stays human**: the gate asserts
+license/format/style-baseline/regression conformance, never that an asset "looks
+good", is on-brand-by-taste, or is fun — art/audio/UX/narrative direction remain
+human decisions. The function reuses the existing proposal model, evaluator four
+gates, `compare`, provenance bundle, and Asset Pipeline v1 manifest/loader/atlas;
+it adds no parallel engine. Existing contracts remain backward-compatible, and
+generated assets/runs/artifacts remain ignored unless explicitly fixture-scoped.
+A hosted/paid asset store stays **DEFER until a #1508 Layer-3 GO** (Layer-3
+distributed orchestration / Elixir remains NO-GO under ADR #92). No
+production-readiness, quality, fun, or Godot replacement/parity claim is
+introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+G rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
