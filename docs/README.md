@@ -149,6 +149,7 @@ claims:
 - [`native-export-design.md`](native-export-design.md)
 - [`plugin-system-design.md`](plugin-system-design.md)
 - [`distributed-elixir-design.md`](distributed-elixir-design.md)
+- [`oss-trust-charter.md`](oss-trust-charter.md) — OSS trust charter (third-rails: no runtime/install fee, no revenue share, no core relicense) and the paid-cloud boundary design gate (every operational/team/scale surface DEFER, each tied to a #1508 Layer-3 hosted/cloud GO)
 - [`godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md)
 - [`godot-plus-demo-design-pillars-v1.md`](godot-plus-demo-design-pillars-v1.md)
 - [`godot-plus-demo-reproducibility-v1.md`](godot-plus-demo-reproducibility-v1.md)
