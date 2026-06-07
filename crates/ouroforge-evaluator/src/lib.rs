@@ -10,6 +10,8 @@ use std::fs;
 use std::path::{Component, Path};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod asset_qa_gate;
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct EvaluationVerdict {
     pub status: String,
@@ -53,7 +55,7 @@ pub struct VisualGateVerdict {
     pub output_root: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "kebab-case")]
 pub enum VisualGateState {
     Pass,

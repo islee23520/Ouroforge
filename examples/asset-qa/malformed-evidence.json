@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "ouroforge.asset-qa-gate.v1",
+  "assetId": "settings-panel",
+  "styleConsistency": "pass",
+  "visualRegression": "pass",
+  "formatResolutionValid": true,
+  "licenseProvenanceComplete": true,
+  "evidenceRefs": []
+}

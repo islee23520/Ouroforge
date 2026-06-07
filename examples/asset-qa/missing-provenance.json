@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.asset-qa-gate.v1",
+  "assetId": "dungeon-tiles",
+  "styleConsistency": "pass",
+  "visualRegression": "pass",
+  "formatResolutionValid": true,
+  "licenseProvenanceComplete": false,
+  "evidenceRefs": [
+    "runs/run-789/evidence/visual/dungeon-tiles.json"
+  ]
+}

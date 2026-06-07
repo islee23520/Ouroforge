@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "ouroforge.asset-qa-gate.v1",
+  "assetId": "hero-idle",
+  "styleConsistency": "pass",
+  "visualRegression": "pass",
+  "formatResolutionValid": true,
+  "licenseProvenanceComplete": true,
+  "evidenceRefs": [
+    "runs/run-789/evidence/visual/hero-idle.json",
+    "runs/run-789/evidence/compare/hero-idle.json",
+    "runs/run-789/evidence/provenance/hero-idle.json"
+  ]
+}
