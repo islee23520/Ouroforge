@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "evidence-marketplace-registry-v1",
+  "assetId": "collect-and-exit-demo-asset-v1",
+  "templateRef": "refs/template.json",
+  "templateDigest": "sha256:11d5364259842c0c0d1b31c5d5b11a35e8f6569d669cffdcd329b171b71e12d2",
+  "acceptanceSuiteRef": "refs/acceptance-suite.json",
+  "replayProof": {
+    "runRef": "runs/collect-and-exit-replay",
+    "expectedVerdictRef": "refs/evaluator-verdict.json",
+    "deterministicInputs": true,
+    "deterministicMetadataRefs": []
+  },
+  "provenance": {
+    "schemaVersion": "provenance-bundle-v1",
+    "bundleId": "collect-and-exit-demo-asset-provenance",
+    "changeId": "collect-and-exit-demo-asset-publish",
+    "status": "complete",
+    "chainLinks": [
+      { "kind": "intent-design-brief", "ref": "refs/intent-design-brief.json", "artifactId": "demo-intent-design-brief" },
+      { "kind": "generated-edited-artifact", "ref": "refs/generated-artifact.json", "artifactId": "demo-generated-artifact" },
+      { "kind": "validation-result", "ref": "refs/validation-result.json", "artifactId": "demo-validation-result" },
+      { "kind": "runtime-observation", "ref": "refs/runtime-observation.json", "artifactId": "demo-runtime-observation" },
+      { "kind": "evaluator-verdict", "ref": "refs/evaluator-verdict.json", "artifactId": "demo-evaluator-verdict" },
+      { "kind": "regression-comparison", "ref": "refs/regression-comparison.json", "artifactId": "demo-regression-comparison" },
+      { "kind": "journal-review-decision", "ref": "refs/journal-review-decision.json", "artifactId": "demo-journal-review-decision" },
+      { "kind": "promotion-rollback-record", "ref": "refs/promotion-rollback-record.json", "artifactId": "demo-promotion-rollback-record" }
+    ],
+    "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+    "boundary": "Read-only audit and replay over local fixture evidence only.",
+    "guardrails": [
+      "Rust/local owns the trusted verification decision.",
+      "No promotion, auto-approval, merge, or command execution is performed."
+    ]
+  },
+  "generatedState": { "generated": false, "tracked": true, "fixtureScoped": true },
+  "boundary": "Local verifiable-asset registry demo fixture; no hosted, paid, or network capability.",
+  "guardrails": [
+    "Local publish/consume only; hosted/paid stays DEFER until a #1508 Layer-3 GO.",
+    "Adoption flows through the existing review/apply/trust-gradient path, never a direct trusted write.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}

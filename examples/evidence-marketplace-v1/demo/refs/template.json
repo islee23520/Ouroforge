@@ -1,0 +1,7 @@
+{
+  "id": "collect-and-exit-template",
+  "gameClass": "grid-puzzle",
+  "summary": "A fixture-scoped collect-and-exit template published as a local verifiable asset.",
+  "scene": "scenes/collect-and-exit.scene.json",
+  "seed": "seeds/collect-and-exit.seed.json"
+}
