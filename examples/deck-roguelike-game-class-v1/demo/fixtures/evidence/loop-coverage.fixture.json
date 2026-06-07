@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "loop-coverage-metric-v1",
+  "fixtureScoped": true,
+  "projectId": "deck_roguelike_game_class_demo",
+  "runId": "m31-deck-roguelike-loop-demo",
+  "inputs": [
+    {
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+      "artifactKind": "seed",
+      "sourceRef": "docs/deck-roguelike-game-class-v1.md",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "seed"
+      ],
+      "trustedValidationRef": "deck_roguelike_demo_contract.rs"
+    },
+    {
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/scenes/deck-roguelike-demo.scene.json",
+      "artifactKind": "scene",
+      "sourceRef": "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "build",
+        "observe"
+      ],
+      "trustedValidationRef": "deck_roguelike_demo_contract.rs"
+    },
+    {
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/four-gate-verdict.fixture.json",
+      "artifactKind": "verdict",
+      "sourceRef": "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json",
+      "provenanceClass": "loop-verified",
+      "loopStageRefs": [
+        "verify"
+      ],
+      "trustedValidationRef": "deck_roguelike_demo_contract.rs"
+    },
+    {
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/journal/deck-roguelike-journal.fixture.md",
+      "artifactKind": "journal",
+      "sourceRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/four-gate-verdict.fixture.json",
+      "provenanceClass": "loop-produced",
+      "loopStageRefs": [
+        "journal",
+        "evolve"
+      ],
+      "trustedValidationRef": "deck_roguelike_demo_contract.rs"
+    }
+  ],
+  "summary": {
+    "totalInputs": 4,
+    "loopProduced": 3,
+    "loopVerified": 1,
+    "manual": 0,
+    "coverageFraction": 1.0,
+    "status": "computed"
+  },
+  "boundary": "Descriptive fixture-scoped authorship attribution only; not a quality score and no auto-apply authority."
+}

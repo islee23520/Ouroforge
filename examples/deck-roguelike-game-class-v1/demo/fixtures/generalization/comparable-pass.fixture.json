@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "second-game-generalization-comparison-v1",
+  "fixtureScoped": true,
+  "comparisonId": "m31-signal-gate-vs-deck-roguelike",
+  "status": "comparable",
+  "classes": [
+    {
+      "id": "signal-gate-platformer",
+      "seedRef": "examples/signal-gate-platformer/seeds/signal-gate-platformer.yaml",
+      "scenarioRef": "examples/signal-gate-platformer/scenarios/signal-gate-platformer.json",
+      "loopCoverageRef": "examples/signal-gate-platformer/fixtures/evidence/loop-coverage.fixture.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    },
+    {
+      "id": "deck-roguelike",
+      "seedRef": "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+      "scenarioRef": "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json",
+      "loopCoverageRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/loop-coverage.fixture.json",
+      "verdictGateIds": [
+        "mechanical",
+        "runtime",
+        "visual",
+        "semantic"
+      ],
+      "loopStageIds": [
+        "seed",
+        "build",
+        "observe",
+        "verify",
+        "journal",
+        "evolve"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "same-loop-stage-shape",
+      "severity": "info",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/fixtures/loop/deck-roguelike-loop-run.fixture.json"
+      ],
+      "summary": "Both classes expose the same six authoring loop stages."
+    },
+    {
+      "id": "same-four-gate-shape",
+      "severity": "info",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/four-gate-verdict.fixture.json"
+      ],
+      "summary": "Both classes are compared against mechanical, runtime, visual, and semantic gates."
+    },
+    {
+      "id": "capability-axis-difference",
+      "severity": "info",
+      "evidenceRefs": [
+        "docs/deck-roguelike-game-class-v1.md"
+      ],
+      "summary": "The deck-roguelike rung adds the seeded stochastic state capability axis rather than new spatial breadth."
+    }
+  ],
+  "boundary": "Evidence shape comparison only; no broad genre support claim."
+}

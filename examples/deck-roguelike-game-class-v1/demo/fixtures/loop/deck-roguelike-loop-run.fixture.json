@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "authoring-loop-run-v1",
+  "fixtureScoped": true,
+  "runId": "m31-deck-roguelike-loop-demo",
+  "gameClass": "deck-roguelike",
+  "seed": 12345,
+  "loopShape": [
+    "seed",
+    "build",
+    "observe",
+    "verify",
+    "journal",
+    "evolve"
+  ],
+  "stages": [
+    {
+      "id": "seed",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml"
+    },
+    {
+      "id": "build",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/scenes/deck-roguelike-demo.scene.json"
+    },
+    {
+      "id": "observe",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/four-gate-verdict.fixture.json"
+    },
+    {
+      "id": "verify",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/four-gate-verdict.fixture.json"
+    },
+    {
+      "id": "journal",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/journal/deck-roguelike-journal.fixture.md"
+    },
+    {
+      "id": "evolve",
+      "artifactRef": "examples/deck-roguelike-game-class-v1/demo/fixtures/generalization/comparable-pass.fixture.json"
+    }
+  ],
+  "boundary": "Fixture-scoped loop evidence only; no generated run output is committed."
+}

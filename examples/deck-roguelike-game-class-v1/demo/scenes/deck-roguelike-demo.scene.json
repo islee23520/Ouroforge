@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1",
+  "id": "deck-roguelike-demo-scene",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "seed": 12345,
+  "metadata": {
+    "title": "Deck-Roguelike Game Class Demo",
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike demo scene (#1602). A seed-reproducible single-encounter run driven through the existing runtime probe; browser/Studio surfaces stay read-only."
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "deck-roguelike-demo",
+    "seed": 12345,
+    "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+    "cards": {
+      "strike": { "type": "attack", "cost": 1, "damage": 6 },
+      "bash": { "type": "attack", "cost": 2, "damage": 10 },
+      "defend": { "type": "skill", "cost": 1, "block": 5 }
+    },
+    "deck": ["strike", "strike", "strike", "strike", "strike", "bash", "bash", "defend", "defend", "defend"],
+    "relics": ["vigor-charm"],
+    "relicVocabulary": {
+      "vigor-charm": { "trigger": "run-start", "effect": { "block": 3 } }
+    },
+    "enemy": {
+      "id": "slime",
+      "maxHp": 20,
+      "intents": [
+        { "type": "attack", "value": 8 },
+        { "type": "attack", "value": 5 }
+      ]
+    }
+  }
+}

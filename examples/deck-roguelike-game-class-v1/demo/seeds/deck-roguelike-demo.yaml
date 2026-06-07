@@ -1,0 +1,15 @@
+id: deck-roguelike-demo
+title: Deck-Roguelike Game Class Demo Fixture
+goal: Validate a seed-reproducible single-encounter deck-roguelike run through the existing runtime, probe, and replay-digest contracts without a per-game evaluator bypass.
+constraints:
+  target: game-runtime
+acceptance:
+  - Project manifest, scene, Seed, and scenario pack fixtures validate as source-like inputs.
+  - The run uses run seed 12345; an identical seed and action sequence reproduce the same replay-state digest (digest-stable).
+  - A different seed shuffles to a different opening hand and a divergent replay-state digest.
+  - The run reaches a win (enemy hp reduced to zero) while the player survives.
+  - Four-gate evidence reports mechanical, runtime, visual, and semantic verdicts with comparable refs.
+  - Loop coverage records Seed, Build, Observe, Verify, Journal, and Evolve stages using local fixture evidence.
+scenarios:
+  - id: deck-roguelike-seeded-run
+    description: End-to-end seed-reproducible single-encounter deck-roguelike run, driven through the read-only runtime probe (deckRoguelikePlayCard / deckRoguelikeEndTurn).

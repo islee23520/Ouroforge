@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "deck-roguelike-demo",
+  "description": "Scenario pack for the Milestone 31 deck-roguelike game class demo fixture. The seeded run is driven through the read-only runtime probe; the live seed-reproducibility proof is in demo-smoke.test.cjs.",
+  "seed": "seeds/deck-roguelike-demo.yaml",
+  "scenes": [
+    "scenes/deck-roguelike-demo.scene.json"
+  ],
+  "scenarioGroups": [
+    {
+      "id": "seeded-run-contract",
+      "description": "Bounded source and evidence contracts for the seed-reproducible deck-roguelike run.",
+      "scenarios": [
+        {
+          "id": "deck-roguelike-seeded-run",
+          "description": "The seeded demo run (seed 12345) is digest-stable, reaches a win, and exposes deck/hand/enemy world-state through the read-only probe; no production-readiness, quality, or Godot-parity claim.",
+          "assertions": [
+            {
+              "world_state": {
+                "path": "deckRoguelike.schemaVersion",
+                "equals": "ouroforge.deck-roguelike-state.v1"
+              }
+            },
+            {
+              "world_state": {
+                "path": "deckRoguelike.seed",
+                "equals": 12345
+              }
+            },
+            {
+              "world_state": {
+                "path": "deckRoguelike.readOnlyInspection.trustedEmitter",
+                "equals": "browser-runtime-deck-roguelike-world-state"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

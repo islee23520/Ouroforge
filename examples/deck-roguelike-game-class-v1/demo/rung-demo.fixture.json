@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "game-complexity-ladder-rung-demo-v1",
+  "id": "gcl-v1-deck-roguelike-rung-demo",
+  "name": "Deck-Roguelike seeded stochastic rung demo",
+  "issue": "#1602",
+  "demo": {
+    "rootRef": "examples/deck-roguelike-game-class-v1/demo",
+    "projectRef": "examples/deck-roguelike-game-class-v1/demo/ouroforge.project.json",
+    "scenarioPackRef": "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json",
+    "seedRef": "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+    "canonicalDocs": [
+      "docs/game-complexity-ladder-v1.md",
+      "docs/deck-roguelike-game-class-v1.md",
+      "docs/deck-roguelike-game-class-v1-demo.md"
+    ],
+    "supersededTreesRecreated": false
+  },
+  "rungGate": {
+    "ladderId": "game-complexity-ladder-v1",
+    "rungId": "deck-roguelike",
+    "gateId": "game-complexity-ladder-v1.deck-roguelike",
+    "rungAxis": "seeded-stochastic-state",
+    "status": "satisfied",
+    "claim": "The deck-roguelike capability-axis rung is satisfied by a loop-produced demo with four-gate evidence and a Milestone 20 loop-coverage verdict over the seeded deck-roguelike run."
+  },
+  "loopProducedEvidence": [
+    {
+      "id": "deck-roguelike-game-class-contract",
+      "kind": "rust-contract",
+      "ref": "crates/ouroforge-core/tests/deck_roguelike_game_class_contract.rs",
+      "producedByLoop": true,
+      "covers": ["seeded_reproducibility", "different_seed_divergence", "winnable_run", "malformed_deck_fail_closed"]
+    },
+    {
+      "id": "deck-roguelike-demo-contract",
+      "kind": "rust-contract",
+      "ref": "crates/ouroforge-core/tests/deck_roguelike_demo_contract.rs",
+      "producedByLoop": true,
+      "covers": ["four_gate_states", "loop_coverage", "rung_linkage", "guardrails", "stale_ref_detection"]
+    },
+    {
+      "id": "deck-roguelike-demo-smoke",
+      "kind": "node-smoke",
+      "ref": "examples/deck-roguelike-game-class-v1/demo/demo-smoke.test.cjs",
+      "producedByLoop": true,
+      "covers": ["live_seed_reproducibility", "win_outcome", "probe_world_state", "gate_states", "rung_linkage"]
+    },
+    {
+      "id": "deck-roguelike-runtime-contract",
+      "kind": "node-smoke",
+      "ref": "examples/game-runtime/deck-roguelike.test.cjs",
+      "producedByLoop": true,
+      "covers": ["probe_exposure", "digest_stability", "divergence", "fail_closed"]
+    }
+  ],
+  "fourGateEvidence": {
+    "validation": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/ouroforge.project.json",
+        "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+        "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json"
+      ]
+    },
+    "runtimeScenarioBehavior": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/deck-roguelike.js",
+        "examples/game-runtime/deck-roguelike.test.cjs",
+        "examples/deck-roguelike-game-class-v1/demo/demo-smoke.test.cjs"
+      ]
+    },
+    "reviewGovernance": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/fixtures/journal/deck-roguelike-journal.fixture.md",
+        "docs/deck-roguelike-game-class-v1.md"
+      ]
+    },
+    "generatedStateTrustBoundary": {
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/README.md",
+        "docs/deck-roguelike-game-class-v1-demo.md"
+      ]
+    }
+  },
+  "loopCoverage": {
+    "status": "satisfied",
+    "verdict": "pass",
+    "surface": "milestone-20-loop-coverage",
+    "coveredPath": "Deck-roguelike seeded single-encounter local authoring loop",
+    "evidenceRefs": [
+      "examples/deck-roguelike-game-class-v1/demo/fixtures/evidence/loop-coverage.fixture.json",
+      "examples/deck-roguelike-game-class-v1/demo/fixtures/loop/deck-roguelike-loop-run.fixture.json"
+    ]
+  },
+  "engineGrowthJustification": {
+    "status": "none",
+    "newEngineCapabilities": [],
+    "unjustifiedCapabilities": [],
+    "justificationRefs": [
+      "docs/deck-roguelike-game-class-v1.md",
+      "docs/game-complexity-ladder-v1.md"
+    ],
+    "rationale": "The rung adds the seeded stochastic state capability axis as data and deterministic logic. No new renderer, physics, audio, animation, runtime, editor, Studio, plugin runtime, or browser authority is requested."
+  },
+  "guardrails": {
+    "deterministic": true,
+    "fixtureScoped": true,
+    "generatedState": false,
+    "sourceControlled": true,
+    "network": false,
+    "liveBrowser": false,
+    "browserTrustedWrites": false,
+    "browserCommandBridge": false,
+    "autoApply": false,
+    "autoMerge": false,
+    "modifiesIssue1": false,
+    "modifiesIssue23": false
+  }
+}

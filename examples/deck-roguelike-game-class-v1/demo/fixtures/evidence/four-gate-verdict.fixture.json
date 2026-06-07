@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "four-gate-verdict-v1",
+  "fixtureScoped": true,
+  "runId": "m31-deck-roguelike-loop-demo",
+  "gameClass": "deck-roguelike",
+  "scenarioId": "deck-roguelike-seeded-run",
+  "verdict": "pass",
+  "gates": [
+    {
+      "id": "mechanical",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json",
+        "examples/deck-roguelike-game-class-v1/demo/scenes/deck-roguelike-demo.scene.json"
+      ],
+      "finding": "The seeded run plays attack cards within the energy budget and reaches a win when enemy hp reaches zero."
+    },
+    {
+      "id": "runtime",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/game-runtime/deck-roguelike.js",
+        "examples/game-runtime/runtime.js"
+      ],
+      "finding": "An identical seed and action sequence reproduce the same runtime replay-state digest; a different seed diverges."
+    },
+    {
+      "id": "visual",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/scenes/deck-roguelike-demo.scene.json"
+      ],
+      "finding": "The probe exposes deck, hand, discard, relics, and enemy run state as read-only inspection evidence; no rendered-visual or production claim is made."
+    },
+    {
+      "id": "semantic",
+      "status": "pass",
+      "evidenceRefs": [
+        "examples/deck-roguelike-game-class-v1/demo/seeds/deck-roguelike-demo.yaml",
+        "examples/deck-roguelike-game-class-v1/demo/scenarios/deck-roguelike-demo.json"
+      ],
+      "finding": "Scenario expectations cover the deterministic opening hand, the win/survival outcome, and same-seed/different-seed digest behavior."
+    }
+  ],
+  "trustedValidationRef": "cargo test deck_roguelike_game_class_contract && cargo test deck_roguelike_demo_contract",
+  "boundary": "Fixture-scoped verdict shape; no production-readiness claim."
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "deck_roguelike_game_class_demo",
+    "name": "Deck-Roguelike Game Class Demo"
+  },
+  "scenes": [
+    {
+      "id": "deck-roguelike-demo",
+      "path": "scenes/deck-roguelike-demo.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "deck-roguelike-demo",
+      "path": "seeds/deck-roguelike-demo.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "deck-roguelike-demo",
+      "path": "scenarios/deck-roguelike-demo.json"
+    }
+  ],
+  "assetRoots": [
+    "assets"
+  ],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ]
+  }
+}
