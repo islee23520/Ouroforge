@@ -1,0 +1,4 @@
+{
+  "id": "generated-artifact",
+  "summary": "Fixture-scoped replay artifacts are tracked only as tests."
+}

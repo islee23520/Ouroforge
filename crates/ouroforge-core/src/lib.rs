@@ -45,6 +45,7 @@ mod behavior_draft_validation;
 pub mod source_apply_verification_runner;
 pub use source_apply_verification_runner::*;
 pub mod behavior_evidence;
+pub mod evidence_marketplace_proof;
 pub mod evidence_marketplace_registry;
 pub mod export_asset_manifest;
 pub mod export_bundle;

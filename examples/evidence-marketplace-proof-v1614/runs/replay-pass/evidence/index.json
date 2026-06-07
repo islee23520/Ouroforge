@@ -1,0 +1,26 @@
+{
+  "artifacts": [
+    {
+      "id": "scenario-result",
+      "kind": "application/json",
+      "path": "evidence/scenarios/collect-and-exit/scenario-result.json",
+      "metadata": {
+        "artifact": "scenario_result"
+      },
+      "added_at_unix_ms": 1
+    },
+    {
+      "id": "semantic-gate-pass",
+      "kind": "application/json",
+      "path": "evidence/scenarios/collect-and-exit/semantic/pass/runtime-invariant-model.json",
+      "metadata": {
+        "artifact": "runtime_invariant_model",
+        "gate": "semantic",
+        "declaredAcceptance": true,
+        "scenarioId": "collect-and-exit",
+        "modelId": "semantic_gate_pass_health"
+      },
+      "added_at_unix_ms": 2
+    }
+  ]
+}

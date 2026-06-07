@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "evidence-marketplace-registry-v1",
+  "assetId": "collect-and-exit-proof-bound-v1",
+  "templateRef": "templates/collect-and-exit/template.json",
+  "templateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "acceptanceSuiteRef": "templates/collect-and-exit/acceptance-suite.json",
+  "replayProof": {
+    "runRef": "runs/replay-pass",
+    "expectedVerdictRef": "expected/reproduced-verdict.json",
+    "deterministicInputs": true,
+    "deterministicMetadataRefs": [
+      "refs/deterministic-metadata.json"
+    ]
+  },
+  "provenance": {
+    "schemaVersion": "provenance-bundle-v1",
+    "bundleId": "collect-and-exit-proof-bound-provenance",
+    "changeId": "1614-proof-bound",
+    "status": "complete",
+    "chainLinks": [
+      {
+        "kind": "intent-design-brief",
+        "ref": "refs/intent-design-brief.json",
+        "artifactId": "cae-intent-design-brief",
+        "expectedDigest": "sha256:9677646617154ca4f3f5ef052f0ca997489214718c48ebb7e52ca8d7179eee97"
+      },
+      {
+        "kind": "generated-edited-artifact",
+        "ref": "refs/generated-artifact.json",
+        "artifactId": "cae-generated-artifact",
+        "expectedDigest": "sha256:321a9cde10d7aba70adf1c76568041cc58c43b7cc4bbc7e538352879eebfa718"
+      },
+      {
+        "kind": "validation-result",
+        "ref": "refs/validation-result.json",
+        "artifactId": "cae-validation-result",
+        "expectedDigest": "sha256:5302987c8995b6c4d43d326729f63e73160b97e3543bdd2934a378d8b14cfd16"
+      },
+      {
+        "kind": "runtime-observation",
+        "ref": "refs/runtime-observation.json",
+        "artifactId": "cae-runtime-observation",
+        "expectedDigest": "sha256:70d7b652cd2b49f2b127886c9df03d7b1864d1cfe0a62f587453d45daf98c51b"
+      },
+      {
+        "kind": "evaluator-verdict",
+        "ref": "expected/reproduced-verdict.json",
+        "artifactId": "cae-evaluator-verdict",
+        "expectedDigest": "sha256:95807a27bc8a15a98679b55b325b22aaca836124993d384ae01dfef6dff4a4cf"
+      },
+      {
+        "kind": "regression-comparison",
+        "ref": "refs/regression-comparison.json",
+        "artifactId": "cae-regression-comparison",
+        "expectedDigest": "sha256:797173bfa16723e331d129fae8af80019f79a2edb95fe1d34b93d6dbb87d747e"
+      },
+      {
+        "kind": "journal-review-decision",
+        "ref": "refs/journal-review-decision.json",
+        "artifactId": "cae-journal-review-decision",
+        "expectedDigest": "sha256:d589758a44fde6773d67ed91f399d67900eccb2e5ee4a41747d11ac7d92ec464"
+      },
+      {
+        "kind": "promotion-rollback-record",
+        "ref": "refs/promotion-rollback-record.json",
+        "artifactId": "cae-promotion-rollback-record",
+        "expectedDigest": "sha256:ba180904b8d4a6ee7c0975eedd3e49cd4ffd825eda07ac29cd25ff1bb274b46b"
+      }
+    ],
+    "generatedState": {
+      "generated": true,
+      "tracked": true,
+      "fixtureScoped": true
+    },
+    "incompleteReasons": [],
+    "compatibilityNotes": [
+      "Replay proof and provenance lineage are additive to evidence-marketplace-registry-v1.",
+      "Assets without expectedDigest links stay readable; digest binding hardens tamper detection."
+    ],
+    "replayInputs": {
+      "runRef": "runs/replay-pass",
+      "expectedVerdictRef": "expected/reproduced-verdict.json",
+      "deterministicInputs": true,
+      "deterministicMetadataRefs": [
+        "refs/deterministic-metadata.json"
+      ]
+    },
+    "boundary": "Read-only audit and replay over local fixture evidence only.",
+    "guardrails": [
+      "Rust/local owns the trusted verification decision.",
+      "No promotion, auto-approval, merge, or command execution is performed."
+    ]
+  },
+  "generatedState": {
+    "generated": false,
+    "tracked": true,
+    "fixtureScoped": true
+  },
+  "boundary": "Local replay-proof and provenance binding fixture; no hosted, paid, or network capability.",
+  "guardrails": [
+    "Replay proof re-runs locally on consume; a tampered proof or provenance ref is detected fail-closed.",
+    "Reuses the Milestone 25 provenance bundle and deterministic replay; no parallel provenance engine.",
+    "Adoption flows through the existing review/apply/trust-gradient path, never a direct trusted write.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}
