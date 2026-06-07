@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-demo-collect-and-exit",
+  "status": "complete",
+  "verdict": "fail",
+  "gameBuildRef": "runs/demo/collect-and-exit/build-002",
+  "checks": [
+    {
+      "checkId": "chk-matrix",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "fail",
+      "failureCount": 1,
+      "evidenceRef": "examples/production-qa-matrix-v1/demo/demo.matrix.fixture.json",
+      "evidenceRefs": ["runs/demo/collect-and-exit/candidate-s1-web/run.json"]
+    },
+    {
+      "checkId": "chk-visual",
+      "kind": "visualRegression",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/visual-regression-scale-v1/suite.match.fixture.json",
+      "evidenceRefs": ["runs/demo/collect-and-exit/visual.json"]
+    },
+    {
+      "checkId": "chk-perf",
+      "kind": "performanceSoak",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/performance-soak-v1/suite.budget-pass.fixture.json",
+      "evidenceRefs": ["runs/demo/collect-and-exit/perf.json"]
+    },
+    {
+      "checkId": "chk-crash",
+      "kind": "crash",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/qa-error-classifier-v1/classifier.clean.fixture.json",
+      "evidenceRefs": ["runs/demo/collect-and-exit/crash.json"]
+    },
+    {
+      "checkId": "chk-accessibility",
+      "kind": "accessibility",
+      "declared": false,
+      "status": "skipped"
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["kind", "declared", "status"]
+  },
+  "boundary": "Consolidated checks are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; composes existing checks via declared-gate-and with no new evaluator."
+}
