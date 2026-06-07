@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.audio-generation.v1",
+  "briefId": "brief-malformed-sfx-v1",
+  "title": "Malformed chime",
+  "description": "A pickup chime brief that declares an unsupported audio format.",
+  "audioKind": "sfx",
+  "audioId": "malformed-from-brief-v1",
+  "format": "flac",
+  "durationMs": 450,
+  "channels": 1,
+  "license": {
+    "licenseId": "CC0-1.0",
+    "holder": "Ouroforge local fixtures",
+    "source": "audio-generation-v1"
+  }
+}

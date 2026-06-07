@@ -70,6 +70,7 @@ pub use loop_coverage_metric::*;
 pub mod asset_generation_proposal;
 pub mod evolve_campaign;
 pub mod generative_intake;
+pub mod audio_generation;
 pub use evolve_campaign::*;
 pub mod meta_progression;
 pub mod plugin_asset_metadata;
