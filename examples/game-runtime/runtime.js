@@ -98,6 +98,7 @@
     }),
   };
   const gridPuzzleModule = (typeof window !== 'undefined' && window.OuroforgeGridPuzzle) || null;
+  const uiuxFlowModule = (typeof window !== 'undefined' && window.OuroforgeUiuxFlow) || null;
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -150,6 +151,7 @@
     goalFlags: {},
     rng: { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 },
     gridPuzzle: null,
+    uiux: null,
     physics: {
       gravity: 1,
       maxFallSpeed: 8,
@@ -617,6 +619,7 @@
       componentDefaults,
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
       gridPuzzle: normalizeGridPuzzleSpec(scene.gridPuzzle),
+      uiux: normalizeUiuxFlowSpec(scene.uiux),
     };
   }
 
@@ -629,6 +632,17 @@
       throw new Error('grid puzzle scene requires the OuroforgeGridPuzzle module to be loaded');
     }
     return gridPuzzleModule.createState(spec);
+  }
+
+  // Build the initial UI/UX flow state for a scene, or null when the scene
+  // declares no flow. Malformed flow specs fail closed: the module throws a
+  // clear diagnostic that propagates out of loadScene.
+  function normalizeUiuxFlowSpec(spec) {
+    if (spec === undefined || spec === null) return null;
+    if (!uiuxFlowModule) {
+      throw new Error('uiux flow scene requires the OuroforgeUiuxFlow module to be loaded');
+    }
+    return uiuxFlowModule.createState(spec);
   }
 
   function normalizeCamera(camera = {}, index = 0, activeCameraId = null, bounds = defaultScene.bounds, fallbackRenderer = rendererState) {
@@ -1558,6 +1572,7 @@
     world.audioWarnings = [];
     world.vfxEvents = [];
     world.gridPuzzle = normalized.gridPuzzle ? clone(normalized.gridPuzzle) : null;
+    world.uiux = normalized.uiux ? clone(normalized.uiux) : null;
     world.tick = 0;
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
@@ -2045,6 +2060,9 @@
       state.gridPuzzle = world.gridPuzzle && gridPuzzleModule
         ? gridPuzzleModule.worldStateView(world.gridPuzzle)
         : null;
+      state.uiux = world.uiux && uiuxFlowModule
+        ? uiuxFlowModule.worldStateView(world.uiux)
+        : null;
       state.input = clone(input);
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
       state.actionInput = clone(actionInput);
@@ -2183,6 +2201,23 @@
     loadScene,
     reload,
     transition,
+    // In-game UI/UX flow navigation. Read-only with respect to trusted state:
+    // it advances the deterministic runtime flow and returns the probe view.
+    uiuxNavigate(action) {
+      if (!world.uiux || !uiuxFlowModule) return null;
+      world.uiux = uiuxFlowModule.navigate(world.uiux, action);
+      record('runtime.uiux.navigate', {
+        currentScreen: world.uiux.currentScreen,
+        accepted: world.uiux.lastNavigation ? world.uiux.lastNavigation.accepted : false,
+      });
+      return uiuxFlowModule.worldStateView(world.uiux);
+    },
+    uiuxSetAccessibility(optionId, value) {
+      if (!world.uiux || !uiuxFlowModule) return null;
+      world.uiux = uiuxFlowModule.setAccessibility(world.uiux, optionId, value);
+      record('runtime.uiux.accessibility', { optionId });
+      return uiuxFlowModule.worldStateView(world.uiux);
+    },
     whenReady() {
       return sceneReady;
     },

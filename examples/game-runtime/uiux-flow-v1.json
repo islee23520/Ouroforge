@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "uiux-flow-v1",
+  "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient",
+  "screens": [
+    { "id": "title", "kind": "menu" },
+    { "id": "onboarding", "kind": "onboarding" },
+    { "id": "hud", "kind": "hud" },
+    { "id": "settings", "kind": "settings" }
+  ],
+  "initialScreen": "title",
+  "transitions": [
+    { "from": "title", "action": "start", "to": "onboarding" },
+    { "from": "onboarding", "action": "next", "to": "hud" },
+    { "from": "hud", "action": "openSettings", "to": "settings" },
+    { "from": "settings", "action": "back", "to": "hud" },
+    { "from": "hud", "action": "quit", "to": "title" }
+  ],
+  "accessibilityOptions": [
+    { "id": "highContrast", "type": "toggle", "default": false },
+    { "id": "reduceMotion", "type": "toggle", "default": false },
+    { "id": "textScale", "type": "enum", "default": "medium", "values": ["small", "medium", "large"] }
+  ]
+}
