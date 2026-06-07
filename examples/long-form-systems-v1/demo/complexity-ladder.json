@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "complexity-ladder-gates-v1",
+  "ladderId": "long-form-systems-v1-demo",
+  "boundary": "Rust/local owns trusted state, gate evaluation, and evidence; generation is proposal-only; browser surfaces are read-only for inspection.",
+  "rungs": [
+    {
+      "order": 1,
+      "rungId": "meta-progression-v1",
+      "gameClass": "long-form-meta-progression",
+      "requiredCapabilities": ["meta-progression-state", "unlock-gating"],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "examples/long-form-systems-v1/demo/meta.definition.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "order": 2,
+      "rungId": "economy-system-v1",
+      "gameClass": "long-form-economy",
+      "requiredCapabilities": ["currency-ledger", "earn-spend-integrity"],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "examples/long-form-systems-v1/demo/economy.definition.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "order": 3,
+      "rungId": "save-profile-scale-v1",
+      "gameClass": "long-form-save-profile",
+      "requiredCapabilities": ["multi-profile-save", "run-history-integrity"],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "crates/ouroforge-core/tests/long_form_systems_demo_contract.rs",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    },
+    {
+      "order": 4,
+      "rungId": "uiux-flow-v1",
+      "gameClass": "long-form-uiux-flow",
+      "requiredCapabilities": ["uiux-flow", "accessibility-options"],
+      "capabilityGate": {
+        "claimedStatus": "satisfied",
+        "loopProducedDemo": true,
+        "demoRef": "examples/long-form-systems-v1/demo/uiux-flow.json",
+        "demoRefState": "current",
+        "fourGate": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "mechanical": "pass",
+          "runtime": "pass",
+          "visual": "pass",
+          "semantic": "pass"
+        },
+        "loopCoverage": {
+          "verdictRef": "docs/long-form-systems-v1-demo.md",
+          "verdictRefState": "current",
+          "status": "pass"
+        }
+      }
+    }
+  ]
+}

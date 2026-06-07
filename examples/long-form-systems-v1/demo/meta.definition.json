@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "meta-progression-v1",
+  "profileId": "demo-hero",
+  "counters": ["runsCompleted", "coinsEarned", "bossesDefeated"],
+  "unlocks": [
+    { "unlockId": "starter-kit", "counter": "runsCompleted", "threshold": 0 },
+    { "unlockId": "second-character", "counter": "runsCompleted", "threshold": 3 },
+    { "unlockId": "gold-shop", "counter": "coinsEarned", "threshold": 100 }
+  ],
+  "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "narrative-system-v1",
+  "storyId": "demo-hero",
+  "flags": ["metGuide", "tutorialDone"],
+  "initialNode": "intro",
+  "nodes": [
+    { "id": "intro", "setFlags": ["metGuide"], "next": "outro" },
+    { "id": "outro", "setFlags": ["tutorialDone"] }
+  ],
+  "events": [
+    { "id": "logTutorial", "when": [{ "flag": "tutorialDone", "equals": true }], "setFlags": [] }
+  ],
+  "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+}
