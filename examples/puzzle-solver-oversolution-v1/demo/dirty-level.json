@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1",
+  "id": "psos-demo-dirty-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "metadata": {
+    "gameClass": "grid-puzzle",
+    "note": "Fixture-scoped demo level for Puzzle Solver and Over-Solution Detection v1 (#1584). The crate is one push from the target, but the designer intended a 3-step path, so a strictly shorter unintended solution exists. The solver proves solvability; the over-solution detector surfaces the bypass as a replayable trace; the design-integrity gate FAILS this level."
+  },
+  "intent": {
+    "intendedSolution": ["down", "up", "left"],
+    "taughtMechanic": "push"
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "psos-demo-dirty",
+    "width": 5,
+    "height": 4,
+    "objects": {
+      "floor": { "role": "background" },
+      "wall": { "role": "solid" },
+      "player": { "role": "player" },
+      "crate": { "role": "pushable" },
+      "target": { "role": "target" }
+    },
+    "legend": {
+      "#": ["floor", "wall"],
+      ".": ["floor"],
+      "@": ["floor", "target"],
+      "*": ["floor", "crate"],
+      "P": ["floor", "player"]
+    },
+    "rows": ["#####", "#@*P#", "#...#", "#####"],
+    "win": { "type": "all-targets-covered" },
+    "lose": { "type": "none" },
+    "intendedSolution": ["down", "up", "left"]
+  }
+}
