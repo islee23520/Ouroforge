@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "evidence-marketplace-registry-v1",
+  "assetId": "proof-less-template-v1",
+  "templateRef": "templates/proof-less/template.json",
+  "acceptanceSuiteRef": "templates/proof-less/acceptance-suite.json",
+  "provenance": {
+    "schemaVersion": "provenance-bundle-v1",
+    "bundleId": "proof-less-template-provenance",
+    "changeId": "proof-less-template-publish",
+    "status": "complete",
+    "chainLinks": [
+      {
+        "kind": "intent-design-brief",
+        "ref": "refs/intent-design-brief.json",
+        "artifactId": "pl-intent-design-brief"
+      },
+      {
+        "kind": "generated-edited-artifact",
+        "ref": "refs/generated-artifact.json",
+        "artifactId": "pl-generated-artifact"
+      },
+      {
+        "kind": "validation-result",
+        "ref": "refs/validation-result.json",
+        "artifactId": "pl-validation-result"
+      },
+      {
+        "kind": "runtime-observation",
+        "ref": "refs/runtime-observation.json",
+        "artifactId": "pl-runtime-observation"
+      },
+      {
+        "kind": "evaluator-verdict",
+        "ref": "expected/proof-less-verdict.json",
+        "artifactId": "pl-evaluator-verdict"
+      },
+      {
+        "kind": "regression-comparison",
+        "ref": "refs/regression-comparison.json",
+        "artifactId": "pl-regression-comparison"
+      },
+      {
+        "kind": "journal-review-decision",
+        "ref": "refs/journal-review-decision.json",
+        "artifactId": "pl-journal-review-decision"
+      },
+      {
+        "kind": "promotion-rollback-record",
+        "ref": "refs/promotion-rollback-record.json",
+        "artifactId": "pl-promotion-rollback-record"
+      }
+    ],
+    "generatedState": {
+      "generated": true,
+      "tracked": true,
+      "fixtureScoped": true
+    },
+    "boundary": "Read-only audit and replay over local fixture evidence only.",
+    "guardrails": [
+      "Rust/local owns the trusted verification decision.",
+      "No promotion, auto-approval, merge, or command execution is performed."
+    ]
+  },
+  "generatedState": {
+    "generated": false,
+    "tracked": true,
+    "fixtureScoped": true
+  },
+  "boundary": "Local verifiable-asset registry fixture missing its replay proof; must be rejected.",
+  "guardrails": [
+    "Local publish/consume only; hosted/paid stays DEFER until a #1508 Layer-3 GO.",
+    "#1 remains open.",
+    "#23 remains open."
+  ]
+}
