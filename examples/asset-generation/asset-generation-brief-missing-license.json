@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.asset-generation-proposal.v1",
+  "briefId": "asset-brief-missing-license-v1",
+  "title": "Unlicensed tileset",
+  "description": "A 64x64 dungeon tileset with no license recorded.",
+  "assetKind": "tileset",
+  "assetId": "dungeon-tiles",
+  "format": "png",
+  "width": 64,
+  "height": 64,
+  "license": {
+    "license": "",
+    "source": "generator=asset-generation-proposal-v1; prompt=dungeon tileset; upstream=unknown",
+    "allowedSource": true
+  }
+}

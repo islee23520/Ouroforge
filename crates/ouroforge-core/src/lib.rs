@@ -67,6 +67,7 @@ pub mod trust_gradient_auto_apply;
 pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
+pub mod asset_generation_proposal;
 pub mod evolve_campaign;
 pub mod generative_intake;
 pub use evolve_campaign::*;
