@@ -1,0 +1,66 @@
+title Malformed Missing CollisionLayer Import
+
+(Malformed PuzzleScript-compatible input for the Grid-Puzzle Game Class v1 DSL
+ingest contract test (#1575). The level uses Wall, but Wall is omitted from
+COLLISIONLAYERS, so its render/collision layer is undeclared. Ingest must reject
+it fail-closed with a clear diagnostic rather than silently assigning a default
+layer and lowering an under-specified spec.)
+
+========
+OBJECTS
+========
+
+Background
+lightgreen
+
+Wall
+brown
+
+Player
+black
+
+Crate
+orange
+
+Target
+yellow
+
+=======
+LEGEND
+=======
+
+. = Background
+# = Wall and Background
+P = Player and Background
+* = Crate and Background
+@ = Target and Background
+
+================
+COLLISIONLAYERS
+================
+
+Background
+Target
+Player, Crate
+
+======
+RULES
+======
+
+[ > Player | Crate ] -> [ > Player | > Crate ]
+
+==============
+WINCONDITIONS
+==============
+
+All Target on Crate
+
+=======
+LEVELS
+=======
+
+######
+#@...#
+#.*P.#
+#....#
+######

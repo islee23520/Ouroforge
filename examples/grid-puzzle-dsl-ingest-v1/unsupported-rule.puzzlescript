@@ -1,0 +1,66 @@
+title Unsupported Rule Sokoban Import
+
+(Well-formed PuzzleScript-compatible input that uses a construct outside the
+supported compatible subset, for the Grid-Puzzle Game Class v1 DSL ingest
+contract test (#1575). The RULES section declares a position-swap rule instead
+of the canonical force-push rule. Ingest must reject it with an explicit
+unsupported-construct diagnostic rather than guess at its semantics.)
+
+========
+OBJECTS
+========
+
+Background
+lightgreen
+
+Wall
+brown
+
+Player
+black
+
+Crate
+orange
+
+Target
+yellow
+
+=======
+LEGEND
+=======
+
+. = Background
+# = Wall and Background
+P = Player and Background
+* = Crate and Background
+@ = Target and Background
+
+================
+COLLISIONLAYERS
+================
+
+Background
+Target
+Player, Wall, Crate
+
+======
+RULES
+======
+
+[ Player | Crate ] -> [ Crate | Player ]
+
+==============
+WINCONDITIONS
+==============
+
+All Target on Crate
+
+=======
+LEVELS
+=======
+
+######
+#@...#
+#.*P.#
+#....#
+######

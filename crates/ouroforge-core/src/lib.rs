@@ -87,6 +87,7 @@ pub mod source_apply_highrisk_blocker;
 pub mod trust_gradient_risk_tier;
 pub mod uiux_flow;
 pub use source_apply_highrisk_blocker::*;
+pub mod grid_puzzle_dsl_ingest;
 pub mod performance_soak;
 pub mod plugin_evidence;
 pub mod plugin_extension_catalog;

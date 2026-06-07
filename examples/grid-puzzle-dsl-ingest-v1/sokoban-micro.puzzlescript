@@ -1,0 +1,92 @@
+title Sokoban Micro Import
+author Ouroforge Era F Milestone 27
+
+(A fixture-scoped, PuzzleScript-compatible block-pushing micro level used by the
+Grid-Puzzle Game Class v1 DSL ingest contract test (#1575). It exercises the
+canonical Sokoban shape: a single player, one crate, one target, walls, and the
+canonical push rule. It is not a generated artifact and makes no quality claim.)
+
+========
+OBJECTS
+========
+
+Background
+lightgreen
+
+Wall
+brown darkbrown
+00010
+11111
+01000
+11111
+00010
+
+Player
+black orange white blue
+.000.
+.111.
+22222
+.333.
+.3.3.
+
+Crate
+orange yellow
+00000
+0...0
+0...0
+0...0
+00000
+
+Target
+darkblue
+.....
+.000.
+.0.0.
+.000.
+.....
+
+=======
+LEGEND
+=======
+
+. = Background
+# = Wall and Background
+P = Player and Background
+* = Crate and Background
+@ = Target and Background
+
+=======
+SOUNDS
+=======
+
+Crate MOVE 36772507
+
+================
+COLLISIONLAYERS
+================
+
+Background
+Target
+Player, Wall, Crate
+
+======
+RULES
+======
+
+[ > Player | Crate ] -> [ > Player | > Crate ]
+
+==============
+WINCONDITIONS
+==============
+
+All Target on Crate
+
+=======
+LEVELS
+=======
+
+######
+#@...#
+#.*P.#
+#....#
+######
