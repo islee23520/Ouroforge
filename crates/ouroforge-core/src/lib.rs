@@ -101,6 +101,7 @@ pub mod qa_performance_budget;
 pub mod qa_playtest_demo;
 pub mod qa_regression_coverage;
 pub mod qa_run_matrix;
+pub mod visual_regression_scale;
 pub mod runtime_frame_budget;
 pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,

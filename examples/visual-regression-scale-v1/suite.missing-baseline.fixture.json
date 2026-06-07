@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "visual-regression-scale-v1",
+  "suiteId": "vrs-missing-001",
+  "status": "partial",
+  "gameBuildRef": "runs/build-collect-and-exit-003",
+  "baselineSetRef": "examples/visual-comparison-evidence-v1",
+  "screens": [
+    {
+      "screenId": "title",
+      "contentVariant": "base",
+      "outcome": "unchanged",
+      "visualEvidenceRef": "examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json",
+      "evidenceRefs": ["runs/vrs/title-base/cmp.json"]
+    },
+    {
+      "screenId": "new-shop",
+      "contentVariant": "base",
+      "outcome": "missing_screenshot",
+      "visualEvidenceRef": "examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json",
+      "evidenceRefs": []
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["screen", "contentVariant", "outcome"]
+  },
+  "boundary": "Visual regression screens are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; reuses the visual gate with no new comparison engine."
+}

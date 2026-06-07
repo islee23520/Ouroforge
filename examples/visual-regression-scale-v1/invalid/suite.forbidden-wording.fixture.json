@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "visual-regression-scale-v1",
+  "suiteId": "vrs-forbidden-wording",
+  "status": "complete",
+  "gameBuildRef": "runs/build-x",
+  "baselineSetRef": "examples/visual-comparison-evidence-v1",
+  "screens": [
+    {
+      "screenId": "hud",
+      "contentVariant": "base",
+      "outcome": "unchanged",
+      "visualEvidenceRef": "examples/visual-comparison-evidence-v1/visual-comparison-unchanged.sample.json",
+      "evidenceRefs": ["runs/vrs/a.json"]
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["outcome"] },
+  "boundary": "evidence inputs, not trusted truth; auto-merge enabled on green; review-gated; read-only or draft-only; reuses the visual gate"
+}
