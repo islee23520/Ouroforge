@@ -1041,6 +1041,65 @@ The recommended next milestone is not expanded by this completion; any later Era
 F rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Puzzle Solver and Over-Solution Detection v1 governance refresh
+
+Puzzle Solver and Over-Solution Detection v1 (Era F Milestone 28 under #1) has
+realized its moat capability on merged evidence: for an authored grid-puzzle
+level, the deterministic verification loop can prove the level has **exactly its
+intended solution**. Solvability is table stakes; the load-bearing deliverable
+is over-solution detection, which surfaces any unintended shortcut as a
+**replayable counterexample trace** ("watch the bypass") rather than a "trust
+me". This is structurally possible only because the grid-puzzle runtime
+(Milestone 27, #1574) is deterministic and fully observable.
+
+The merged evidence chain is the scope/contract #1579
+(`docs/puzzle-solver-oversolution-v1.md`, PR #1622); the Deterministic
+Grid-Puzzle Solver v1 #1580 (`crates/ouroforge-core/src/puzzle_solver.rs`,
+PR #1677) — bounded breadth-first search returning solvable with a replayable
+witness, unsolvable only after full exploration, or bounded-search exhaustion
+reported explicitly (never a false negative); the Designer Intent Capture and
+Over-Solution Detector v1 #1581 (`puzzle_oversolution.rs`, PR #1708) — validated
+intent capture and an exhaustive search for every distinct shorter unintended
+solution, each a replayable trace, with no false positive on single-solution
+levels and fail-closed on missing intent; the Difficulty Metric Artifact v1
+#1582 (`puzzle_difficulty_metric.rs`, PR #1715) — solution length, branching
+factor, dead-end density, and mechanic-introduction order computed from
+solver/detector evidence (fail-closed on stale evidence), descriptive
+measurement only; the Solver and Over-Solution Detection Demo v1 #1584
+(`docs/puzzle-solver-oversolution-v1-demo.md`, PR #1722) — a deterministic
+fixture-scoped demo where a dirty level's over-solution is caught with a trace
+and the gate fails it while a clean level passes; and Scenario Coverage v28 #1585
+(`docs/scenario-coverage-v28.md`, PR #1724) — an enumerated solver / detector /
+difficulty / design-integrity-gate regression matrix plus a four-gate
+`declared-gate-and` backward-compatibility golden.
+
+The realized design-integrity gate verdict — *intent satisfied AND no unintended
+over-solution* — composes via the existing evaluator `declared-gate-and`
+aggregation and is demonstrated end to end (#1584) and regression-covered
+(#1585). The **remaining gap** is the Design-Integrity Gate v1 #1583, which
+formalizes that gate as a declared gate inside the evaluator; it is **still open**
+and Milestone 28 is therefore recorded as *substantially complete, gate
+integration pending* rather than fully complete. No milestone is marked complete
+ahead of merged evidence.
+
+The boundaries stay explicit and reaffirmed. The solver, detector, difficulty
+metric, and gate semantics are owned by **Rust/local** and operate **over the
+existing** `ouroforge.grid-puzzle.v1` state model and runtime — no new engine,
+runtime, writer, or parallel evaluator. Detection, measurement, and gating only:
+there is **no auto-fix** of detected over-solutions. The metrics are descriptive
+and carry no difficulty, quality, fun, production-readiness, or Godot
+replacement/parity claim. Generation stays proposal-only through the existing
+review/apply/trust-gradient path; browser/Studio surfaces remain read-only;
+existing runtime/probe/evaluator four-gate aggregation contracts remain
+backward-compatible; generated runs/evidence remain ignored unless explicitly
+fixture-scoped; Layer-3 distributed orchestration / Elixir remains NO-GO under
+ADR #92 and deferred under #1508. #1 and #23 remain open governance anchors.
+
+The recommended next step within Milestone 28 is to land the Design-Integrity
+Gate v1 #1583; no later Era F rung is expanded by this refresh, and each requires
+its own scope issue with explicit non-goals, regression coverage, generated-state
+audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Foundation Hardening v1 governance refresh
 
 Foundation Hardening v1 is recorded as **complete for Milestone A.H**, closing
