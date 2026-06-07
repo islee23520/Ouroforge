@@ -128,6 +128,21 @@ a parallel evaluator. When the level declares no design-integrity evidence the
 gate stays neutral, exactly as the existing four gates do for undeclared
 evidence.
 
+The gate is implemented (#1583) as
+`ouroforge_evaluator::design_integrity_gate`: a declared-evidence gate that
+consumes the over-solution detector's result (intent-satisfaction,
+over-solution count, and whether the bounded search was exhausted) and emits a
+verdict ANDed into the existing aggregation via
+`compose_design_integrity_into_categories`. Because `ouroforge-core` depends on
+the evaluator crate, the detector cannot live in the evaluator; the gate instead
+consumes the detector's declared result evidence, mirroring how the visual gate
+consumes a precomputed `compare` artifact. The gate **fails closed**: malformed
+evidence, an unsatisfiable captured intent, any over-solution, or a bounded
+search that was exhausted before the shorter-solution space was fully explored
+(`Inconclusive`) all block — an exhausted search is never coerced into a pass.
+The gate performs no trusted write, auto-apply, or auto-fix of detected
+over-solutions; detection, measurement, and gating only.
+
 ## Evidence and provenance
 
 All solver verdicts, detector counterexamples, difficulty artifacts, and gate

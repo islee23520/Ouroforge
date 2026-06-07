@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.design-integrity-gate.v1",
+  "levelId": "grid-puzzle-scene-v1",
+  "scenarioId": "scene-grid-puzzle",
+  "intentSatisfied": true,
+  "intendedLength": 6,
+  "overSolutionCount": 0,
+  "searchExhausted": false,
+  "evidenceRefs": []
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "ouroforge.design-integrity-gate.v1",
+  "levelId": "grid-puzzle-oversolution-v1",
+  "scenarioId": "scene-grid-puzzle-oversolution",
+  "intentSatisfied": true,
+  "intendedLength": 6,
+  "overSolutionCount": 1,
+  "searchExhausted": false,
+  "evidenceRefs": [
+    "runs/run-322/evidence/design-integrity/grid-puzzle-oversolution-v1.report.json",
+    "runs/run-322/evidence/design-integrity/grid-puzzle-oversolution-v1.counterexample-0.json"
+  ]
+}
