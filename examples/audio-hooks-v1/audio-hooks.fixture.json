@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "audio-hooks-v1",
+  "hookSet": {
+    "schemaVersion": "audio-hooks-v1",
+    "hooks": [
+      {
+        "hookId": "ambient-loop",
+        "priority": 1,
+        "when": { "kind": "always" },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "ambient-loop",
+          "targetEntityId": "music-bus",
+          "intent": "ambient_loop"
+        }
+      },
+      {
+        "hookId": "combat-music",
+        "priority": 10,
+        "when": { "kind": "numberAtLeast", "signal": "enemyCount", "threshold": 1 },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "combat-music",
+          "targetEntityId": "music-bus",
+          "intent": "music_combat"
+        }
+      },
+      {
+        "hookId": "low-health-sting",
+        "priority": 20,
+        "when": { "kind": "numberBelow", "signal": "playerHealth", "threshold": 25 },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "low-health-sting",
+          "targetEntityId": "sfx-bus",
+          "intent": "sfx_low_health"
+        }
+      },
+      {
+        "hookId": "boss-theme",
+        "priority": 30,
+        "when": { "kind": "flagEquals", "flag": "bossActive", "value": "true" },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "boss-theme",
+          "targetEntityId": "music-bus",
+          "intent": "music_boss"
+        }
+      },
+      {
+        "hookId": "checkpoint-jingle",
+        "priority": 15,
+        "when": { "kind": "eventPresent", "event": "checkpoint_reached" },
+        "emit": {
+          "behaviorId": "adaptive-audio",
+          "actionId": "checkpoint-jingle",
+          "targetEntityId": "sfx-bus",
+          "intent": "sfx_checkpoint"
+        }
+      }
+    ]
+  },
+  "signalSequence": [
+    {
+      "label": "calm",
+      "flags": {},
+      "numbers": { "enemyCount": 0, "playerHealth": 100 },
+      "events": [],
+      "expectedIntents": ["ambient_loop"]
+    },
+    {
+      "label": "combat",
+      "flags": {},
+      "numbers": { "enemyCount": 3, "playerHealth": 80 },
+      "events": [],
+      "expectedIntents": ["music_combat", "ambient_loop"]
+    },
+    {
+      "label": "checkpoint-during-combat",
+      "flags": {},
+      "numbers": { "enemyCount": 2, "playerHealth": 60 },
+      "events": ["checkpoint_reached"],
+      "expectedIntents": ["sfx_checkpoint", "music_combat", "ambient_loop"]
+    },
+    {
+      "label": "boss-low-health",
+      "flags": { "bossActive": "true" },
+      "numbers": { "enemyCount": 1, "playerHealth": 15 },
+      "events": [],
+      "expectedIntents": ["music_boss", "sfx_low_health", "music_combat", "ambient_loop"]
+    }
+  ]
+}

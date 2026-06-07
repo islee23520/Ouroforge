@@ -73,6 +73,7 @@ pub mod audio_generation;
 pub mod audio_qa;
 pub mod evolve_campaign;
 pub mod generative_intake;
+pub mod audio_hooks;
 pub use evolve_campaign::*;
 pub mod economy_system;
 pub mod meta_progression;
