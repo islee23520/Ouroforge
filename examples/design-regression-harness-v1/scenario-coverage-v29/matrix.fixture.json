@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "scenario-coverage-v29-design-regression-matrix-v1",
+  "issue": 1590,
+  "note": "Fixture-scoped regression matrix for Design Regression Harness v1 (#1587 Era F Milestone 29).",
+  "harnessCases": [
+    {
+      "id": "V29.harness.regression",
+      "harness": "examples/game-runtime/design-regression-harness-v1.json",
+      "levelId": "level-newly-broken",
+      "expectedOutcome": "newly-broken",
+      "expectsTrace": true,
+      "trace": [
+        "left"
+      ],
+      "overallVerdict": "regressed",
+      "promotionBlocked": true
+    },
+    {
+      "id": "V29.harness.improved",
+      "harness": "examples/game-runtime/design-regression-harness-v1.json",
+      "levelId": "level-improved",
+      "expectedOutcome": "improved",
+      "expectsTrace": false
+    },
+    {
+      "id": "V29.harness.unchanged",
+      "harness": "examples/game-runtime/design-regression-harness-v1.json",
+      "levelId": "level-unchanged",
+      "expectedOutcome": "unchanged",
+      "expectsTrace": false
+    },
+    {
+      "id": "V29.harness.stale",
+      "harness": "examples/game-runtime/design-regression-harness-stale-v1.json",
+      "levelId": "level-stale-baseline",
+      "expectedOutcome": "inconclusive",
+      "expectsTrace": false,
+      "overallVerdict": "inconclusive"
+    }
+  ],
+  "backwardCompat": {
+    "spec": "examples/game-runtime/grid-puzzle-scene-v1.json",
+    "maxStates": 200000,
+    "expected": "solvable"
+  },
+  "wordingAudit": {
+    "doc": "docs/scenario-coverage-v29.md",
+    "anchors": [
+      "#1",
+      "#23",
+      "fixture-scoped",
+      "read-only"
+    ]
+  }
+}
