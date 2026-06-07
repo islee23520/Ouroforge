@@ -121,6 +121,25 @@ impl GridState {
         evaluate_win(self)
     }
 
+    /// Sorted positions of every pushable on the grid. Together with the player
+    /// position this is the dynamic part of the state; static geometry never
+    /// moves. Callers (e.g. the over-solution detector) use it to key states.
+    pub fn pushable_positions(&self) -> Vec<(usize, usize)> {
+        let mut pushables = Vec::new();
+        for (y, row) in self.cells.iter().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
+                if cell
+                    .iter()
+                    .any(|object| self.role_of(object) == Some("pushable"))
+                {
+                    pushables.push((x, y));
+                }
+            }
+        }
+        pushables.sort_unstable();
+        pushables
+    }
+
     fn role_of(&self, object: &str) -> Option<&str> {
         self.role_by_object
             .iter()
@@ -413,19 +432,10 @@ fn advance(state: &mut GridState, direction: &str) {
 /// position plus the sorted set of pushable positions. Static geometry (solids,
 /// targets, background) never changes, so it is excluded from the visited key.
 fn search_key(state: &GridState) -> (usize, Vec<(usize, usize)>) {
-    let mut pushables = Vec::new();
-    for (y, row) in state.cells.iter().enumerate() {
-        for (x, cell) in row.iter().enumerate() {
-            if cell
-                .iter()
-                .any(|object| state.role_of(object) == Some("pushable"))
-            {
-                pushables.push((x, y));
-            }
-        }
-    }
-    pushables.sort_unstable();
-    (state.player.1 * state.width + state.player.0, pushables)
+    (
+        state.player.1 * state.width + state.player.0,
+        state.pushable_positions(),
+    )
 }
 
 /// Deterministic bounded breadth-first solve over a validated initial state.

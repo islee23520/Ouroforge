@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ouroforge.over-solution-report.v1",
+  "note": "Fixture-scoped sample over-solution detector output for grid-puzzle-oversolution-v1.json (#1581). The designer intended a 3-step path, but the level can be won in a single push; the detector surfaces that shorter solution as a replayable counterexample trace. Replay [\"left\"] on the runtime to watch the bypass.",
+  "level": "grid-puzzle-oversolution-v1",
+  "intendedLength": 3,
+  "counterexamples": [
+    {
+      "kind": "shorter-than-intended",
+      "trace": ["left"],
+      "length": 1,
+      "exercisesMechanic": true
+    }
+  ]
+}

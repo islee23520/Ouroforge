@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1",
+  "id": "grid-puzzle-oversolution-micro-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "metadata": {
+    "gameClass": "grid-puzzle",
+    "note": "Fixture-scoped grid-puzzle scene for the over-solution detector (#1581). The crate sits one push away from the target, so the level can be won in a single move; the designer's intended solution is a longer scenic path, so a strictly shorter unintended solution exists and must be surfaced as a replayable counterexample."
+  },
+  "intent": {
+    "intendedSolution": ["down", "up", "left"],
+    "taughtMechanic": "push"
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "sokoban-oversolution-micro-v1",
+    "width": 5,
+    "height": 4,
+    "objects": {
+      "floor": { "role": "background" },
+      "wall": { "role": "solid" },
+      "player": { "role": "player" },
+      "crate": { "role": "pushable" },
+      "target": { "role": "target" }
+    },
+    "legend": {
+      "#": ["floor", "wall"],
+      ".": ["floor"],
+      "@": ["floor", "target"],
+      "*": ["floor", "crate"],
+      "P": ["floor", "player"]
+    },
+    "rows": [
+      "#####",
+      "#@*P#",
+      "#...#",
+      "#####"
+    ],
+    "win": { "type": "all-targets-covered" },
+    "lose": { "type": "none" },
+    "intendedSolution": ["down", "up", "left"]
+  }
+}
