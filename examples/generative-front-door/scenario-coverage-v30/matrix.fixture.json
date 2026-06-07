@@ -15,7 +15,8 @@
     "unverified": "examples/generative-front-door/generative-accessibility-unverified-brief-v1.json"
   },
   "backwardCompat": {
-    "trustGradientDoc": "docs/trust-gradient-audit-v1.md"
+    "trustGradientDoc": "docs/trust-gradient-design.md",
+    "trustGradientAuditFixture": "examples/trust-gradient-v1/fixtures/audit-log-complete.json"
   },
   "wordingAudit": {
     "doc": "docs/scenario-coverage-v30.md",

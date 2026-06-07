@@ -1,5 +1,12 @@
 {
   "schemaVersion": "compare-backward-compat-v32",
   "fixtureScoped": true,
+  "surface": "evolve compare",
+  "runKind": "non-balance",
+  "status": "unchanged",
+  "balanceTelemetryRequired": false,
+  "evidenceRefs": [
+    "docs/run-comparison-v2.md"
+  ],
   "note": "compare surface unchanged for non-balance runs"
 }

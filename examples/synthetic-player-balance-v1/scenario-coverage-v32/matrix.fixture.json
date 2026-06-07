@@ -2,6 +2,29 @@
   "schemaVersion": "scenario-coverage-v32-synthetic-player-balance-matrix-v1",
   "issue": 1610,
   "personaContract": "crates/ouroforge-core/tests/synthetic_player_agents_contract.rs",
+  "runtimeFixtures": {
+    "deckBalanceScene": "examples/game-runtime/deck-roguelike-balance-scene-v1.json",
+    "personas": "examples/game-runtime/synthetic-player-personas-v1.json"
+  },
+  "expectedPersonaDigest": {
+    "personaId": "balanced-veteran",
+    "digest": "persona=balanced-veteran|skill=70|aggro=50|outcome=won|turn=3|actions=7|budget=0|rng=20:1703683439:15|turn=3|status=won|php=5|pbl=0|ehp=0|hand=defend,strike,strike,bash|draw=strike,strike,defend|discard=bash"
+  },
+  "telemetryEvidence": {
+    "doc": "docs/synthetic-player-balance-v1.md",
+    "signals": [
+      "pick-rate",
+      "win-deck inclusion",
+      "degenerate-combo flags",
+      "dead-item flags",
+      "difficulty curve"
+    ],
+    "readOnlyBoundary": [
+      "descriptive observations",
+      "read-only",
+      "never an auto-applied nerf"
+    ]
+  },
   "compareGolden": "examples/synthetic-player-balance-v1/scenario-coverage-v32/compare-backward-compat.golden.json",
   "wordingAudit": {
     "doc": "docs/scenario-coverage-v32.md",

@@ -14,10 +14,15 @@
       "left",
       "up"
     ],
+    "nonWinningReplay": [
+      "left",
+      "left"
+    ],
     "oversolution": "examples/game-runtime/grid-puzzle-oversolution-v1.json"
   },
   "backwardCompat": {
-    "platformer": "examples/game-runtime/scene.json"
+    "platformer": "examples/game-runtime/scene.json",
+    "collectAndExit": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json"
   },
   "wordingAudit": {
     "doc": "docs/scenario-coverage-v27.md",
