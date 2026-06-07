@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ouroforge.synthetic-player-personas.v1",
+  "metadata": {
+    "note": "Fixture-scoped synthetic player persona roster for Synthetic Player Persona Agents v1 (#1606). Human-like (skill, aggression) personas that drive the existing deck-roguelike probe (#1601) deterministically; not win-maximizers. Skill 0-100 governs misplay/fumble rate; aggression 0-100 governs attack-vs-block style. Seeded persona decision stream is independent of the deck shuffle stream."
+  },
+  "budget": { "maxTurns": 40, "maxActions": 400 },
+  "personas": [
+    { "id": "cautious-novice", "skill": 20, "aggression": 25, "seed": 1 },
+    { "id": "reckless-novice", "skill": 20, "aggression": 90, "seed": 2 },
+    { "id": "balanced-veteran", "skill": 70, "aggression": 50, "seed": 3 },
+    { "id": "aggressive-expert", "skill": 95, "aggression": 95, "seed": 4 },
+    { "id": "defensive-expert", "skill": 95, "aggression": 5, "seed": 5 }
+  ]
+}

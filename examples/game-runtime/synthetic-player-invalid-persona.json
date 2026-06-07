@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.synthetic-player-personas.v1",
+  "metadata": {
+    "note": "Fixture-scoped malformed persona roster for Synthetic Player Persona Agents v1 (#1606): an out-of-range skill must fail closed with a clear diagnostic."
+  },
+  "budget": { "maxTurns": 40, "maxActions": 400 },
+  "personas": [
+    { "id": "broken-persona", "skill": 200, "aggression": 50, "seed": 7 }
+  ]
+}
