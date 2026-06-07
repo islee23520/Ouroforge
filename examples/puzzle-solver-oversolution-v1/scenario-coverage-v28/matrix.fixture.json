@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "scenario-coverage-v28-puzzle-solver-matrix-v1",
+  "issue": 1585,
+  "note": "Fixture-scoped regression matrix for Puzzle Solver and Over-Solution Detection v1 (#1579 Era F Milestone 28). Asserts states/shapes only; no flaky or timing assertions. Reuses the level and evidence fixtures committed by #1580/#1581/#1582.",
+  "solverCases": [
+    { "id": "V28.solver.solvable", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "maxStates": 200000, "expected": "solvable" },
+    { "id": "V28.solver.unsolvable", "spec": "examples/game-runtime/grid-puzzle-unsolvable-v1.json", "maxStates": 200000, "expected": "unsolvable" },
+    { "id": "V28.solver.exhausted", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "maxStates": 2, "expected": "exhausted" }
+  ],
+  "detectorCases": [
+    { "id": "V28.detector.detected", "spec": "examples/game-runtime/grid-puzzle-oversolution-v1.json", "intent": "fromScene", "expected": "over-solution" },
+    { "id": "V28.detector.none", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "intent": { "intendedSolution": ["left", "down", "left", "up"], "taughtMechanic": "push" }, "expected": "clean" },
+    { "id": "V28.detector.missing-intent", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "intent": {}, "expected": "fail-closed" }
+  ],
+  "difficultyCases": [
+    { "id": "V28.difficulty.known", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "evidence": "examples/game-runtime/grid-puzzle-difficulty-evidence-v1.json", "expected": "computed", "solutionLength": 4, "mechanicOrder": ["push", "move"] },
+    { "id": "V28.difficulty.stale", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "evidence": "examples/game-runtime/grid-puzzle-difficulty-evidence-stale-v1.json", "expected": "fail-closed" }
+  ],
+  "gateCases": [
+    { "id": "V28.gate.fail", "spec": "examples/game-runtime/grid-puzzle-oversolution-v1.json", "intent": "fromScene", "expected": "fail" },
+    { "id": "V28.gate.pass", "spec": "examples/game-runtime/grid-puzzle-scene-v1.json", "intent": { "intendedSolution": ["left", "down", "left", "up"], "taughtMechanic": "push" }, "expected": "pass" }
+  ],
+  "compatibility": {
+    "fourGateGolden": "compatibility/four-gate-aggregation.golden.json"
+  },
+  "wordingAudit": {
+    "forbiddenClaims": ["auto-merge", "production-ready", "Godot replacement", "Godot parity", "good game", "fun game", "shippable"],
+    "note": "v28 coverage asserts deterministic states and shapes; it makes no quality, fun, production, or Godot-parity claim, and performs no auto-fix of detected over-solutions."
+  }
+}

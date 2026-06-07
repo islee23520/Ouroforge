@@ -1,0 +1,7 @@
+{
+  "mechanical": { "declared": true, "status": "pass", "resultCount": 1, "failureCount": 0 },
+  "runtime": { "declared": false, "status": "pass", "resultCount": 0, "failureCount": 0 },
+  "visual": { "declared": true, "status": "pass", "resultCount": 1, "failureCount": 0 },
+  "semantic": { "declared": false, "status": "pass", "resultCount": 0, "failureCount": 0 },
+  "aggregation": { "operator": "declared-gate-and", "undeclaredGatePolicy": "neutral" }
+}
