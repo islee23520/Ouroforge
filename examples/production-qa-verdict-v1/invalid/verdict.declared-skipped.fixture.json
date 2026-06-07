@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-declared-skipped",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-x",
+  "checks": [
+    {
+      "checkId": "c1",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "skipped",
+      "evidenceRef": "runs/pqv/a.json"
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["kind"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only; composes existing checks"
+}

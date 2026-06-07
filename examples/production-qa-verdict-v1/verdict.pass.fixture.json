@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-pass-001",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-collect-and-exit-001",
+  "checks": [
+    {
+      "checkId": "chk-matrix",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/production-qa-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqv/matrix.json"]
+    },
+    {
+      "checkId": "chk-visual",
+      "kind": "visualRegression",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/visual-regression-scale-v1/suite.match.fixture.json",
+      "evidenceRefs": ["runs/pqv/visual.json"]
+    },
+    {
+      "checkId": "chk-perf",
+      "kind": "performanceSoak",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/performance-soak-v1/suite.budget-pass.fixture.json",
+      "evidenceRefs": ["runs/pqv/perf.json"]
+    },
+    {
+      "checkId": "chk-crash",
+      "kind": "crash",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/qa-error-classifier-v1/classifier.clean.fixture.json",
+      "evidenceRefs": ["runs/pqv/crash.json"]
+    },
+    {
+      "checkId": "chk-flaky",
+      "kind": "flaky",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/qa-flake-rerun-policy-v1/policy.stable.fixture.json",
+      "evidenceRefs": ["runs/pqv/flaky.json"]
+    },
+    {
+      "checkId": "chk-accessibility",
+      "kind": "accessibility",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "runs/pqv/accessibility/report.json",
+      "evidenceRefs": ["runs/pqv/accessibility.json"]
+    },
+    {
+      "checkId": "chk-assetux",
+      "kind": "assetUx",
+      "declared": false,
+      "status": "skipped"
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["kind", "declared", "status"]
+  },
+  "boundary": "Consolidated checks are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; composes existing checks via declared-gate-and with no new evaluator."
+}

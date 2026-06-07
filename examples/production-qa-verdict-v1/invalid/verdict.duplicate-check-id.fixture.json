@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-duplicate-check-id",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-x",
+  "checks": [
+    {
+      "checkId": "c1",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "pass",
+      "evidenceRef": "runs/pqv/a.json"
+    },
+    {
+      "checkId": "c1",
+      "kind": "visualRegression",
+      "declared": true,
+      "status": "pass",
+      "evidenceRef": "runs/pqv/b.json"
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["kind"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only; composes existing checks"
+}

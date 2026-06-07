@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-stale-no-blocker",
+  "status": "stale",
+  "verdict": "blocked",
+  "gameBuildRef": "runs/build-x",
+  "checks": [
+    {
+      "checkId": "c1",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "pass",
+      "evidenceRef": "runs/pqv/a.json"
+    }
+  ],
+  "staleEvidenceRefs": ["runs/pqv/a.json"],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["kind"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only; composes existing checks"
+}

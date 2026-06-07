@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-unknown-kind",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-x",
+  "checks": [
+    {
+      "checkId": "c1",
+      "kind": "fuzzing",
+      "declared": true,
+      "status": "pass",
+      "evidenceRef": "runs/pqv/a.json"
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["kind"] },
+  "boundary": "evidence inputs, not trusted truth; no auto-fix; review-gated; read-only or draft-only; composes existing checks"
+}

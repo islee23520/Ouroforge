@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-fail-001",
+  "status": "complete",
+  "verdict": "fail",
+  "gameBuildRef": "runs/build-collect-and-exit-002",
+  "checks": [
+    {
+      "checkId": "chk-matrix",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/production-qa-matrix-v1/matrix.complete.fixture.json",
+      "evidenceRefs": ["runs/pqv/matrix.json"]
+    },
+    {
+      "checkId": "chk-visual",
+      "kind": "visualRegression",
+      "declared": true,
+      "status": "fail",
+      "failureCount": 1,
+      "evidenceRef": "examples/visual-regression-scale-v1/suite.diff.fixture.json",
+      "evidenceRefs": ["runs/pqv/visual.json"]
+    },
+    {
+      "checkId": "chk-crash",
+      "kind": "crash",
+      "declared": true,
+      "status": "pass",
+      "failureCount": 0,
+      "evidenceRef": "examples/qa-error-classifier-v1/classifier.clean.fixture.json",
+      "evidenceRefs": ["runs/pqv/crash.json"]
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["kind", "declared", "status"]
+  },
+  "boundary": "Consolidated checks are evidence inputs, not trusted truth; no auto-fix or auto-apply; review-gated; dashboards and Studio stay read-only or draft-only; composes existing checks via declared-gate-and with no new evaluator."
+}

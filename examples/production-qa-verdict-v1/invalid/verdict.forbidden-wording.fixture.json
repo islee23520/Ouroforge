@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "production-qa-verdict-v1",
+  "verdictId": "pqv-forbidden-wording",
+  "status": "complete",
+  "verdict": "pass",
+  "gameBuildRef": "runs/build-x",
+  "checks": [
+    {
+      "checkId": "c1",
+      "kind": "regressionMatrix",
+      "declared": true,
+      "status": "pass",
+      "evidenceRef": "runs/pqv/a.json"
+    }
+  ],
+  "dashboardCompat": { "readOnly": true, "surface": "evidence-dashboard", "columns": ["kind"] },
+  "boundary": "evidence inputs, not trusted truth; auto-apply enabled when the verdict is pass; review-gated; read-only or draft-only; composes existing checks"
+}
