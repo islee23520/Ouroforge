@@ -1328,6 +1328,65 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Audio Generation and Audio-QA v1 governance refresh
+
+Audio Generation and Audio-QA v1 is recorded as **complete for Era G Milestone
+37** under #1, on merged evidence, as a conservative, additive, local-only
+milestone. It extends the verified-asset pattern to **audio** (SFX, music,
+adaptive audio): a generated audio asset is a **proposal carrying
+license/provenance**, routed through the existing review/apply/trust-gradient
+path, and is promotable only after a function-specific **audio-QA gate** passes.
+The function is a composition of surfaces that already exist — it adds no new
+audio engine, runtime, or writer.
+
+The merged evidence chain is the scope/contract gate #1641
+(`docs/audio-pipeline-v1.md`, PR #1705); the Audio Generation Proposal Model v1
+#1642 (`crates/ouroforge-core/src/audio_generation.rs`, PR #1713) — generation
+emits a `MutationProposal` carrying mandatory license/provenance, proposal-only
+(proposed / pending / unverified), failing closed on a missing license, a blank
+credit, or a malformed audio descriptor, and routing through the existing
+trust-gradient as manual-only; the Audio-QA Check v1 #1643
+(`crates/ouroforge-core/src/audio_qa.rs`, PR #1719) — format/loudness validity,
+license/provenance completeness, and regression vs baseline, composing additively
+under `declared-gate-and` (`undeclaredGatePolicy: neutral`) and failing closed
+while preserving the `stale > fail > pass` precedence at the aggregation boundary;
+the Adaptive-Audio Runtime Hooks v1 #1644
+(`crates/ouroforge-core/src/audio_hooks.rs` plus the deterministic runtime mirror
+`examples/game-runtime/audio-hooks.js`, PR #1729) — adaptive-audio hooks that emit
+`BehaviorIntent` audio intents from a bounded world-state signal snapshot,
+reusing the existing runtime audio-intent surface, deterministic and
+snapshot/restore-stable; the Audio Generation and QA Demo v1 #1645
+(`docs/audio-pipeline-v1-demo.md`, PR #1734) — a deterministic, fixture-scoped
+walkthrough where audio is generated proposal-only, blocked when
+unlicensed/invalid, and promotable only when verified, with adaptive hooks firing
+deterministically; and Scenario Coverage v35 #1646
+(`docs/scenario-coverage-v35.md`, PR #1737) — an enumerated, state/shape-only
+regression suite over the proposal, audio-QA, and hook behaviors plus a
+backward-compatibility guarantee that the existing runtime audio-intent emission
+remains valid. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. **License/provenance and the
+audio-QA gate are mandatory before any audio promotion; the gate fails closed.**
+No unlicensed, uncredited, or unverified-style generated audio is ever promoted.
+Generation stays proposal-only through the existing review/apply/trust-gradient
+path, never a direct trusted write, auto-apply, self-approval, or reviewer bypass;
+browser/Studio surfaces remain read-only and the runtime/probe stays read-only
+with respect to trusted state. **Taste stays human**: the gate asserts
+format/loudness/license/regression conformance, never that audio "sounds good" or
+is fun — sound direction remains a human decision. The function reuses the
+existing proposal model, trust-gradient, evaluator aggregation, `compare`,
+provenance bundle, asset-manifest audio classification, and the runtime
+audio-intent surface; it adds no parallel engine. Existing contracts remain
+backward-compatible, and generated audio/runs/artifacts remain ignored unless
+explicitly fixture-scoped. A hosted/paid audio store stays **DEFER until a #1508
+Layer-3 GO** (Layer-3 distributed orchestration / Elixir remains NO-GO under ADR
+#92). No production-readiness, quality, fun, or Godot replacement/parity claim is
+introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+G rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
