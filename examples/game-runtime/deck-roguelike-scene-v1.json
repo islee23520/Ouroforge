@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1",
+  "id": "deck-roguelike-trial-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "seed": 12345,
+  "metadata": {
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike scene for the Deck-Roguelike Game Class v1 runtime contract (#1601). Deterministic, seed-reproducible single-encounter run."
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "deck-roguelike-trial-v1",
+    "seed": 12345,
+    "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+    "cards": {
+      "strike": { "type": "attack", "cost": 1, "damage": 6 },
+      "bash": { "type": "attack", "cost": 2, "damage": 10 },
+      "defend": { "type": "skill", "cost": 1, "block": 5 }
+    },
+    "deck": ["strike", "strike", "strike", "strike", "strike", "bash", "bash", "defend", "defend", "defend"],
+    "relics": ["vigor-charm"],
+    "relicVocabulary": {
+      "vigor-charm": { "trigger": "run-start", "effect": { "block": 3 } }
+    },
+    "enemy": {
+      "id": "slime",
+      "maxHp": 20,
+      "intents": [
+        { "type": "attack", "value": 8 },
+        { "type": "attack", "value": 5 }
+      ]
+    }
+  }
+}

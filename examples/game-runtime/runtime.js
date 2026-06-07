@@ -99,6 +99,7 @@
   };
   const gridPuzzleModule = (typeof window !== 'undefined' && window.OuroforgeGridPuzzle) || null;
   const uiuxFlowModule = (typeof window !== 'undefined' && window.OuroforgeUiuxFlow) || null;
+  const deckRoguelikeModule = (typeof window !== 'undefined' && window.OuroforgeDeckRoguelike) || null;
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -152,6 +153,7 @@
     rng: { schemaVersion: 'runtime-seeded-rng-v1', algorithm: 'mulberry32', seed: 0, state: 0, drawCount: 0 },
     gridPuzzle: null,
     uiux: null,
+    deckRoguelike: null,
     physics: {
       gravity: 1,
       maxFallSpeed: 8,
@@ -620,6 +622,7 @@
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
       gridPuzzle: normalizeGridPuzzleSpec(scene.gridPuzzle),
       uiux: normalizeUiuxFlowSpec(scene.uiux),
+      deckRoguelike: normalizeDeckRoguelikeSpec(scene.deckRoguelike),
     };
   }
 
@@ -643,6 +646,17 @@
       throw new Error('uiux flow scene requires the OuroforgeUiuxFlow module to be loaded');
     }
     return uiuxFlowModule.createState(spec);
+  }
+
+  // Build the initial deck-roguelike state for a scene, or null when the scene
+  // declares no deck run. Malformed deck specs fail closed: the module throws a
+  // clear diagnostic that propagates out of loadScene.
+  function normalizeDeckRoguelikeSpec(spec) {
+    if (spec === undefined || spec === null) return null;
+    if (!deckRoguelikeModule) {
+      throw new Error('deck roguelike scene requires the OuroforgeDeckRoguelike module to be loaded');
+    }
+    return deckRoguelikeModule.createState(spec);
   }
 
   function normalizeCamera(camera = {}, index = 0, activeCameraId = null, bounds = defaultScene.bounds, fallbackRenderer = rendererState) {
@@ -1573,6 +1587,7 @@
     world.vfxEvents = [];
     world.gridPuzzle = normalized.gridPuzzle ? clone(normalized.gridPuzzle) : null;
     world.uiux = normalized.uiux ? clone(normalized.uiux) : null;
+    world.deckRoguelike = normalized.deckRoguelike ? clone(normalized.deckRoguelike) : null;
     world.tick = 0;
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
@@ -1796,6 +1811,10 @@
       ? gridPuzzleModule.digestState(world.gridPuzzle)
       : null;
     if (gridPuzzleDigest) state.gridPuzzle = gridPuzzleDigest;
+    const deckRoguelikeDigest = world.deckRoguelike && deckRoguelikeModule
+      ? deckRoguelikeModule.digestState(world.deckRoguelike)
+      : null;
+    if (deckRoguelikeDigest) state.deckRoguelike = deckRoguelikeDigest;
     state.digest = {
       algorithm: 'fnv1a64-canonical-json-v1',
       value: fnv1a64({
@@ -1809,6 +1828,9 @@
         // Only grid-puzzle scenes contribute this key, so non-grid scene
         // digests remain byte-identical to their pre-grid-puzzle values.
         ...(gridPuzzleDigest ? { gridPuzzle: gridPuzzleDigest } : {}),
+        // Likewise, only deck-roguelike scenes contribute this key, so other
+        // scene digests remain byte-identical to their prior values.
+        ...(deckRoguelikeDigest ? { deckRoguelike: deckRoguelikeDigest } : {}),
       }),
     };
     return state;
@@ -2063,6 +2085,9 @@
       state.uiux = world.uiux && uiuxFlowModule
         ? uiuxFlowModule.worldStateView(world.uiux)
         : null;
+      state.deckRoguelike = world.deckRoguelike && deckRoguelikeModule
+        ? deckRoguelikeModule.worldStateView(world.deckRoguelike)
+        : null;
       state.input = clone(input);
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
       state.actionInput = clone(actionInput);
@@ -2217,6 +2242,32 @@
       world.uiux = uiuxFlowModule.setAccessibility(world.uiux, optionId, value);
       record('runtime.uiux.accessibility', { optionId });
       return uiuxFlowModule.worldStateView(world.uiux);
+    },
+    // Deck-roguelike actions. Read-only with respect to trusted state: each
+    // advances the deterministic deck run and returns the probe view.
+    deckRoguelikePlayCard(handIndex) {
+      if (!world.deckRoguelike || !deckRoguelikeModule) return null;
+      const previousStatus = world.deckRoguelike.status;
+      world.deckRoguelike = deckRoguelikeModule.advance(world.deckRoguelike, { action: 'play-card', handIndex });
+      record('runtime.deck_roguelike.play_card', {
+        handIndex,
+        accepted: world.deckRoguelike.lastAction ? world.deckRoguelike.lastAction.accepted : false,
+        status: world.deckRoguelike.status,
+      });
+      if (world.deckRoguelike.status !== previousStatus) {
+        record('runtime.deck_roguelike.status_changed', { status: world.deckRoguelike.status, turn: world.deckRoguelike.turn });
+      }
+      return deckRoguelikeModule.worldStateView(world.deckRoguelike);
+    },
+    deckRoguelikeEndTurn() {
+      if (!world.deckRoguelike || !deckRoguelikeModule) return null;
+      const previousStatus = world.deckRoguelike.status;
+      world.deckRoguelike = deckRoguelikeModule.advance(world.deckRoguelike, { action: 'end-turn' });
+      record('runtime.deck_roguelike.end_turn', { turn: world.deckRoguelike.turn, status: world.deckRoguelike.status });
+      if (world.deckRoguelike.status !== previousStatus) {
+        record('runtime.deck_roguelike.status_changed', { status: world.deckRoguelike.status, turn: world.deckRoguelike.turn });
+      }
+      return deckRoguelikeModule.worldStateView(world.deckRoguelike);
     },
     whenReady() {
       return sceneReady;
