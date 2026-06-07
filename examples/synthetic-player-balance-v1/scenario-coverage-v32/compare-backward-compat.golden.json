@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "compare-backward-compat-v32",
+  "fixtureScoped": true,
+  "note": "compare surface unchanged for non-balance runs"
+}

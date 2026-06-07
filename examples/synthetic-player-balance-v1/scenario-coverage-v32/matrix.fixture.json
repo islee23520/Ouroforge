@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "scenario-coverage-v32-synthetic-player-balance-matrix-v1",
+  "issue": 1610,
+  "personaContract": "crates/ouroforge-core/tests/synthetic_player_agents_contract.rs",
+  "compareGolden": "examples/synthetic-player-balance-v1/scenario-coverage-v32/compare-backward-compat.golden.json",
+  "wordingAudit": {
+    "doc": "docs/scenario-coverage-v32.md",
+    "anchors": [
+      "#1",
+      "#23",
+      "fixture-scoped",
+      "read-only"
+    ]
+  }
+}
