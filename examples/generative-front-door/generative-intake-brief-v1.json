@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-sokoban-micro-v1",
+  "title": "Single-crate sokoban micro",
+  "description": "A tiny block-pushing puzzle: the player pushes one crate onto a single target in a small walled room.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "sokoban-micro-from-brief-v1",
+  "rows": [
+    "######",
+    "#@...#",
+    "#.*P.#",
+    "#....#",
+    "######"
+  ],
+  "intendedSolution": ["left", "down", "left", "up"]
+}

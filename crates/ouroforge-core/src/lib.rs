@@ -68,6 +68,7 @@ pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
 pub mod evolve_campaign;
+pub mod generative_intake;
 pub use evolve_campaign::*;
 pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;

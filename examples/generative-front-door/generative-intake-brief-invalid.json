@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "brief-sokoban-malformed-v1",
+  "title": "Malformed sokoban brief",
+  "description": "A brief whose sketched grid is not rectangular; the trusted Rust validator must reject the assembled artifact fail-closed.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "sokoban-malformed-from-brief-v1",
+  "rows": [
+    "######",
+    "#@...#",
+    "#.*P.",
+    "#....#",
+    "######"
+  ],
+  "intendedSolution": ["left", "down", "left", "up"]
+}
