@@ -106,6 +106,12 @@ fn era_i_closure_keeps_forbidden_claims_blocked() {
 
 #[test]
 fn governance_anchors_remain_open() {
+    // Hermetic by default: the live GitHub anchor check is opt-in so `cargo test`
+    // does not depend on network / gh-auth / external issue state. Set
+    // OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK=1 to verify issues #1/#23 are OPEN.
+    if std::env::var("OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK").is_err() {
+        return;
+    }
     let root = repo_root();
     for issue in ["1", "23"] {
         let output = std::process::Command::new("gh")

@@ -102,6 +102,13 @@ fn contracts_preserve_generated_state_wording_and_governance_boundaries() {
     assert_eq!(STEAM_STORE_ASSETS_GENERATOR, "steam-store-assets-v1");
     assert!(STEAM_STORE_ASSETS_BOUNDARY.contains("human submits"));
 
+    // Hermetic by default: the live GitHub anchor check is opt-in so `cargo test`
+    // does not depend on network / gh-auth / external issue state. The doc/governance
+    // assertions above already run unconditionally. Set
+    // OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK=1 to verify issues #1/#23 are OPEN.
+    if std::env::var("OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK").is_err() {
+        return;
+    }
     let root = repo_root();
     let issue_1 = std::process::Command::new("gh")
         .args([

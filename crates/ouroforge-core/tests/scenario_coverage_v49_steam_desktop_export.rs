@@ -174,6 +174,13 @@ fn v49_docs_preserve_generated_state_wording_and_governance() {
         );
     }
 
+    // Hermetic by default: the live GitHub anchor check is opt-in so `cargo test`
+    // does not depend on network / gh-auth / external issue state. The doc/governance
+    // assertions above already run unconditionally. Set
+    // OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK=1 to verify issues #1/#23 are OPEN.
+    if std::env::var("OUROFORGE_LIVE_GOVERNANCE_ANCHOR_CHECK").is_err() {
+        return;
+    }
     let root = repo_root();
     for issue in ["1", "23"] {
         let output = std::process::Command::new("gh")
