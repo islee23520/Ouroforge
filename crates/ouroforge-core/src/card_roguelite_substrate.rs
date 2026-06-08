@@ -27,6 +27,8 @@ pub const CARD_ROGUELITE_SCORE_RESOLUTION_SCHEMA_VERSION: &str =
 pub const CARD_ROGUELITE_SCORE_COMPOSITION_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-score-composition.v1";
 pub const CARD_ROGUELITE_RUN_ANTE_SCHEMA_VERSION: &str = "ouroforge.card-roguelite-run-ante.v1";
+pub const CARD_ROGUELITE_SHOP_ECONOMY_SCHEMA_VERSION: &str =
+    "ouroforge.card-roguelite-shop-economy.v1";
 pub const CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM: &str = "fnv1a64-canonical-json-v1";
 
 const MAX_CARDS: usize = 128;
@@ -294,6 +296,52 @@ pub struct CardRogueliteRunAnteRound {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CardRogueliteShopEconomyReport {
+    pub schema_version: String,
+    pub run_id: String,
+    pub config_id: String,
+    pub variant: String,
+    pub seed: u32,
+    pub seed_algorithm: String,
+    pub starting_gold: i32,
+    pub final_gold: i32,
+    pub starting_deck: Vec<String>,
+    pub final_deck: Vec<String>,
+    pub starting_offers: Vec<CardRogueliteShopOffer>,
+    pub final_offers: Vec<CardRogueliteShopOffer>,
+    pub transactions: Vec<CardRogueliteShopTransaction>,
+    pub reroll_count: u32,
+    pub removal_lever_used: bool,
+    pub digest: CardRogueliteDigest,
+    pub read_only_inspection: CardRogueliteReadOnlyInspection,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteShopTransaction {
+    pub command: CardRogueliteShopCommand,
+    pub gold_before: i32,
+    pub gold_after: i32,
+    pub deck_size_before: usize,
+    pub deck_size_after: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquired_card_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed_card_id: Option<String>,
+    pub offers_after: Vec<CardRogueliteShopOffer>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum CardRogueliteShopCommand {
+    Buy { offer_index: usize },
+    Sell { deck_index: usize },
+    Reroll,
+    Remove { deck_index: usize },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CardRogueliteCompositionFinding {
     pub card_id: String,
     pub modifier_ids: Vec<String>,
@@ -363,6 +411,26 @@ struct RunAnteDigestInput<'a> {
     final_gold: i32,
     rounds: &'a [CardRogueliteRunAnteRound],
     budget_exhausted: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShopEconomyDigestInput<'a> {
+    schema_version: &'a str,
+    run_id: &'a str,
+    config_id: &'a str,
+    variant: &'a str,
+    seed: u32,
+    seed_algorithm: &'a str,
+    starting_gold: i32,
+    final_gold: i32,
+    starting_deck: &'a [String],
+    final_deck: &'a [String],
+    starting_offers: &'a [CardRogueliteShopOffer],
+    final_offers: &'a [CardRogueliteShopOffer],
+    transactions: &'a [CardRogueliteShopTransaction],
+    reroll_count: u32,
+    removal_lever_used: bool,
 }
 
 fn one() -> i32 {
@@ -599,19 +667,7 @@ pub fn resolve_card_roguelite_state(config: &CardRogueliteConfig) -> Result<Card
         .iter()
         .min_by_key(|step| step.ante)
         .expect("validated non-empty ante steps");
-    let mut offers = Vec::with_capacity(config.shop.offer_count);
-    let card_ids = config.cards.keys().cloned().collect::<Vec<_>>();
-    for _ in 0..config.shop.offer_count {
-        let roll = rng.next_raw();
-        let card_id = card_ids[(roll as usize) % card_ids.len()].clone();
-        let price = (config.shop.price_floor + config.cards[&card_id].cost as i32)
-            .max(config.shop.price_floor);
-        offers.push(CardRogueliteShopOffer {
-            card_id,
-            price,
-            roll,
-        });
-    }
+    let offers = draw_shop_offers(config, &mut rng)?;
     let mut state = CardRogueliteState {
         schema_version: CARD_ROGUELITE_SUBSTRATE_STATE_SCHEMA_VERSION.to_string(),
         config_id: config.config_id.clone(),
@@ -835,6 +891,148 @@ pub fn resolve_card_roguelite_run_ante(
         read_only_inspection: read_only_inspection(),
     };
     report.digest = digest_run_ante(&report);
+    Ok(report)
+}
+
+pub fn resolve_card_roguelite_shop_economy(
+    config: &CardRogueliteConfig,
+    commands: &[CardRogueliteShopCommand],
+) -> Result<CardRogueliteShopEconomyReport> {
+    validate_card_roguelite_config(config)?;
+    let state = resolve_card_roguelite_state(config)?;
+    let mut rng = SeededRng::new(state.seed);
+    rng.restore(state.rng);
+    let starting_gold = state.gold;
+    let starting_deck = state.deck.clone();
+    let starting_offers = state.shop_offers.clone();
+    let mut gold = state.gold;
+    let mut deck = state.deck;
+    let mut offers = state.shop_offers;
+    let mut transactions = Vec::with_capacity(commands.len());
+    let mut reroll_count = 0_u32;
+    let mut removal_lever_used = false;
+
+    for command in commands {
+        let gold_before = gold;
+        let deck_size_before = deck.len();
+        let mut acquired_card_id = None;
+        let mut removed_card_id = None;
+
+        match command {
+            CardRogueliteShopCommand::Buy { offer_index } => {
+                let offer = offers
+                    .get(*offer_index)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("buy offerIndex {offer_index} is out of range"))?;
+                if gold < offer.price {
+                    return Err(anyhow!(
+                        "insufficient gold to buy {}: have {}, need {}",
+                        offer.card_id,
+                        gold,
+                        offer.price
+                    ));
+                }
+                gold = gold
+                    .checked_sub(offer.price)
+                    .ok_or_else(|| anyhow!("shop buy gold underflow"))?;
+                deck.push(offer.card_id.clone());
+                offers.remove(*offer_index);
+                acquired_card_id = Some(offer.card_id);
+            }
+            CardRogueliteShopCommand::Sell { deck_index } => {
+                if deck.len() <= 1 {
+                    return Err(anyhow!("cannot sell the final deck card"));
+                }
+                let card_id = deck
+                    .get(*deck_index)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("sell deckIndex {deck_index} is out of range"))?;
+                let value = shop_service_price(config, &card_id)? / 2;
+                let value = value.max(1);
+                deck.remove(*deck_index);
+                gold = gold
+                    .checked_add(value)
+                    .ok_or_else(|| anyhow!("shop sell gold overflow"))?;
+                removed_card_id = Some(card_id);
+            }
+            CardRogueliteShopCommand::Reroll => {
+                let cost = config.shop.price_floor.max(1);
+                if gold < cost {
+                    return Err(anyhow!(
+                        "insufficient gold to reroll: have {}, need {}",
+                        gold,
+                        cost
+                    ));
+                }
+                gold = gold
+                    .checked_sub(cost)
+                    .ok_or_else(|| anyhow!("shop reroll gold underflow"))?;
+                offers = draw_shop_offers(config, &mut rng)?;
+                reroll_count = reroll_count
+                    .checked_add(1)
+                    .ok_or_else(|| anyhow!("shop reroll count overflow"))?;
+            }
+            CardRogueliteShopCommand::Remove { deck_index } => {
+                if deck.len() <= 1 {
+                    return Err(anyhow!("cannot remove the final deck card"));
+                }
+                let card_id = deck
+                    .get(*deck_index)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("remove deckIndex {deck_index} is out of range"))?;
+                let cost = config.shop.price_floor.max(1);
+                if gold < cost {
+                    return Err(anyhow!(
+                        "insufficient gold to remove {}: have {}, need {}",
+                        card_id,
+                        gold,
+                        cost
+                    ));
+                }
+                gold = gold
+                    .checked_sub(cost)
+                    .ok_or_else(|| anyhow!("shop remove gold underflow"))?;
+                deck.remove(*deck_index);
+                removed_card_id = Some(card_id);
+                removal_lever_used = true;
+            }
+        }
+
+        transactions.push(CardRogueliteShopTransaction {
+            command: command.clone(),
+            gold_before,
+            gold_after: gold,
+            deck_size_before,
+            deck_size_after: deck.len(),
+            acquired_card_id,
+            removed_card_id,
+            offers_after: offers.clone(),
+        });
+    }
+
+    let mut report = CardRogueliteShopEconomyReport {
+        schema_version: CARD_ROGUELITE_SHOP_ECONOMY_SCHEMA_VERSION.to_string(),
+        run_id: format!("{}-seed-{}-shop", config.config_id, config.seed),
+        config_id: config.config_id.clone(),
+        variant: config.variant.clone(),
+        seed: config.seed,
+        seed_algorithm: SEEDED_RNG_ALGORITHM.to_string(),
+        starting_gold,
+        final_gold: gold,
+        starting_deck,
+        final_deck: deck,
+        starting_offers,
+        final_offers: offers,
+        transactions,
+        reroll_count,
+        removal_lever_used,
+        digest: CardRogueliteDigest {
+            algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+            value: String::new(),
+        },
+        read_only_inspection: read_only_inspection(),
+    };
+    report.digest = digest_shop_economy(&report);
     Ok(report)
 }
 
@@ -1141,6 +1339,33 @@ fn read_only_inspection() -> CardRogueliteReadOnlyInspection {
     }
 }
 
+fn draw_shop_offers(
+    config: &CardRogueliteConfig,
+    rng: &mut SeededRng,
+) -> Result<Vec<CardRogueliteShopOffer>> {
+    let mut offers = Vec::with_capacity(config.shop.offer_count);
+    let card_ids = config.cards.keys().cloned().collect::<Vec<_>>();
+    for _ in 0..config.shop.offer_count {
+        let roll = rng.next_raw();
+        let card_id = card_ids[(roll as usize) % card_ids.len()].clone();
+        let price = shop_service_price(config, &card_id)?;
+        offers.push(CardRogueliteShopOffer {
+            card_id,
+            price,
+            roll,
+        });
+    }
+    Ok(offers)
+}
+
+fn shop_service_price(config: &CardRogueliteConfig, card_id: &str) -> Result<i32> {
+    let card = config
+        .cards
+        .get(card_id)
+        .ok_or_else(|| anyhow!("shop references undeclared card {card_id}"))?;
+    Ok((config.shop.price_floor + card.cost as i32).max(config.shop.price_floor))
+}
+
 fn shuffle_refs(cards: &[String], rng: &mut SeededRng) -> Vec<String> {
     let mut result = cards.to_vec();
     for i in (1..result.len()).rev() {
@@ -1198,6 +1423,31 @@ fn digest_score_composition(composition: &CardRogueliteScoreComposition) -> Card
         degenerate_threshold: composition.degenerate_threshold,
         total_score: composition.total_score,
         findings: &composition.findings,
+    })
+    .unwrap_or_default();
+    CardRogueliteDigest {
+        algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+        value: format!("{:016x}", fnv1a64(&canonical)),
+    }
+}
+
+fn digest_shop_economy(report: &CardRogueliteShopEconomyReport) -> CardRogueliteDigest {
+    let canonical = serde_json::to_vec(&ShopEconomyDigestInput {
+        schema_version: &report.schema_version,
+        run_id: &report.run_id,
+        config_id: &report.config_id,
+        variant: &report.variant,
+        seed: report.seed,
+        seed_algorithm: &report.seed_algorithm,
+        starting_gold: report.starting_gold,
+        final_gold: report.final_gold,
+        starting_deck: &report.starting_deck,
+        final_deck: &report.final_deck,
+        starting_offers: &report.starting_offers,
+        final_offers: &report.final_offers,
+        transactions: &report.transactions,
+        reroll_count: report.reroll_count,
+        removal_lever_used: report.removal_lever_used,
     })
     .unwrap_or_default();
     CardRogueliteDigest {

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "run-shop-buy-sell-v1",
+  "variant": "run-shop-v1",
+  "seed": 1807,
+  "cards": {
+    "spark": { "cost": 2, "tags": ["starter", "score"], "actions": [{ "type": "score", "amount": 9 }] },
+    "focus": { "cost": 1, "tags": ["starter", "filter"], "actions": [{ "type": "block", "amount": 4 }] },
+    "wound": { "cost": 0, "tags": ["starter", "clutter"], "actions": [{ "type": "score", "amount": 1 }] },
+    "flare": { "cost": 3, "tags": ["shop", "score"], "actions": [{ "type": "damage", "amount": 14 }] }
+  },
+  "startingDeck": ["spark", "focus", "wound", "spark"],
+  "run": {
+    "startingHp": 30,
+    "startingQuota": 18,
+    "anteSteps": [
+      { "ante": 1, "quota": 18, "rewardGold": 8 },
+      { "ante": 2, "quota": 24, "rewardGold": 12 }
+    ]
+  },
+  "shop": { "baseGold": 18, "offerCount": 3, "priceFloor": 3 }
+}
