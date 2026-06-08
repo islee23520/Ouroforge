@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "ouroforge.balance-report.v1",
+  "scene": "deck-roguelike-balance-telemetry-trial-v1",
+  "totalRuns": 5,
+  "winRate": {
+    "wins": 5,
+    "total": 5
+  },
+  "wins": 5,
+  "losses": 0,
+  "playing": 0,
+  "cards": [
+    {
+      "card": "brick",
+      "plays": 0,
+      "runsIncluded": 0,
+      "winsIncluded": 0,
+      "lossesIncluded": 0
+    },
+    {
+      "card": "hex",
+      "plays": 12,
+      "runsIncluded": 5,
+      "winsIncluded": 5,
+      "lossesIncluded": 0
+    },
+    {
+      "card": "smite",
+      "plays": 13,
+      "runsIncluded": 5,
+      "winsIncluded": 5,
+      "lossesIncluded": 0
+    },
+    {
+      "card": "strike",
+      "plays": 6,
+      "runsIncluded": 5,
+      "winsIncluded": 5,
+      "lossesIncluded": 0
+    }
+  ],
+  "degenerateCombos": [
+    {
+      "cards": [
+        "hex"
+      ],
+      "share": {
+        "plays": 12,
+        "totalPlays": 31
+      },
+      "winInclusion": {
+        "included": 5,
+        "totalWins": 5
+      },
+      "replay": {
+        "deckSeed": 31,
+        "persona": "cautious-novice",
+        "personaSeed": 1
+      }
+    },
+    {
+      "cards": [
+        "hex",
+        "smite"
+      ],
+      "winInclusion": {
+        "included": 5,
+        "totalWins": 5
+      },
+      "replay": {
+        "deckSeed": 31,
+        "persona": "cautious-novice",
+        "personaSeed": 1
+      }
+    },
+    {
+      "cards": [
+        "smite"
+      ],
+      "share": {
+        "plays": 13,
+        "totalPlays": 31
+      },
+      "winInclusion": {
+        "included": 5,
+        "totalWins": 5
+      },
+      "replay": {
+        "deckSeed": 31,
+        "persona": "cautious-novice",
+        "personaSeed": 1
+      }
+    }
+  ],
+  "deadItems": [
+    {
+      "card": "brick",
+      "plays": 0,
+      "replay": {
+        "deckSeed": 31,
+        "persona": "cautious-novice",
+        "personaSeed": 1
+      }
+    }
+  ],
+  "difficultyCurve": [
+    {
+      "persona": "aggressive-expert",
+      "skill": 95,
+      "aggression": 95,
+      "outcome": "won",
+      "turns": 2,
+      "actions": 7
+    },
+    {
+      "persona": "balanced-veteran",
+      "skill": 70,
+      "aggression": 50,
+      "outcome": "won",
+      "turns": 4,
+      "actions": 9
+    },
+    {
+      "persona": "cautious-novice",
+      "skill": 20,
+      "aggression": 25,
+      "outcome": "won",
+      "turns": 2,
+      "actions": 7
+    },
+    {
+      "persona": "defensive-expert",
+      "skill": 95,
+      "aggression": 5,
+      "outcome": "won",
+      "turns": 2,
+      "actions": 7
+    },
+    {
+      "persona": "reckless-novice",
+      "skill": 20,
+      "aggression": 90,
+      "outcome": "won",
+      "turns": 3,
+      "actions": 9
+    }
+  ],
+  "readOnlyInspection": {
+    "trustedEmitter": "balance-telemetry-aggregation",
+    "browserStudioMode": "read-only descriptive balance report",
+    "disallowedActions": [
+      "trusted writes",
+      "auto-applied nerf or buff",
+      "balance guarantee",
+      "live mutation"
+    ]
+  },
+  "digest": "report|scene=deck-roguelike-balance-telemetry-trial-v1|runs=5|won=5|lost=0|playing=0|cards=brick:0:0:0:0,hex:12:5:5:0,smite:13:5:5:0,strike:6:5:5:0|degen={hex@5/5#31:cautious-novice},{hex+smite@5/5#31:cautious-novice},{smite@5/5#31:cautious-novice}|dead={brick#31:cautious-novice}|curve=aggressive-expert:won:2:7,balanced-veteran:won:4:9,cautious-novice:won:2:7,defensive-expert:won:2:7,reckless-novice:won:3:9"
+}

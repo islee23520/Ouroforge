@@ -212,6 +212,9 @@
     const rng = { state: (state.seed ^ normalizedPersona.seed) >>> 0, drawCount: 0, seed: normalizedPersona.seed };
     let actions = 0;
     let budgetExhausted = false;
+    // Per-card play tally (observation only), consumed by balance telemetry
+    // aggregation (#1607). Counts a card once per accepted play.
+    const cardPlays = {};
     while (state.status === 'playing') {
       if (actions >= bounds.maxActions) {
         budgetExhausted = true;
@@ -221,6 +224,9 @@
       const decision = chooseAction(normalizedPersona, rng, view);
       if (decision.action === 'play-card') {
         state = deck.advance(state, { action: 'play-card', handIndex: decision.handIndex });
+        if (state.lastAction && state.lastAction.accepted && state.lastAction.card) {
+          cardPlays[state.lastAction.card] = (cardPlays[state.lastAction.card] || 0) + 1;
+        }
       } else {
         // Ending a turn begins the next one; stop before starting a turn beyond
         // the budget so a run record never advances past maxTurns.
@@ -247,6 +253,7 @@
       turns: state.turn,
       actions,
       budgetExhausted,
+      cardPlays,
       digest,
       readOnlyInspection: {
         trustedEmitter: 'synthetic-player-persona-run',

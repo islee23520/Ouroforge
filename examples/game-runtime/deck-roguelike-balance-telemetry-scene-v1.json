@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1",
+  "id": "deck-roguelike-balance-telemetry-trial-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "seed": 31,
+  "metadata": {
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike encounter for Balance Telemetry Aggregation v1 (#1607). Plants a degenerate combo (smite 18 dmg + hex 15 dmg, both 1 energy: they dominate play-share and are co-played in every winning run) and a dead item (brick: costs 4, unaffordable with 3 energy, never played). strike is a normal card that is played but not flagged. Synthetic persona runs (#1606) over this scene produce a balance report that must flag the smite+hex combo and the dead brick."
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "deck-roguelike-balance-telemetry-trial-v1",
+    "seed": 31,
+    "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+    "cards": {
+      "strike": { "type": "attack", "cost": 1, "damage": 6 },
+      "smite": { "type": "attack", "cost": 1, "damage": 18 },
+      "hex": { "type": "attack", "cost": 1, "damage": 15 },
+      "brick": { "type": "attack", "cost": 4, "damage": 99 }
+    },
+    "deck": ["smite", "smite", "smite", "hex", "hex", "hex", "strike", "strike", "strike", "brick"],
+    "enemy": {
+      "id": "warden",
+      "maxHp": 80,
+      "intents": [
+        { "type": "attack", "value": 5 },
+        { "type": "attack", "value": 5 }
+      ]
+    }
+  }
+}
