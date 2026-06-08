@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ouroforge.release-readiness.v1",
+  "bundleId": "release-readiness-era-j-candidate-local-web-001",
+  "releaseCandidateId": "era-j-candidate-local-web-001",
+  "provenanceBundleRef": "examples/provenance-bundle-v1/complete.fixture.json",
+  "releaseProvenanceBundleRef": "examples/release-provenance-bundle-v1/complete-release-bundle.fixture.json",
+  "generator": "release-readiness-bundle-v1",
+  "status": "ready",
+  "gateResults": [
+    { "gateId": "gate-visual", "gateKind": "four-gate-visual", "status": "pass", "evidenceRef": "runs/era-j-candidate/evaluator-visual.json" },
+    { "gateId": "gate-semantic", "gateKind": "four-gate-semantic", "status": "pass", "evidenceRef": "runs/era-j-candidate/evaluator-semantic.json" },
+    { "gateId": "gate-design", "gateKind": "four-gate-design-integrity", "status": "pass", "evidenceRef": "runs/era-j-candidate/design-integrity.json" },
+    { "gateId": "gate-provenance", "gateKind": "four-gate-provenance", "status": "pass", "evidenceRef": "examples/provenance-bundle-v1/complete.fixture.json" },
+    { "gateId": "gate-balance", "gateKind": "balance", "status": "pass", "evidenceRef": "examples/balance-copilot-v1/reverification-v1.json" },
+    { "gateId": "gate-funfeel", "gateKind": "fun-feel-human-gate", "status": "pass", "evidenceRef": "examples/playtest-funfeel-v1/human-verdict.fixture.json" },
+    { "gateId": "gate-compliance", "gateKind": "release-compliance", "status": "pass", "evidenceRef": "examples/release-compliance-gate-v1/compliant-input.fixture.json" },
+    { "gateId": "gate-steam-export", "gateKind": "steam-export-readiness", "status": "pass", "evidenceRef": "examples/steam-desktop-export-v1/demo-manifest.json" }
+  ],
+  "missingGateKinds": [],
+  "blockedReasons": [],
+  "humanGoNoGoRequired": true,
+  "humanGoNoGoRecorded": false,
+  "readOnlySurface": true,
+  "releaseAuthorityGranted": false,
+  "autoMergeAllowed": false,
+  "trustedWriteAuthority": false,
+  "boundary": "Rust/local read-only release-readiness composition; extends Milestone 25/44 provenance; human go/no-go required and recorded separately; browser/Studio read-only; no release authority; no auto-merge; no auto-apply; no fun/quality/production/Godot claim; #1 and #23 remain open"
+}

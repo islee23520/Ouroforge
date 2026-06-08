@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ouroforge.release-readiness.v1",
+  "decisionId": "era-j-human-go-001",
+  "bundleId": "release-readiness-era-j-candidate-local-web-001",
+  "releaseCandidateId": "era-j-candidate-local-web-001",
+  "bundleStatus": "ready",
+  "decision": "go",
+  "humanActor": "era-j-release-owner",
+  "humanConfirmed": true,
+  "rationale": "Human records a local go decision after reviewing the read-only readiness bundle; this does not publish, merge, sign, or upload anything.",
+  "decidedAtUnixMs": 1871000000000,
+  "releaseReady": true,
+  "readOnlySurface": true,
+  "releaseAuthorityGranted": false,
+  "autoMergeAllowed": false,
+  "trustedWriteAuthority": false,
+  "boundary": "Rust/local read-only release-readiness composition; extends Milestone 25/44 provenance; human go/no-go required and recorded separately; browser/Studio read-only; no release authority; no auto-merge; no auto-apply; no fun/quality/production/Godot claim; #1 and #23 remain open"
+}

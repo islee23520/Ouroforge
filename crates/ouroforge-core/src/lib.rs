@@ -141,6 +141,7 @@ pub mod puzzle_solver;
 pub mod release_auto_apply;
 pub mod release_compliance_gate;
 pub mod release_provenance_bundle;
+pub mod release_readiness;
 pub mod seeded_rng;
 pub mod steam_export_build;
 pub mod steam_store_assets;
