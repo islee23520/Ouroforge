@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v48.localization.v1",
+  "issue": "1835",
+  "anchor": "#1 Era I Milestone 53",
+  "generatedStatePolicy": "fixture-scoped only; generated localization reports, locale proposals, and demo outputs remain untracked unless explicitly fixture-scoped",
+  "boundary": "Rust/local state/shape checks only; browser/Studio read-only or draft-only; generated runs/artifacts remain untracked unless fixture-scoped; no timing flakes, no trusted writes, no auto-apply, no auto-merge, no self-approval, no creative/tone automation, no fun/quality/production/Godot-replacement claim; #1 and #23 remain open",
+  "rows": [
+    {
+      "id": "V48.externalization.catalog",
+      "surface": "#1833 externalized string catalog",
+      "fixtureRef": "examples/localization-v1/string-catalog.complete.fixture.json",
+      "expectedShape": "source catalog contains stable string ids, source refs, context, and declared placeholders matching source text"
+    },
+    {
+      "id": "V48.locale.generation.valid",
+      "surface": "#1833 generated translated locale proposal",
+      "fixtureRef": "examples/localization-v1/locale.es.fixture.json",
+      "expectedShape": "complete es-ES locale validates pass with proposalOnly true and placeholder sets preserved"
+    },
+    {
+      "id": "V48.locale.missing.reject",
+      "surface": "#1833 missing translation rejection",
+      "fixtureRef": "examples/localization-v1/invalid/locale.missing.fixture.json",
+      "expectedShape": "missing required string id fails closed with visible diagnostic"
+    },
+    {
+      "id": "V48.locale.placeholder.reject",
+      "surface": "#1833 placeholder mismatch rejection",
+      "fixtureRef": "examples/localization-v1/invalid/locale.placeholder-mismatch.fixture.json",
+      "expectedShape": "missing or renamed placeholders fail closed with per-string diagnostics"
+    },
+    {
+      "id": "V48.demo.smoke",
+      "surface": "#1834 localization demo",
+      "fixtureRef": "examples/localization-v1/demo/demo-manifest.json",
+      "expectedShape": "demo resolves a localized title and rejects incomplete locale without network or live browser"
+    },
+    {
+      "id": "V48.default_locale.backcompat",
+      "surface": "default-locale behavior backward compatibility",
+      "fixtureRef": "examples/localization-v1/scenario-coverage-v48/default-locale-backcompat-golden.json",
+      "expectedShape": "source locale en-US remains the default catalog text path and does not require generated locale proposal"
+    }
+  ]
+}

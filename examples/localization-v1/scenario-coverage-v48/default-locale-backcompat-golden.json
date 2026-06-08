@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v48.default-locale-backcompat.v1",
+  "issue": "1835",
+  "catalogRef": "examples/localization-v1/string-catalog.complete.fixture.json",
+  "boundary": "state/shape-only default-locale backward compatibility; source catalog text remains valid without a generated locale, not a timing assertion, not a trusted write, and not a translation quality verdict",
+  "expected": {
+    "sourceLocale": "en-US",
+    "titleId": "deckbuilder.ui.title",
+    "titleText": "Card / Hand / Pipeline UI",
+    "shopBalanceId": "deckbuilder.shop.balance",
+    "shopBalancePlaceholders": ["amount", "currency"],
+    "proposalRequiredForSourceLocale": false,
+    "disallowedActions": ["trusted writes", "auto-apply", "auto-merge", "self-approval", "creative/tone automation", "automated fun verdict"]
+  }
+}
