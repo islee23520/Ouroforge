@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "trust-gradient-audit-v1",
+  "entries": [
+    {
+      "sequence": 0,
+      "proposalRef": "proposal/previous-game-scale-auto-apply",
+      "tier": "low",
+      "gates": {
+        "mechanical": "pass",
+        "runtime": "pass",
+        "visual": "pass",
+        "semantic": "pass"
+      },
+      "budgetRemaining": 3,
+      "applyResult": "auto-applied",
+      "rollbackHandle": {
+        "applyTransactionId": "txn-release-previous-000",
+        "reverseRef": "examples/release-auto-apply-v1/fixtures/reverse/txn-release-previous-000.json"
+      }
+    }
+  ],
+  "killSwitch": {
+    "engaged": true,
+    "reason": "operator halted release-scale autonomy"
+  }
+}

@@ -119,6 +119,7 @@ pub mod provenance_replay;
 pub mod puzzle_difficulty_metric;
 pub mod puzzle_oversolution;
 pub mod puzzle_solver;
+pub mod release_auto_apply;
 pub mod seeded_rng;
 pub use ouroforge_source_apply::source_apply_audit_ledger;
 pub use seeded_rng::SEEDED_RNG_ALGORITHM;

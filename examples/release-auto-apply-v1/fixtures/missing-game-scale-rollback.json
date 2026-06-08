@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "release-auto-apply-v1",
+  "releaseCandidateRef": "examples/release-auto-apply-v1/fixtures/release-candidate/missing-rollback.json",
+  "trustDecision": {
+    "schemaVersion": "trust-gradient-auto-apply-v1",
+    "proposalRef": "proposal/game-scale-without-rollback",
+    "tier": "low",
+    "eligibility": "auto-apply-eligible",
+    "confidence": 0.97,
+    "rerunGates": {
+      "mechanical": "pass",
+      "runtime": "pass",
+      "visual": "pass",
+      "semantic": "pass"
+    },
+    "budget": {
+      "remaining": 4,
+      "cost": 1
+    },
+    "autonomyEnabled": true,
+    "rollbackHandle": {
+      "applyTransactionId": "txn-release-no-rollback-003",
+      "reverseRef": "examples/release-auto-apply-v1/fixtures/reverse/txn-release-no-rollback-003.json"
+    }
+  },
+  "verification": {
+    "preflightRef": "examples/release-auto-apply-v1/fixtures/evidence/no-rollback-preflight.json",
+    "postApplyRerunRef": "examples/release-auto-apply-v1/fixtures/evidence/no-rollback-post-apply-rerun.json",
+    "provenanceBundleRef": "examples/release-auto-apply-v1/fixtures/evidence/no-rollback-provenance-bundle.json",
+    "complianceGateRef": "examples/release-auto-apply-v1/fixtures/evidence/no-rollback-compliance-gate.json",
+    "allRequiredChecksPassed": true,
+    "humanReleaseGateState": "pending-human-go-no-go"
+  },
+  "gameScaleRollback": {
+    "rollbackScope": "single-artifact",
+    "rollbackCommand": "ouroforge rollback --transaction txn-release-no-rollback-003 --reverse examples/release-auto-apply-v1/fixtures/reverse/txn-release-no-rollback-003.json",
+    "rollbackEvidenceRef": "examples/release-auto-apply-v1/fixtures/evidence/no-rollback-single-artifact.json",
+    "coversWholeGameState": false
+  },
+  "boundary": "proposal-only release auto-apply evidence; Rust/local owned; browser and Studio read-only; no auto-merge; no autonomous release; human release go/no-go remains pending"
+}
