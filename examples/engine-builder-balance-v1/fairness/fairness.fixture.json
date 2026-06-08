@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "ouroforge.balance-fairness.v1",
+  "fixtureId": "engine-builder-fairness",
+  "boundary": "Rust/local owns descriptive fairness and daily-seed solvability evidence; browser/Studio read-only; no auto-apply; no auto-merge; no fun guarantee; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this tiny seeded witness matrix is fixture-scoped regression data.",
+  "seeds": [
+    {
+      "seed": 7201,
+      "dailySeed": true,
+      "skilledWitness": { "personaId": "skilled-planner", "actions": ["draft heat-sink", "play shield", "play reactor-loop", "play overcharger"], "outcome": "won", "finalScore": 180 },
+      "observedLosses": [
+        { "personaId": "greedy", "actions": ["skip shield", "play overcharger"], "attribution": "decisions" }
+      ]
+    },
+    {
+      "seed": 7202,
+      "dailySeed": true,
+      "skilledWitness": null,
+      "observedLosses": [
+        { "personaId": "skilled-planner", "actions": ["draft shield", "play shield", "play heat-sink"], "attribution": "luck" }
+      ]
+    }
+  ]
+}

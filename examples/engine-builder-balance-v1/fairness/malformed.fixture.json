@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.balance-fairness.v1",
+  "fixtureId": "malformed-duplicate-seed",
+  "boundary": "Rust/local owns descriptive fairness and daily-seed solvability evidence; browser/Studio read-only; no auto-apply; no auto-merge; no fun guarantee; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped.",
+  "seeds": [
+    { "seed": 1, "dailySeed": false, "skilledWitness": null, "observedLosses": [] },
+    { "seed": 1, "dailySeed": false, "skilledWitness": null, "observedLosses": [] }
+  ]
+}
