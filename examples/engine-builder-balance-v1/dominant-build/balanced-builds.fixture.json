@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "ouroforge.balance-dominant-build-telemetry.v1",
+  "fixtureId": "balanced-build-mix",
+  "declaredModifiers": ["overcharger", "reactor-loop", "heat-sink"],
+  "boundary": "Rust/local owns descriptive pick-rate and win-rate metrics; browser/Studio read-only; no auto-apply; no auto-merge; no fun guarantee; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this tiny telemetry matrix is fixture-scoped regression data.",
+  "runs": [
+    { "runId": "seed-610", "deckSeed": 610, "personaId": "smith", "outcome": "won", "buildId": "loop-engine", "score": 124, "modifiers": ["overcharger", "reactor-loop"] },
+    { "runId": "seed-611", "deckSeed": 611, "personaId": "racer", "outcome": "lost", "buildId": "loop-engine", "score": 92, "modifiers": ["overcharger", "reactor-loop"] },
+    { "runId": "seed-612", "deckSeed": 612, "personaId": "planner", "outcome": "won", "buildId": "armor-engine", "score": 118, "modifiers": ["heat-sink"] },
+    { "runId": "seed-613", "deckSeed": 613, "personaId": "auditor", "outcome": "lost", "buildId": "starter-engine", "score": 90, "modifiers": [] }
+  ]
+}

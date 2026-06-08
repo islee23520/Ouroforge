@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.balance-dominant-build-telemetry.v1",
+  "fixtureId": "malformed-undeclared-modifier",
+  "declaredModifiers": ["overcharger"],
+  "boundary": "Rust/local owns descriptive pick-rate and win-rate metrics; browser/Studio read-only; no auto-apply; no auto-merge; no fun guarantee; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped.",
+  "runs": [
+    { "runId": "seed-700", "deckSeed": 700, "personaId": "smith", "outcome": "won", "buildId": "loop-engine", "score": 100, "modifiers": ["reactor-loop"] }
+  ]
+}
