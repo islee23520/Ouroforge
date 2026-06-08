@@ -1614,6 +1614,59 @@ The recommended next milestone is not expanded by this completion; any later Era
 I/J work requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Scaled Trust Gradient, Release Provenance and Compliance v1 governance refresh (Era H Milestone 44)
+
+Scaled Trust Gradient, Release Provenance and Compliance v1 is recorded as **complete for
+Era H Milestone 44** under #1, on merged evidence, as a conservative, additive,
+local-only release-trust milestone. It scales the Milestone 22 trust gradient only
+inside bounded, rollback-backed low-risk data/scene changes, adds a per-release
+provenance bundle, adds a compliance reviewer gate, demonstrates the release-trust
+path with fixture-scoped evidence, and locks Scenario Coverage v41. The milestone
+records release evidence and blockers; it does not create release authority, a
+browser/Studio writer, or an autonomous shipping path.
+
+The merged evidence chain is the scope/contract gate #1689
+(`docs/release-trust-provenance-v1.md`, PR #1702) — records the scaled trust,
+release provenance, and compliance contracts while keeping high-risk and
+source-affecting work outside auto-apply; Broadened Bounded Auto-Apply and
+Game-Scale Rollback v1 #1690 (`crates/ouroforge-core/src/release_auto_apply.rs`,
+PR #1906) — extends only the low-risk rollback-backed data/scene tier and keeps
+high-risk, source-affecting, CI/workflow, dependency, credentialed, and release
+mutations manual-review; Per-Release Provenance Bundle v1 #1691
+(`crates/ouroforge-core/src/release_provenance_bundle.rs`, PR #1910) — records
+linked release evidence, artifact/license/provenance refs, compliance refs, and a
+human go/no-go placeholder without publishing; Compliance Reviewer Gate v1 #1693
+(`crates/ouroforge-core/src/release_compliance_gate.rs`, PR #1956) — blocks
+release readiness until license, policy, age-rating, artifact provenance, and the
+human go/no-go checks pass; Scaled Trust, Release Provenance and Compliance Demo
+v1 #1694 (`docs/release-trust-provenance-v1-demo.md`, PR #1964) — proves the
+local fixture-scoped path while preserving blocked compliance and human-go/no-go
+evidence; and Scenario Coverage v41 #1695 (`docs/scenario-coverage-v41.md`, PR
+#1973) — locks release-trust regressions for low-risk auto-apply boundaries,
+source/high-risk blocking, provenance bundle shape, compliance blocking, demo
+evidence, and governance. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. High-risk and source-affecting
+changes **never auto-apply**; they remain manual-review proposals through the
+existing review/apply/trust-gradient path. Release requires compliance plus a
+human go/no-go, and missing license, policy, age-rating, provenance, artifact, or
+human approval evidence blocks the release-trust verdict. Rust/local owns trusted
+validation, persistence, provenance/compliance logic, evidence writing,
+run/project binding, source-apply, and CLI behavior. Browser, Studio, dashboard,
+and cockpit surfaces remain deterministic/read-only inspection surfaces for
+trusted state and gain no trusted writes, command bridges, autonomous apply,
+auto-merge, self-approval, reviewer bypass, or hidden mutation authority.
+Generated runs/assets/content/release artifacts remain ignored unless explicitly
+fixture-scoped. Shipping, hosted/cloud, real-player telemetry, and live-ops stay
+Layer-3 gated (DEFER per #1508), distributed orchestration / Elixir remains
+NO-GO under ADR #92, and no production-ready, quality/fun, Godot
+replacement/parity, or autonomous-shipping claim is introduced. Scenario Coverage
+numbering continues from the Era H sequence through v41.
+
+The recommended next milestone is not expanded by this completion; any later Era
+I/J rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Autonomous Producer and Whole-Game Orchestration v1 governance refresh (Era H Milestone 43)
 
 Autonomous Producer and Whole-Game Orchestration v1 is recorded as **complete for
@@ -2313,6 +2366,23 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   remain open governance anchors** and are not modified, closed, or narrowed by
   this milestone.
 
+
+- **Era H Milestone 44 — Scaled Trust Gradient, Release Provenance and Compliance v1**
+  (#1689–#1696): extends the Era H accountability framework into per-release
+  trust, provenance, and compliance evidence. The merged chain records the scope
+  contract, broadened-but-bounded low-risk rollback-backed auto-apply,
+  per-release provenance bundle, compliance reviewer gate, fixture-scoped
+  release-trust demo, Scenario Coverage v41, and this governance refresh (PRs
+  #1702/#1906/#1910/#1956/#1964/#1973; Scenario Coverage v41). High-risk and
+  source-affecting changes never auto-apply; release requires compliance plus a
+  human go/no-go. Rust/local owns trusted provenance/compliance/review/apply
+  logic; browser/Studio/dashboard/cockpit surfaces remain read-only and gain no
+  trusted writes, auto-apply, auto-merge, self-approval, reviewer bypass, or
+  command bridge. Generated release artifacts remain untracked unless
+  fixture-scoped, shipping/live-ops stay Layer-3 gated, and no production-ready,
+  quality/fun, Godot replacement/parity, or autonomous-shipping claim is
+  introduced. **#1 and #23 remain open governance anchors** and are not modified,
+  closed, or narrowed by this milestone.
 
 - **Era I Milestone 47 — Card-Roguelite Substrate v1** (#1791–#1797):
   generalizes the existing deck-roguelike class into a validated Rust/local
