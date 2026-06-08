@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.curation-selection.v1",
+  "selectionId": "demo-human-selection-rivet-strike-v1",
+  "candidateSetId": "curation-cockpit-demo-candidate-set-v1",
+  "selectedVariantId": "demo-card-rivet-strike-v1",
+  "selectedProposalId": "generative-demo-card-rivet-strike-run-v1",
+  "selectedPayloadDigest": "__COMPUTED_IN_TEST__",
+  "decision": "selected",
+  "humanActor": "human-curator-local-demo",
+  "rationale": "Chosen for the deterministic demo because it is a compact card candidate; this is provenance only and does not apply the proposal.",
+  "recordedAtUnixMs": 1786000002000,
+  "surfaceBoundary": "read-only-provenance",
+  "trustedWriteRequested": false,
+  "applyAuthority": false
+}

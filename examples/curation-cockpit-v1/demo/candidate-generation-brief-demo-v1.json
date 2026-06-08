@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "ouroforge.candidate-generation.v1",
+  "candidateSetId": "curation-cockpit-demo-candidate-set-v1",
+  "title": "Curation cockpit deterministic demo candidates",
+  "description": "Generate three deckbuilder proposal-only candidates for a local human curation demo.",
+  "requestedCount": 3,
+  "variants": [
+    {
+      "variantId": "demo-card-rivet-strike-v1",
+      "kind": "card",
+      "summary": "A low-cost engine-part attack card candidate for the deckbuilder substrate.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "demo-card-rivet-strike-brief-v1",
+        "title": "Rivet Strike card candidate",
+        "description": "A deckbuilder card candidate that rewards a simple attack-and-block opening without adding a new resolver.",
+        "gameClass": "deck-roguelike",
+        "runId": "demo-card-rivet-strike-run-v1",
+        "seed": 57101,
+        "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "rivet-strike": { "type": "attack", "cost": 1, "damage": 7 },
+          "brace-plate": { "type": "skill", "cost": 1, "block": 5 }
+        },
+        "deck": ["rivet-strike", "rivet-strike", "brace-plate"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 24, "intents": [{ "type": "attack", "damage": 5 }] }
+      }
+    },
+    {
+      "variantId": "demo-tuning-calibrated-opening-v1",
+      "kind": "tuning",
+      "summary": "A starting-deck tuning candidate with a slightly safer opening profile.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "demo-tuning-calibrated-opening-brief-v1",
+        "title": "Calibrated opening tuning candidate",
+        "description": "A tuning candidate that changes the starting deck mix while remaining proposal-only.",
+        "gameClass": "deck-roguelike",
+        "runId": "demo-tuning-calibrated-opening-run-v1",
+        "seed": 57102,
+        "player": { "maxHp": 32, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "strike": { "type": "attack", "cost": 1, "damage": 6 },
+          "guard": { "type": "skill", "cost": 1, "block": 6 }
+        },
+        "deck": ["strike", "guard", "guard"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 26, "intents": [{ "type": "attack", "damage": 4 }] }
+      }
+    },
+    {
+      "variantId": "demo-flavor-workshop-hum-v1",
+      "kind": "flavor",
+      "summary": "A conservative workshop-flavor candidate carried as deckbuilder proposal data.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "demo-flavor-workshop-hum-brief-v1",
+        "title": "Workshop hum flavor candidate",
+        "description": "A flavor candidate for the engine room waking up, represented as deckbuilder fixture data for inspection only.",
+        "gameClass": "deck-roguelike",
+        "runId": "demo-flavor-workshop-hum-run-v1",
+        "seed": 57103,
+        "player": { "maxHp": 31, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "listen": { "type": "skill", "cost": 1, "block": 4 },
+          "tap-wrench": { "type": "attack", "cost": 1, "damage": 5 }
+        },
+        "deck": ["listen", "tap-wrench", "tap-wrench"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 22, "intents": [{ "type": "attack", "damage": 4 }] }
+      }
+    }
+  ]
+}
