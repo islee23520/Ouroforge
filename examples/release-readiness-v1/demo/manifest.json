@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "ouroforge.release-readiness-demo.v1",
+  "demoId": "release-readiness-demo-v1",
+  "issue": 1872,
+  "title": "Release Readiness Demo v1",
+  "determinism": {
+    "networkRequired": false,
+    "liveBrowserRequired": false,
+    "fixtureScoped": true,
+    "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this demo manifest and referenced JSON are committed fixture-scoped regression evidence."
+  },
+  "balanceCopilot": {
+    "sourceTelemetryFixture": "examples/engine-builder-balance-v1/dominant-build/dominant-build.fixture.json",
+    "balancedTelemetryFixture": "examples/engine-builder-balance-v1/dominant-build/balanced-builds.fixture.json",
+    "recommendationSetFixture": "examples/balance-copilot-v1/recommendation-set-v1.json",
+    "humanApprovalFixture": "examples/balance-copilot-v1/human-approval-v1.json",
+    "reverificationFixture": "examples/balance-copilot-v1/reverification-v1.json",
+    "expectedRecommendationId": "balance-rec-dominant-loop-engine",
+    "expectedTargetBuildId": "loop-engine",
+    "expectedDecision": "approved-with-tweak",
+    "expectedReverificationStatus": "reverified-improved",
+    "autoApplyAllowed": false,
+    "trustedWriteAuthority": false
+  },
+  "releaseReadiness": {
+    "bundleInputFixture": "examples/release-readiness-v1/complete-ready-bundle.input.json",
+    "bundleFixture": "examples/release-readiness-v1/complete-ready-bundle.fixture.json",
+    "goNoGoInputFixture": "examples/release-readiness-v1/go-no-go.input.json",
+    "goNoGoRecordFixture": "examples/release-readiness-v1/go-no-go.fixture.json",
+    "expectedBundleStatus": "ready",
+    "humanGoNoGoRequired": true,
+    "humanGoNoGoRecordedInBundle": false,
+    "expectedHumanDecision": "go",
+    "releaseAuthorityGranted": false,
+    "autoMergeAllowed": false,
+    "trustedWriteAuthority": false
+  },
+  "readOnlySurfaces": ["Rust/local validation", "browser/Studio read-only inspection"],
+  "boundary": "Rust/local deterministic fixture-scoped demo; reuses deckbuilder balance and release-readiness evidence; browser/Studio read-only; no network/live browser; no auto-apply; no auto-merge; no release authority; no automated fun score; no quality/production/Godot claim; #1 and #23 remain open"
+}
