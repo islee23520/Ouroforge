@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "steamworks-no-steam-fallback-v1",
+  "mode": "steam-required",
+  "steamAvailable": true,
+  "disabledFeatures": [],
+  "localOnlyFeatures": [],
+  "userMessage": "Steam required.",
+  "boundary": "Steamworks fallback over the existing runtime; Rust/local owns trusted validation; JS/browser/Studio/Electron/Steamworks are read-only with no direct trusted writes; graceful no-Steam fallback is mandatory; Steam desktop is not Layer-3 cloud/mobile; Steam account/signing/Release button remain human/Ring-3."
+}

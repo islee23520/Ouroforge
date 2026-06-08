@@ -138,6 +138,7 @@ pub mod release_compliance_gate;
 pub mod release_provenance_bundle;
 pub mod seeded_rng;
 pub mod steam_export_build;
+pub mod steamworks_integration;
 pub use ouroforge_source_apply::source_apply_audit_ledger;
 pub use seeded_rng::SEEDED_RNG_ALGORITHM;
 pub mod trust_gradient_audit;

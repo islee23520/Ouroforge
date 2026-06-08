@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "steamworks-integration-wiring-v1",
+  "issue": 1839,
+  "runtime": "existing-web-runtime",
+  "bridge": "steamworks.js",
+  "bridgeModule": "examples/steamworks-integration-v1/steamworks-bridge.mock.cjs",
+  "features": [
+    {
+      "name": "overlay",
+      "jsHook": "openOverlay",
+      "trustedSource": "Rust/local trusted evidence decides availability; JS only requests overlay evidence.",
+      "fallback": "graceful no-Steam fallback disables overlay without failing local play."
+    },
+    {
+      "name": "achievements",
+      "jsHook": "unlockAchievement",
+      "trustedSource": "Rust/local trusted run evidence is required before achievement unlock proposals.",
+      "fallback": "graceful no-Steam fallback records local-only achievement evidence."
+    },
+    {
+      "name": "cloud-saves",
+      "jsHook": "syncCloudSave",
+      "trustedSource": "Rust/local trusted save validation owns serialized state evidence.",
+      "fallback": "graceful no-Steam fallback keeps local-save available."
+    },
+    {
+      "name": "daily-seed-leaderboard",
+      "jsHook": "submitDailySeedScore",
+      "trustedSource": "Rust/local trusted run evidence provides the daily-seed score evidence.",
+      "fallback": "graceful no-Steam fallback keeps leaderboard submission disabled."
+    }
+  ],
+  "fallbackRef": "examples/steamworks-integration-v1/no-steam-fallback.valid.fixture.json",
+  "leaderboardPayloadRef": "examples/steamworks-integration-v1/daily-seed-leaderboard.valid.fixture.json",
+  "trustedStatePolicy": "Rust/local owns trusted state; JS, browser, Studio, Electron, and Steamworks surfaces are read-only and have no direct trusted writes.",
+  "boundary": "Steamworks integration over the existing runtime; Rust/local owns trusted validation; JS/browser/Studio/Electron/Steamworks are read-only with no direct trusted writes; graceful no-Steam fallback is mandatory; Steam desktop is not Layer-3 cloud/mobile; Steam account/signing/Release button remain human/Ring-3."
+}
