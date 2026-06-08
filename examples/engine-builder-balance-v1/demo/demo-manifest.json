@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.engine-builder-balance-demo.v1",
+  "issue": "1815",
+  "demoId": "engine-builder-balance-v1-demo",
+  "comboFixture": "examples/engine-builder-balance-v1/combo-detector/degenerate-combo.fixture.json",
+  "dominantFixture": "examples/engine-builder-balance-v1/dominant-build/dominant-build.fixture.json",
+  "fairnessFixture": "examples/engine-builder-balance-v1/fairness/fairness.fixture.json",
+  "expected": {
+    "degenerateCombo": { "cards": ["overcharger", "reactor-loop"], "replayDeckSeed": 310, "replayPersona": "smith" },
+    "dominantBuild": { "buildId": "loop-engine", "replayDeckSeed": 510, "replayPersona": "smith" },
+    "deadModifier": "rusty-bearing",
+    "unfairSeed": 7202,
+    "dailySeedFailure": 7202
+  },
+  "boundary": "Fixture-scoped deterministic local demo; Rust/local owns validation; browser/Studio read-only; no network/live browser; no auto-apply; no auto-merge; no fun/quality/production/Godot claim; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this manifest is fixture-scoped source-like regression data."
+}
