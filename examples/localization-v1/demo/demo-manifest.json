@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ouroforge.localization-demo.v1",
+  "issue": 1834,
+  "title": "Localization Demo v1",
+  "catalogRef": "examples/localization-v1/string-catalog.complete.fixture.json",
+  "completeLocaleRef": "examples/localization-v1/locale.es.fixture.json",
+  "rejectedLocaleRef": "examples/localization-v1/invalid/locale.missing.fixture.json",
+  "expected": {
+    "sourceTitleId": "deckbuilder.ui.title",
+    "sourceTitle": "Card / Hand / Pipeline UI",
+    "localizedTitle": "IU de cartas / mano / canalización",
+    "completeLocale": "es-ES",
+    "completeStatus": "pass",
+    "rejectedLocale": "fr-FR",
+    "rejectedStatus": "fail",
+    "rejectedReasonContains": "missing translation for deckbuilder.runmap.blocked"
+  },
+  "determinism": {
+    "network": "disabled",
+    "liveBrowser": "not required",
+    "generatedStatePolicy": "fixture-scoped only; generated localization reports and demo outputs remain untracked unless explicitly fixture-scoped"
+  },
+  "governance": {
+    "boundary": "Rust/local validates localization completeness and placeholder integrity; generation remains proposal-only; browser/Studio surfaces remain read-only or draft-only; trusted writes route through the existing review/apply/trust-gradient path",
+    "claims": "mechanical localization demo only; no production-ready, quality, fun, shippable, release, market, or Godot replacement/parity claim",
+    "anchors": "#1 and #23 remain open"
+  }
+}
