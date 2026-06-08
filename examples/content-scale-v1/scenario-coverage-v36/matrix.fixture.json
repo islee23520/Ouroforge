@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "scenario-coverage-v36-content-scale-matrix-v1",
+  "issue": 1654,
+  "milestone": "Era G Milestone 38",
+  "backwardCompat": {
+    "singleLevelM30Valid": "examples/generative-front-door/generative-intake-brief-v1.json",
+    "singleLevelM30Invalid": "examples/generative-front-door/generative-intake-brief-invalid.json"
+  },
+  "generation": {
+    "campaignValid": "examples/generative-front-door/campaign-scale-brief-v1.json",
+    "campaignInvalid": "examples/generative-front-door/campaign-scale-brief-invalid.json"
+  },
+  "novelty": {
+    "mixed": "examples/generative-front-door/content-novelty-campaign-v1.json",
+    "low": "examples/generative-front-door/content-novelty-campaign-low-v1.json"
+  },
+  "curve": {
+    "pass": "examples/generative-front-door/content-difficulty-curve-pass-v1.json",
+    "spike": "examples/generative-front-door/content-difficulty-curve-spike-v1.json",
+    "missingEvidence": "examples/generative-front-door/content-difficulty-curve-missing-evidence-v1.json"
+  },
+  "curation": {
+    "admit": "examples/content-curation/admit.json",
+    "unsolvable": "examples/content-curation/reject-unsolvable.json",
+    "imbalanced": "examples/content-curation/reject-imbalanced.json",
+    "lowNovelty": "examples/content-curation/reject-low-novelty.json",
+    "curveSpike": "examples/content-curation/reject-curve-spike.json",
+    "malformed": "examples/content-curation/malformed.json",
+    "missingDimension": "examples/content-curation/malformed-missing-curve-evidence.json"
+  }
+}
