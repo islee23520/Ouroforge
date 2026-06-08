@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "ouroforge.candidate-generation.v1",
+  "candidateSetId": "curation-candidate-set-invalid-v1",
+  "title": "Malformed curation candidates",
+  "description": "Requested count does not match the declared candidate variants.",
+  "requestedCount": 2,
+  "variants": [
+    {
+      "variantId": "candidate-invalid-count-v1",
+      "kind": "card",
+      "summary": "Only one variant is present, so the brief must fail closed.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "candidate-invalid-count-brief-v1",
+        "title": "Invalid count card",
+        "description": "Malformed candidate count fixture.",
+        "gameClass": "deck-roguelike",
+        "runId": "candidate-invalid-count-run-v1",
+        "seed": 5703,
+        "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "spark": { "type": "attack", "cost": 1, "damage": 6 }
+        },
+        "deck": ["spark"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 20, "intents": [{ "type": "attack", "damage": 4 }] }
+      }
+    }
+  ]
+}

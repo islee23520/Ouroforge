@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "ouroforge.candidate-generation.v1",
+  "candidateSetId": "curation-candidate-set-v1",
+  "title": "Deckbuilder curation candidates",
+  "description": "Generate four proposal-only variants for a human to curate: card, tuning, flavor, and store copy.",
+  "requestedCount": 4,
+  "variants": [
+    {
+      "variantId": "candidate-card-spark-v1",
+      "kind": "card",
+      "summary": "Add an engine-part themed attack card candidate over the deck-roguelike substrate.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "candidate-card-spark-brief-v1",
+        "title": "Spark Coil card candidate",
+        "description": "A deckbuilder card candidate that demonstrates an engine-part themed attack without a new resolver.",
+        "gameClass": "deck-roguelike",
+        "runId": "candidate-card-spark-run-v1",
+        "seed": 5701,
+        "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "spark-coil": { "type": "attack", "cost": 1, "damage": 7 },
+          "brace": { "type": "skill", "cost": 1, "block": 5 }
+        },
+        "deck": ["spark-coil", "spark-coil", "brace"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 24, "intents": [{ "type": "attack", "damage": 5 }] }
+      }
+    },
+    {
+      "variantId": "candidate-tuning-quota-v1",
+      "kind": "tuning",
+      "summary": "Tune a deckbuilder opening encounter by adjusting the seed and starting deck mix.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "candidate-tuning-quota-brief-v1",
+        "title": "Opening quota tuning candidate",
+        "description": "A tuning candidate that changes the starting mix while remaining proposal-only.",
+        "gameClass": "deck-roguelike",
+        "runId": "candidate-tuning-quota-run-v1",
+        "seed": 5702,
+        "player": { "maxHp": 32, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "strike": { "type": "attack", "cost": 1, "damage": 6 },
+          "guard": { "type": "skill", "cost": 1, "block": 6 }
+        },
+        "deck": ["strike", "guard", "guard"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 26, "intents": [{ "type": "attack", "damage": 4 }] }
+      }
+    },
+    {
+      "variantId": "candidate-flavor-room-v1",
+      "kind": "flavor",
+      "summary": "Flavor text candidate expressed as a small grid-puzzle proposal for inspection.",
+      "gameClass": "grid-puzzle",
+      "gridPuzzle": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "candidate-flavor-room-brief-v1",
+        "title": "Flavor room candidate",
+        "description": "A flavor candidate for a workshop room where the engine wakes up.",
+        "gameClass": "grid-puzzle",
+        "puzzleId": "candidate-flavor-room-puzzle-v1",
+        "rows": ["######", "#P...#", "#.*@.#", "#....#", "######"],
+        "intendedSolution": ["right", "right"]
+      }
+    },
+    {
+      "variantId": "candidate-store-copy-v1",
+      "kind": "store-copy",
+      "summary": "Store-copy candidate kept as proposal data for human curation.",
+      "gameClass": "grid-puzzle",
+      "gridPuzzle": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "candidate-store-copy-brief-v1",
+        "title": "Store copy candidate",
+        "description": "A conservative store-copy candidate: local evidence-first deckbuilding experiments for human curation.",
+        "gameClass": "grid-puzzle",
+        "puzzleId": "candidate-store-copy-puzzle-v1",
+        "rows": ["######", "#P...#", "#.*@.#", "#....#", "######"],
+        "intendedSolution": ["right", "right"]
+      }
+    }
+  ]
+}

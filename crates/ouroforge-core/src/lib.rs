@@ -79,6 +79,7 @@ pub mod audio_qa;
 pub mod balance_combo_detector;
 pub mod balance_dominant_build;
 pub mod balance_fairness;
+pub mod candidate_generation;
 pub mod card_roguelite_substrate;
 pub mod content_difficulty_curve;
 pub mod content_novelty;
