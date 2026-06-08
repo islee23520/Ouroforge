@@ -576,3 +576,84 @@ Before any M63 implementation PR begins, verify all of the following:
 - The manual Rust CLI fallback has a fresh passing verification.
 - #1 and #23 remain open; this gate does not close or replace them.
 - Layer-3 distributed/hosted/live-ops remains deferred.
+
+---
+
+## Milestone 63 executor skeleton scope and golden-parity contract
+
+Issue: #1934 — Executor Skeleton Scope and Two-Plane CLI Drive Contract v1
+
+Status: **M63 SKELETON CONTRACT — IMPLEMENTATION BOUNDARY ONLY.** This section
+builds on the M62 GO record. It introduces the local Elixir/OTP application
+boundary under `studio/executor/` with no domain scheduling logic yet. The Rust
+kernel remains unchanged and is still the data plane.
+
+### Skeleton boundary
+
+The Studio executor skeleton is an OTP application root only:
+
+- `studio/executor/mix.exs` defines the local `:ouroforge_executor` application.
+- `OuroforgeExecutor.Application` starts a top-level supervisor with no children
+  in M63. Later milestones may add scheduler, CLI-driver, budget, retry,
+  backpressure, and telemetry workers under this supervisor.
+- `OuroforgeExecutor.Contract` records declarative boundary metadata: allowed
+  CLI command families, explicitly forbidden direct-write command families,
+  control-plane responsibilities, Rust data-plane ownership, and the golden
+  parity requirement.
+
+This skeleton intentionally does not run `ouroforge`, schedule tasks, write
+artifacts, validate schemas, certify reviews, or implement any distributed or
+hosted behavior.
+
+### Frozen CLI drive contract for the skeleton
+
+The executable contract for M63 is the M62 allowlist, represented in the Elixir
+skeleton as declarative metadata. The executor may drive artifact production,
+validation, review/apply/trust-gradient gates, and read-only inspection only by
+spawning approved `ouroforge` CLI invocations. The skeleton keeps these command
+families visible in tests so later implementation cannot quietly broaden the
+kernel surface.
+
+The explicitly forbidden direct-write command families remain outside the
+executor surface even though the Rust CLI exposes them for other local tooling:
+
+- `ouroforge ledger append`
+- `ouroforge evidence add`
+
+The executor must use Rust-owned review/apply/trust-gradient commands for trusted
+state transitions and read-only list/show/export commands for inspection.
+
+### Golden-parity definition
+
+Golden parity is the M63+ acceptance rule for any executor-driven campaign:
+
+1. Run the manual path with the documented `ouroforge` CLI commands from a clean
+   fixture/worktree.
+2. Run the executor path from the same inputs, where the executor only schedules
+   the same frozen CLI commands.
+3. Compare the generated Rust-owned artifact set byte-for-byte.
+4. The executor path passes only when artifacts are byte-identical to the manual
+   CLI path, excluding only explicitly declared non-semantic runtime envelopes
+   such as wall-clock timestamps, OS process ids, and temporary log paths.
+
+The executor may improve supervision and operator ergonomics, but it may not
+change artifact semantics. Any non-identical artifact requires a Rust-kernel
+change in its own lane or a blocked executor PR; the executor must not normalize,
+rewrite, or self-certify the difference.
+
+### Local-first fallback restatement
+
+A fresh checkout must remain able to complete the full production loop manually
+through the Rust CLI without the executor. The executor is optional local
+control-plane convenience, not required data-plane infrastructure. CI and human
+operators must continue to be able to run Rust verification independently of
+`studio/executor`.
+
+### M63 downstream reference
+
+M63 implementation issues must reference this section and the M62 gate before
+adding behavior. The next permitted additions are bounded control-plane pieces
+only: scheduler shape, CLI invocation wrapper, demo parity harness, coverage
+update, supervision/budget/recovery, concurrency/backpressure/telemetry, and the
+final governance handoff. Distributed/multi-machine, hosted/cloud, servers,
+databases, and live ops remain Layer-3 DEFER.
