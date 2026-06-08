@@ -529,7 +529,7 @@ fn play_run(spec: &Value, persona: &Persona, budget: Budget) -> RunRecord {
     let mut actions = 0u32;
     let mut budget_exhausted = false;
     while state.status == "playing" {
-        if state.turn > budget.max_turns || actions >= budget.max_actions {
+        if actions >= budget.max_actions {
             budget_exhausted = true;
             break;
         }
@@ -538,6 +538,12 @@ fn play_run(spec: &Value, persona: &Persona, budget: Budget) -> RunRecord {
                 play_card(&mut state, index);
             }
             Action::EndTurn => {
+                // Ending a turn begins the next one; stop before starting a turn
+                // beyond the budget so a run record never advances past max_turns.
+                if state.turn >= budget.max_turns {
+                    budget_exhausted = true;
+                    break;
+                }
                 end_turn(&mut state);
             }
         }
@@ -743,7 +749,10 @@ fn run_budget_bounds_every_run() {
         turn_capped.budget_exhausted,
         "the turn budget flags exhaustion"
     );
-    assert!(turn_capped.turns <= 2, "the turn budget bounds the turns");
+    assert_eq!(
+        turn_capped.turns, 1,
+        "the turn budget bounds the run to exactly max_turns turns (no off-by-one)"
+    );
 
     // A generous budget lets the same persona finish: the cap, not the policy,
     // stopped the bounded runs.

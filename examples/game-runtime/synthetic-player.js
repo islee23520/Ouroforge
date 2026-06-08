@@ -213,7 +213,7 @@
     let actions = 0;
     let budgetExhausted = false;
     while (state.status === 'playing') {
-      if (state.turn > bounds.maxTurns || actions >= bounds.maxActions) {
+      if (actions >= bounds.maxActions) {
         budgetExhausted = true;
         break;
       }
@@ -222,6 +222,12 @@
       if (decision.action === 'play-card') {
         state = deck.advance(state, { action: 'play-card', handIndex: decision.handIndex });
       } else {
+        // Ending a turn begins the next one; stop before starting a turn beyond
+        // the budget so a run record never advances past maxTurns.
+        if (state.turn >= bounds.maxTurns) {
+          budgetExhausted = true;
+          break;
+        }
         state = deck.advance(state, { action: 'end-turn' });
       }
       actions += 1;

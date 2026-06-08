@@ -118,7 +118,7 @@ const EXPECTED_DIGESTS = {
   // A tight turn budget likewise halts the run.
   const turnCapped = synthetic.playRun(deck, deckSpec, persona, { maxTurns: 1, maxActions: 999 });
   assert.equal(turnCapped.budgetExhausted, true, 'hitting the turn budget flags budget exhaustion');
-  assert.ok(turnCapped.turns <= 2, 'the turn budget bounds the number of turns');
+  assert.equal(turnCapped.turns, 1, 'the turn budget bounds the run to exactly maxTurns turns (no off-by-one)');
 
   // A generous budget lets the same persona finish, proving the cap — not the
   // policy — stopped the bounded runs.
