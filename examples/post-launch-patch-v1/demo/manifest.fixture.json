@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "post-launch-patch-demo-v1",
+  "issue": 1847,
+  "demoId": "post-launch-patch-demo-001",
+  "patchReverifyPlanRef": "examples/post-launch-patch-v1/patch-reverify.pass.fixture.json",
+  "steamBuildManifestRef": "examples/steam-export-build-v1/build-manifest.valid.fixture.json",
+  "steamDepotConfigRef": "examples/steam-export-build-v1/depot-config.valid.fixture.json",
+  "legacySaveRef": "examples/save-migration-v1/legacy-save.v0.fixture.json",
+  "expectedRepackageStatus": "repackaged-after-reverify",
+  "expectedMigrationStatus": "migrated",
+  "networkPolicy": "offline-fixture-only-no-network",
+  "browserPolicy": "no-live-browser-required",
+  "generatedStatePolicy": "Generated demo runs, package descriptors, migrated saves, and evidence stay untracked unless fixture-scoped.",
+  "boundary": "Deterministic Rust/local demo over existing patch re-verify, Steam export, save/restore, and replay-digest contracts; browser/Studio surfaces are read-only; no network and no live browser; no direct trusted writes; release remains human/Ring-3; #1 and #23 remain open."
+}
