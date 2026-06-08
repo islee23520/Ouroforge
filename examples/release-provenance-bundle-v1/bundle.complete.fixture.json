@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "release-provenance-bundle-v1",
+  "releaseId": "release-candidate-001",
+  "status": "complete",
+  "chainLinks": [
+    { "kind": "intent", "ref": "examples/release-provenance-bundle-v1/refs/intent.json", "artifactId": "intent-001" },
+    { "kind": "content", "ref": "examples/release-provenance-bundle-v1/refs/content.json", "artifactId": "content-001" },
+    { "kind": "assets", "ref": "examples/release-provenance-bundle-v1/refs/assets.json", "artifactId": "assets-001" },
+    { "kind": "qa", "ref": "examples/release-provenance-bundle-v1/refs/qa.json", "artifactId": "qa-001" },
+    { "kind": "per-change-provenance", "ref": "examples/release-provenance-bundle-v1/refs/per-change-bundle.complete.json", "artifactId": "change-bundle-001" },
+    { "kind": "compliance", "ref": "examples/release-provenance-bundle-v1/refs/compliance.json", "artifactId": "compliance-001" },
+    { "kind": "release-candidate", "ref": "examples/release-provenance-bundle-v1/refs/release-candidate.json", "artifactId": "candidate-001" }
+  ],
+  "incompleteReasons": [],
+  "replayability": {
+    "deterministicInputs": true,
+    "perChangeBundleRefs": ["examples/release-provenance-bundle-v1/refs/per-change-bundle.complete.json"],
+    "expectedReplayRefs": ["examples/release-provenance-bundle-v1/refs/replay-expected.json"]
+  },
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composition over Milestone 25 provenance; Rust/local read-only audit; browser and Studio read-only; no parallel provenance engine; no release authority",
+  "guardrails": ["do not fabricate missing chain links", "human release go/no-go remains required", "no auto-merge or quality/fun claim"]
+}

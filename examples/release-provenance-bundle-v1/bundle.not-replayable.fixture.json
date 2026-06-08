@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "release-provenance-bundle-v1",
+  "releaseId": "release-candidate-003",
+  "status": "incomplete",
+  "chainLinks": [
+    { "kind": "intent", "ref": "examples/release-provenance-bundle-v1/refs/intent.json", "artifactId": "intent-003" },
+    { "kind": "content", "ref": "examples/release-provenance-bundle-v1/refs/content.json", "artifactId": "content-003" },
+    { "kind": "assets", "ref": "examples/release-provenance-bundle-v1/refs/assets.json", "artifactId": "assets-003" },
+    { "kind": "qa", "ref": "examples/release-provenance-bundle-v1/refs/qa.json", "artifactId": "qa-003" },
+    { "kind": "per-change-provenance", "ref": "examples/release-provenance-bundle-v1/refs/per-change-bundle.complete.json", "artifactId": "change-bundle-003" },
+    { "kind": "compliance", "ref": "examples/release-provenance-bundle-v1/refs/compliance.json", "artifactId": "compliance-003" },
+    { "kind": "release-candidate", "ref": "examples/release-provenance-bundle-v1/refs/release-candidate.json", "artifactId": "candidate-003" }
+  ],
+  "incompleteReasons": ["deterministic release replay refs are absent"],
+  "replayability": {
+    "deterministicInputs": false,
+    "perChangeBundleRefs": [],
+    "expectedReplayRefs": []
+  },
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composition over Milestone 25 provenance; Rust/local read-only audit; browser and Studio read-only; no parallel provenance engine; no release authority",
+  "guardrails": ["do not fabricate missing chain links", "human release go/no-go remains required", "no auto-merge or quality/fun claim"]
+}
