@@ -100,6 +100,7 @@
   const gridPuzzleModule = (typeof window !== 'undefined' && window.OuroforgeGridPuzzle) || null;
   const uiuxFlowModule = (typeof window !== 'undefined' && window.OuroforgeUiuxFlow) || null;
   const deckRoguelikeModule = (typeof window !== 'undefined' && window.OuroforgeDeckRoguelike) || null;
+  const deckbuilderUiModule = (typeof window !== 'undefined' && window.OuroforgeDeckbuilderUi) || null;
   const defaultScene = {
     schemaVersion: '1',
     id: 'fallback-scene',
@@ -154,6 +155,7 @@
     gridPuzzle: null,
     uiux: null,
     deckRoguelike: null,
+    deckbuilderUi: null,
     physics: {
       gravity: 1,
       maxFallSpeed: 8,
@@ -601,6 +603,10 @@
     const bounds = size(scene.bounds, defaultScene.bounds);
     const componentDefaults = normalizeComponentDefaults(scene.componentDefaults);
     const normalizedRenderer = renderer.normalizeRenderer(scene.renderer, bounds);
+    const deckRoguelike = normalizeDeckRoguelikeSpec(scene.deckRoguelike);
+    const deckRoguelikeView = deckRoguelike && deckRoguelikeModule
+      ? deckRoguelikeModule.worldStateView(deckRoguelike)
+      : null;
     return {
       schemaVersion: String(scene.schemaVersion || defaultScene.schemaVersion),
       id: String(scene.id || 'unnamed-scene'),
@@ -622,7 +628,8 @@
       entities: resolveComposition(sourceEntities.map((entity, index) => normalizeEntity(entity, index, componentDefaults))),
       gridPuzzle: normalizeGridPuzzleSpec(scene.gridPuzzle),
       uiux: normalizeUiuxFlowSpec(scene.uiux),
-      deckRoguelike: normalizeDeckRoguelikeSpec(scene.deckRoguelike),
+      deckRoguelike,
+      deckbuilderUi: normalizeDeckbuilderUiSpec(scene.deckbuilderUi, deckRoguelikeView),
     };
   }
 
@@ -657,6 +664,18 @@
       throw new Error('deck roguelike scene requires the OuroforgeDeckRoguelike module to be loaded');
     }
     return deckRoguelikeModule.createState(spec);
+  }
+
+
+  // Build the initial deckbuilder UI state for a scene, or null when the scene
+  // declares no deckbuilder UI. It consumes the current deck run as read-only
+  // observation; malformed UI specs fail closed with a clear diagnostic.
+  function normalizeDeckbuilderUiSpec(spec, deckRoguelikeView) {
+    if (spec === undefined || spec === null) return null;
+    if (!deckbuilderUiModule) {
+      throw new Error('deckbuilder ui scene requires the OuroforgeDeckbuilderUi module to be loaded');
+    }
+    return deckbuilderUiModule.createState(spec, deckRoguelikeView);
   }
 
   function normalizeCamera(camera = {}, index = 0, activeCameraId = null, bounds = defaultScene.bounds, fallbackRenderer = rendererState) {
@@ -1588,6 +1607,7 @@
     world.gridPuzzle = normalized.gridPuzzle ? clone(normalized.gridPuzzle) : null;
     world.uiux = normalized.uiux ? clone(normalized.uiux) : null;
     world.deckRoguelike = normalized.deckRoguelike ? clone(normalized.deckRoguelike) : null;
+    world.deckbuilderUi = normalized.deckbuilderUi ? clone(normalized.deckbuilderUi) : null;
     world.tick = 0;
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
@@ -2088,6 +2108,9 @@
       state.deckRoguelike = world.deckRoguelike && deckRoguelikeModule
         ? deckRoguelikeModule.worldStateView(world.deckRoguelike)
         : null;
+      state.deckbuilderUi = world.deckbuilderUi && deckbuilderUiModule
+        ? deckbuilderUiModule.worldStateView(world.deckbuilderUi)
+        : null;
       state.input = clone(input);
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };
       state.actionInput = clone(actionInput);
@@ -2257,7 +2280,11 @@
       if (world.deckRoguelike.status !== previousStatus) {
         record('runtime.deck_roguelike.status_changed', { status: world.deckRoguelike.status, turn: world.deckRoguelike.turn });
       }
-      return deckRoguelikeModule.worldStateView(world.deckRoguelike);
+      const deckView = deckRoguelikeModule.worldStateView(world.deckRoguelike);
+      if (world.deckbuilderUi && deckbuilderUiModule) {
+        world.deckbuilderUi = deckbuilderUiModule.syncWithDeck(world.deckbuilderUi, deckView);
+      }
+      return deckView;
     },
     deckRoguelikeEndTurn() {
       if (!world.deckRoguelike || !deckRoguelikeModule) return null;
@@ -2267,7 +2294,30 @@
       if (world.deckRoguelike.status !== previousStatus) {
         record('runtime.deck_roguelike.status_changed', { status: world.deckRoguelike.status, turn: world.deckRoguelike.turn });
       }
-      return deckRoguelikeModule.worldStateView(world.deckRoguelike);
+      const deckView = deckRoguelikeModule.worldStateView(world.deckRoguelike);
+      if (world.deckbuilderUi && deckbuilderUiModule) {
+        world.deckbuilderUi = deckbuilderUiModule.syncWithDeck(world.deckbuilderUi, deckView);
+      }
+      return deckView;
+    },
+    deckbuilderUiSelectCard(handIndex) {
+      if (!world.deckbuilderUi || !deckbuilderUiModule) return null;
+      world.deckbuilderUi = deckbuilderUiModule.selectCard(world.deckbuilderUi, handIndex);
+      record('runtime.deckbuilder_ui.select_card', {
+        handIndex,
+        accepted: world.deckbuilderUi.interaction.lastAction.accepted,
+      });
+      return deckbuilderUiModule.worldStateView(world.deckbuilderUi);
+    },
+    deckbuilderUiQueueSelected(slotId) {
+      if (!world.deckbuilderUi || !deckbuilderUiModule) return null;
+      world.deckbuilderUi = deckbuilderUiModule.queueSelected(world.deckbuilderUi, slotId);
+      record('runtime.deckbuilder_ui.queue_selected', {
+        slotId,
+        accepted: world.deckbuilderUi.interaction.lastAction.accepted,
+        draftOnly: true,
+      });
+      return deckbuilderUiModule.worldStateView(world.deckbuilderUi);
     },
     whenReady() {
       return sceneReady;
