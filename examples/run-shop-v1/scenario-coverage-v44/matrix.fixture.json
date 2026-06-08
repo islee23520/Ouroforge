@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "scenario-coverage-v44",
+  "issue": 1809,
+  "fixtureScoped": true,
+  "boundary": "Rust/local owns run and shop regression coverage. Browser/Studio surfaces are read-only inspection only. Coverage uses state/shape assertions only; no timing, no network, no live browser, trusted writes, auto-apply, auto-merge, self-approval, automated fun score, quality verdict, production-ready claim, or Godot replacement/parity claim. Generated runs/artifacts remain untracked unless fixture-scoped. #1 and #23 remain open governance anchors.",
+  "scenarios": [
+    {
+      "id": "v44-run-escalation-quota-curve",
+      "system": "run",
+      "kind": "escalating-quota-shape",
+      "fixtureRef": "examples/run-shop-v1/fixtures/escalating.win.json",
+      "expect": "bounded run preserves the quota curve 40 -> 64 -> 84 with deterministic digest shape"
+    },
+    {
+      "id": "v44-run-terminal-win",
+      "system": "run",
+      "kind": "terminal-win-state",
+      "fixtureRef": "examples/run-shop-v1/fixtures/escalating.win.json",
+      "expect": "winning fixture reaches terminal won with total score 84 and final gold 47"
+    },
+    {
+      "id": "v44-run-terminal-loss",
+      "system": "run",
+      "kind": "terminal-loss-state",
+      "fixtureRef": "examples/run-shop-v1/fixtures/escalating.loss.json",
+      "expect": "losing fixture exhausts budget on the second ante and pays only passed rewards"
+    },
+    {
+      "id": "v44-shop-buy-integrity",
+      "system": "shop",
+      "kind": "buy-transaction-shape",
+      "fixtureRef": "examples/run-shop-v1/fixtures/shop.buy-sell.json",
+      "expect": "buying a deterministic offer records acquired card, gold delta, and deck growth"
+    },
+    {
+      "id": "v44-shop-sell-integrity",
+      "system": "shop",
+      "kind": "sell-transaction-shape",
+      "fixtureRef": "examples/run-shop-v1/fixtures/shop.buy-sell.json",
+      "expect": "selling the bought card records removal and restores the deck without profit fabrication"
+    },
+    {
+      "id": "v44-shop-reroll-determinism",
+      "system": "shop",
+      "kind": "reroll-state-shape",
+      "fixtureRef": "examples/run-shop-v1/fixtures/shop.reroll.json",
+      "expect": "reroll changes offers deterministically for a seed and tracks reroll count"
+    },
+    {
+      "id": "v44-shop-remove-probability-lever",
+      "system": "shop",
+      "kind": "remove-transaction-shape",
+      "fixtureRef": "examples/run-shop-v1/fixtures/shop.remove.json",
+      "expect": "removal spends gold and removes wound from the seeded deck as a probability lever"
+    },
+    {
+      "id": "v44-backcompat-substrate-run-economy-golden",
+      "system": "backcompat",
+      "kind": "substrate-run-economy-golden",
+      "fixtureRef": "examples/run-shop-v1/scenario-coverage-v44/substrate-run-economy.golden.json",
+      "expect": "classic substrate run and shop economy remain valid and golden-stable"
+    },
+    {
+      "id": "v44-generated-state-and-governance-audit",
+      "system": "governance",
+      "kind": "wording-audit",
+      "fixtureRef": "docs/scenario-coverage-v44.md",
+      "expect": "docs preserve generated-state boundaries, conservative wording, state/shape scope, and #1/#23 open anchors"
+    }
+  ]
+}

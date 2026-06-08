@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "run-shop-v44-substrate-run-economy-backcompat-golden.v1",
+  "issue": 1809,
+  "fixtureScoped": true,
+  "configRef": "examples/card-roguelite-substrate-v1/fixtures/classic.valid.json",
+  "expectedConfigId": "deck-roguelike-classic",
+  "expectedVariant": "deck-roguelike-classic",
+  "expectedSeed": 12345,
+  "expectedStateDigest": "a14b2e123a0a4657",
+  "expectedRunStatus": "won",
+  "expectedRunTotalScore": 61,
+  "expectedRunFinalGold": 109,
+  "expectedRunDigest": "2739fa3f5f9a8eb7",
+  "expectedShopStartingGold": 109,
+  "expectedShopFinalGoldAfterReroll": 108,
+  "expectedShopRerollCount": 1,
+  "expectedShopDigestAfterReroll": "03fa636b23a9b537",
+  "expectedStartingOfferIds": ["defend", "defend", "bash"],
+  "expectedFinalOfferIdsAfterReroll": ["strike", "bash", "strike"]
+}
