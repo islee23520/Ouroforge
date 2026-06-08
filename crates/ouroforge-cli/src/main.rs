@@ -25,12 +25,13 @@ use ouroforge_core::{
     read_scene, reject_already_applied_visual_edit_draft_decision,
     reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
     run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
-    run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
+    run_dogfood_campaign_harness, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
     source_patch_preview_read_model, update_journal, validate_scene_reload,
     validate_source_patch_preview_artifact, validate_visual_edit_draft_review_preflight,
     write_agent_handoff_contract_from_path, write_regression_promotion_draft,
     write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
+    BrowserSmokePoolConfig, DogfoodCampaignHarnessConfig, DogfoodFrictionObservation,
+    MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
     PatchDiffIntegrityLimits, ProjectAssetManifest, ProjectAssetType, ProjectManifest,
     ProjectSceneMutationContext, RuntimeFrameBudgetStatus, ScenarioRunConfig, SceneEdit,
     SceneOnlyMutationOperation, Seed, SourcePatchPreviewArtifact,
@@ -73,6 +74,10 @@ enum Commands {
         project: Option<PathBuf>,
         #[arg(long, value_name = "ID")]
         scenario_pack: Option<String>,
+    },
+    Dogfood {
+        #[command(subcommand)]
+        command: DogfoodCommand,
     },
     Ledger {
         #[command(subcommand)]
@@ -256,6 +261,23 @@ enum ProjectCommand {
         destination: PathBuf,
         #[arg(long, default_value = "minimal-2d")]
         template: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum DogfoodCommand {
+    /// Run or resume the Era L dogfood campaign harness. Friction JSON is an array of DogfoodFrictionObservation objects.
+    Harness {
+        #[arg(long, default_value = "seeds/dogfood-deckbuilder.yaml")]
+        seed_path: PathBuf,
+        #[arg(long, default_value = "runs")]
+        runs_root: PathBuf,
+        #[arg(long, default_value_t = 2)]
+        workers: usize,
+        #[arg(long, value_name = "PATH")]
+        resume_run_dir: Option<PathBuf>,
+        #[arg(long, default_value = "[]", value_name = "JSON")]
+        friction_json: String,
     },
 }
 
@@ -870,6 +892,27 @@ fn main() -> Result<()> {
                 let summary = run_private_mvp(&artifacts.run_dir, workers)?;
                 println!("{}", serde_json::to_string_pretty(&summary)?);
             }
+        }
+        Commands::Dogfood {
+            command:
+                DogfoodCommand::Harness {
+                    seed_path,
+                    runs_root,
+                    workers,
+                    resume_run_dir,
+                    friction_json,
+                },
+        } => {
+            let friction: Vec<DogfoodFrictionObservation> =
+                serde_json::from_str(&friction_json).context("failed to parse --friction-json")?;
+            let report = run_dogfood_campaign_harness(&DogfoodCampaignHarnessConfig {
+                seed_path,
+                runs_root,
+                workers,
+                resume_run_dir,
+                friction,
+            })?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
         Commands::Ledger {
             command:
