@@ -1619,6 +1619,71 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Content-at-Scale Generation and Curation v1 governance refresh
+
+Content-at-Scale Generation and Curation v1 is recorded as **complete for Era G
+Milestone 38** under #1, on merged evidence, as a conservative, additive,
+local-only milestone. It scales generation from single levels to **campaign
+scale** — many levels and a large card/relic pool across the grid-puzzle and
+deck-roguelike genres — while making **curation mandatory** so scale does not
+become slop: only solvable, balanced, sufficiently-novel content with a verified
+whole-game difficulty curve is admitted. Every capability **reuses an existing
+surface** (the Milestone 30 generative front door, the Milestone 28 solver and
+difficulty metrics, the Milestone 32 balance telemetry, and the evaluator
+`declared-gate-and` aggregation); it adds **no new generator, engine, runtime, or
+writer**.
+
+The merged evidence chain is the scope/contract gate #1648
+(`docs/content-scale-v1.md`, PR #1706) — defines the campaign-scale generation,
+dedup/novelty, whole-game curve, curation-gate, and asset/provenance contracts
+and the reuse statement; Campaign-Scale Generation v1 #1649
+(`crates/ouroforge-core/src/content_scale_generation.rs` plus the deck-roguelike
+genre added to `generative_intake.rs`, PR #1779) — turns a campaign brief into a
+*set* of proposal-only artifacts across both genres, reusing the existing
+`MutationProposal` model with no per-game escape hatch; Deduplication and Novelty
+Metrics v1 #1650 (`crates/ouroforge-core/src/content_novelty.rs`, PR #1781) —
+descriptive dedup/novelty metrics computed over the existing generated artifacts
+(a content digest, not a similarity engine), read/measure-only and never
+destructive; Whole-Game Difficulty-Curve Verification v1 #1651
+(`crates/ouroforge-core/src/content_difficulty_curve.rs`, PR #1784) — verifies an
+ordered campaign's difficulty curve against declared tolerances, deriving each
+stage's difficulty from the existing Milestone 28 metric and Milestone 32 balance
+report and flagging spikes/regressions; Content Curation Gate v1 #1652
+(`crates/ouroforge-evaluator/src/content_curation_gate.rs`, PR #1785) — the
+campaign-level promotion guard, composing one declared `contentCuration` category
+into the existing `declared-gate-and` aggregation and admitting a campaign only
+when all four evidence dimensions are declared and solvable/balanced/novel/curve
+pass; the Content-at-Scale Generation and Curation Demo v1 #1653
+(`docs/content-scale-v1-demo.md`, PR #1786) — a deterministic, fixture-scoped
+slice where generation feeds curation, low-novelty and curve-spike campaigns are
+curated out, and a curve-verified set is admitted; and Scenario Coverage v36
+#1654 (`docs/scenario-coverage-v36.md`, PR #1787) — an enumerated,
+state/shape-only regression suite over generation/novelty/curve/curation plus a
+backward-compatibility golden proving single-level Milestone 30 generation
+remains valid. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. **Curation is mandatory** before any
+campaign promotion, and **non-slop at scale is a process guarantee, not a quality
+or fun claim**: "balanced", "novel", and "curated" are measurements against
+declared, evidence-backed thresholds, not proof that a campaign is good, fun,
+shippable, or production-ready; **content tone, taste, and art/audio/UX/narrative
+direction stay human decisions** and the human release go/no-go is preserved.
+Generation/role-agent/producer output stays **proposal-only** through the existing
+review/apply/trust-gradient path — never a trusted write, auto-apply, auto-merge,
+self-approval, or reviewer bypass — and generated assets/content require
+license/provenance and the function-specific QA gate before promotion. Trusted
+logic is Rust/local; browser/Studio surfaces remain read-only. Coverage is
+state/shape-only with no flaky/timing-based assertions, existing contracts remain
+backward-compatible, and generated runs/assets/content/artifacts remain ignored
+unless explicitly fixture-scoped. Shipping/hosted/cloud/live-ops stays **DEFER
+until a #1508 Layer-3 GO** (Layer-3 distributed orchestration / Elixir remains
+NO-GO under ADR #92). No production-readiness, quality, fun, or Godot
+replacement/parity claim is introduced.
+
+The recommended next milestone is not expanded by this completion; any later Era
+G rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Design Regression Harness v1 governance refresh
 
 Design Regression Harness v1 (Era F Milestone 29 under #1) is recorded as
