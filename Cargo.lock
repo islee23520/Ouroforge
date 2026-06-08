@@ -293,6 +293,7 @@ dependencies = [
  "ouroforge-evidence",
  "ouroforge-gdd",
  "ouroforge-ledger",
+ "ouroforge-source-apply",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -332,6 +333,15 @@ name = "ouroforge-ledger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde_json",
+]
+
+[[package]]
+name = "ouroforge-source-apply"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
  "serde_json",
 ]
 

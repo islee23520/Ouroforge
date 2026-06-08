@@ -4,6 +4,7 @@ members = [
   "crates/ouroforge-evidence",
   "crates/ouroforge-evaluator",
   "crates/ouroforge-gdd",
+  "crates/ouroforge-source-apply",
   "crates/ouroforge-core",
   "crates/ouroforge-cli",
 ]
