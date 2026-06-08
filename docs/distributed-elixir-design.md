@@ -759,3 +759,144 @@ M64 implementation PRs must add tests proving:
 These tests may use fixture-shaped CLI/read-model data. Any real kernel action
 must go through `ouroforge` CLI and must preserve golden parity with the manual
 CLI path.
+
+---
+
+## Milestone 65 concurrency, backpressure, and telemetry contract
+
+Issue: #1945 — Concurrency, Backpressure, and Telemetry Scope & Contract v1
+
+Status: **M65 CONTRACT — TESTABLE SCOPE ONLY.** This section fixes the local
+Elixir/OTP control-plane contract for bounded concurrency, backpressure, and
+read-only telemetry before implementation. The two-plane contract remains
+unchanged: Elixir/OTP = executor control plane only; Rust kernel = data plane.
+The Rust kernel is unchanged and is reached only through the frozen `ouroforge`
+CLI surface recorded above.
+
+### Bounded-concurrency contract
+
+The executor may run multiple local control-plane workers concurrently only when
+all of these constraints hold:
+
+- The scheduler has selected ready tasks from the Rust-owned/contract-owned
+  production plan without violating dependency order or reassigning in-flight
+  work.
+- A global local worker cap and a per-command-family cap permit another attempt.
+  Initial M65 defaults should be conservative and test-visible; later tuning must
+  remain local configuration, not kernel semantics.
+- The budget/stop gate from M64 permits assignment and CLI drive at the moment of
+  scheduling and again immediately before spawning `ouroforge`.
+- Trusted-write routes remain serialized per idempotency key, mutation/review id,
+  or artifact target so concurrent workers cannot race duplicate
+  review/apply/trust-gradient operations.
+- The executor never starts distributed workers, remote nodes, hosted queues,
+  databases, or live-ops services. Concurrency is local single-machine OTP
+  process concurrency only.
+
+A worker slot represents executor control-plane capacity, not data-plane
+ownership. The worker may hold local attempt state and may spawn one bounded
+`ouroforge` CLI process; it must not write artifacts, ledgers, evidence,
+verdicts, release state, or trust-gradient records directly.
+
+### Backpressure contract
+
+Backpressure is a local admission-control model in the style of GenStage or
+Broadway, but M65 does not require adopting either dependency. The testable
+contract is:
+
+1. **Demand is explicit** — a scheduler may request at most the number of tasks
+   allowed by the remaining global cap, command-family cap, trusted-write key
+   serialization, and current budget decision.
+2. **Overflow is blocked, not buffered unboundedly** — when no slot is available,
+   ready tasks stay pending in deterministic plan order. The executor does not
+   create an unbounded mailbox, external queue, database row, or hidden retry
+   backlog.
+3. **Budget halts drain safely** — if the M64 budget/stop gate changes to a halt
+   state, no new assignments or CLI drives begin. In-flight attempts may finish
+   and must then be reconciled against Rust-owned ledger/evidence before any
+   retry.
+4. **Retry pressure is bounded** — retry/backoff attempts consume the same
+   worker and command-family capacity as first attempts. A retry cannot bypass
+   backpressure or trusted-write serialization.
+5. **Operator visibility is read-only** — blocked demand is surfaced as local
+   telemetry/diagnostic state and does not mutate Rust artifacts or self-certify
+   progress.
+
+Backpressure tests should prove that a saturated executor leaves extra ready
+work pending, preserves deterministic ordering, halts on budget/stop decisions,
+and resumes only through the M64 ledger/evidence recovery invariant.
+
+### Read-only telemetry surface
+
+M65 telemetry is an observation surface derived from executor-local lifecycle
+state plus Rust-owned artifacts. It is not product truth and it is not a trusted
+write path.
+
+Allowed telemetry fields are limited to:
+
+- run/plan/task ids and command family names already present in inputs or
+  Rust-owned outputs;
+- local worker lifecycle events: `queued`, `assigned`, `started`, `completed`,
+  `failed`, `retrying`, `blocked`, and `budget_halted`;
+- local counters: active workers, queued ready tasks, completed tasks, failed
+  attempts, retry attempts, blocked tasks, and budget-halt count;
+- read-only references to Rust-owned run/ledger/evidence/verdict/review records;
+- timing metadata for local control-plane measurement, such as monotonic start,
+  stop, duration, and backoff delay.
+
+Forbidden telemetry behavior:
+
+- no direct artifact, ledger, evidence, verdict, release, or trust-gradient
+  writes;
+- no inference that a product artifact is valid merely because a worker process
+  completed;
+- no hosted dashboard, server, socket, distributed pubsub, or live telemetry
+  service in M65;
+- no new kernel schema or CLI command family.
+
+Telemetry may be emitted to the local caller, logs, tests, or ephemeral in-memory
+state. Persisted product facts remain Rust-owned and must be produced through the
+frozen `ouroforge` CLI surface.
+
+### Utilization and throughput definitions
+
+M65 utilization/throughput measurements are local control-plane diagnostics only:
+
+- **Worker utilization** = `busy_worker_milliseconds / available_worker_milliseconds`
+  over a measured local executor window, where available capacity is the configured
+  worker cap multiplied by the window duration.
+- **Command-family utilization** = busy time for a command family divided by that
+  family's configured local capacity over the same window.
+- **Throughput** = count of tasks reconciled to terminal control-plane states per
+  measured window. Terminal means `completed_by_kernel_evidence`, `blocked`,
+  `failed`, or `budget_halted`; product acceptance still belongs to the Rust
+  kernel/evaluator/trust-gradient path.
+- **Backpressure depth** = count of ready-but-unassigned tasks held pending
+  because local capacity, budget, or trusted-write serialization prevented
+  assignment.
+- **Retry pressure** = retry attempts divided by total attempts over the window.
+
+These numbers may guide local operator tuning, but they do not alter artifact
+semantics, schema validation, evaluator decisions, or trusted-write acceptance.
+They must always be reproducible from local executor events plus Rust-owned
+artifact references.
+
+### Testable downstream requirements
+
+M65 implementation PRs must add tests proving:
+
+- worker caps and command-family caps prevent over-assignment;
+- ready work remains pending in deterministic order under backpressure;
+- trusted-write shaped work is serialized by idempotency key or blocked before
+  duplicate CLI drive;
+- budget/stop halts prevent new assignments and new CLI invocations;
+- utilization, throughput, backpressure depth, and retry pressure are computed
+  from local observations without direct artifact/ledger/evidence writes;
+- telemetry contains Rust-owned refs only as read-only references and never
+  self-certifies product truth;
+- #1 and #23 remain open.
+
+The next M65 implementation issues may introduce Elixir modules under
+`studio/executor/` for these control-plane mechanics. Any kernel action must
+still go through the frozen `ouroforge` CLI and must preserve golden parity with
+the manual Rust-CLI path.
