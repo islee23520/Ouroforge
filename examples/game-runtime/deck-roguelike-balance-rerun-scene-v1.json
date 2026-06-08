@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1",
+  "id": "deck-roguelike-balance-rerun-trial-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "seed": 31,
+  "metadata": {
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike encounter for Balance Cockpit Re-Run Diff v1 (#1608). smite is the load-bearing degenerate (18 damage for 1 energy, six copies); the warden has enough HP that nerfing smite's damage flips wins to losses. Used to demonstrate a seeded re-run + win-rate diff after a proposed (never auto-applied) nerf. brick (cost 4) is an unaffordable dead item."
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "deck-roguelike-balance-rerun-trial-v1",
+    "seed": 31,
+    "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+    "cards": {
+      "strike": { "type": "attack", "cost": 1, "damage": 6 },
+      "smite": { "type": "attack", "cost": 1, "damage": 18 },
+      "defend": { "type": "skill", "cost": 1, "block": 5 },
+      "brick": { "type": "attack", "cost": 4, "damage": 99 }
+    },
+    "deck": ["smite", "smite", "smite", "smite", "smite", "smite", "strike", "strike", "defend", "brick"],
+    "enemy": {
+      "id": "colossus",
+      "maxHp": 70,
+      "intents": [
+        { "type": "attack", "value": 9 },
+        { "type": "attack", "value": 7 }
+      ]
+    }
+  }
+}
