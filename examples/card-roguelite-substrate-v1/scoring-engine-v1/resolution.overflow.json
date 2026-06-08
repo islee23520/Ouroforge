@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "scoring-resolution-overflow",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4805,
+  "cards": {
+    "starter-gear": {
+      "cost": 1,
+      "tags": ["starter", "gear"],
+      "actions": [{ "type": "score", "amount": 1073741824 }],
+      "modifierRefs": ["overflow-double"]
+    }
+  },
+  "startingDeck": ["starter-gear"],
+  "modifiers": {
+    "overflow-double": {
+      "order": 10,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": { "text": "double score beyond safe range", "scope": "scoringPhase", "operation": "multiplicative" }
+    }
+  },
+  "run": { "startingHp": 20, "startingQuota": 10, "anteSteps": [{ "ante": 1, "quota": 10, "rewardGold": 4 }] },
+  "shop": { "baseGold": 5, "offerCount": 1, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

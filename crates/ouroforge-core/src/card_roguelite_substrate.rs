@@ -22,6 +22,8 @@ pub const CARD_ROGUELITE_SUBSTRATE_STATE_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-substrate-state.v1";
 pub const CARD_ROGUELITE_SUBSTRATE_PROBE_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-substrate-probe.v1";
+pub const CARD_ROGUELITE_SCORE_RESOLUTION_SCHEMA_VERSION: &str =
+    "ouroforge.card-roguelite-score-resolution.v1";
 pub const CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM: &str = "fnv1a64-canonical-json-v1";
 
 const MAX_CARDS: usize = 128;
@@ -207,6 +209,41 @@ pub struct CardRogueliteProbeState {
     pub digest: CardRogueliteDigest,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteScoreResolution {
+    pub schema_version: String,
+    pub config_id: String,
+    pub variant: String,
+    pub seed: u32,
+    pub total_score: i32,
+    pub card_scores: Vec<CardRogueliteCardScoreTrace>,
+    pub digest: CardRogueliteDigest,
+    pub read_only_inspection: CardRogueliteReadOnlyInspection,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteCardScoreTrace {
+    pub card_id: String,
+    pub base_score: i32,
+    pub final_score: i32,
+    pub steps: Vec<CardRogueliteScoreStep>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteScoreStep {
+    pub modifier_id: String,
+    pub order: i32,
+    pub add_score: i32,
+    pub multiply_score: i32,
+    pub before_score: i32,
+    pub after_add_score: i32,
+    pub after_multiply_score: i32,
+    pub effect_text: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DigestInput<'a> {
@@ -223,6 +260,17 @@ struct DigestInput<'a> {
     shop_offers: &'a [CardRogueliteShopOffer],
     score: i32,
     status: CardRogueliteStatus,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScoreResolutionDigestInput<'a> {
+    schema_version: &'a str,
+    config_id: &'a str,
+    variant: &'a str,
+    seed: u32,
+    total_score: i32,
+    card_scores: &'a [CardRogueliteCardScoreTrace],
 }
 
 fn one() -> i32 {
@@ -444,11 +492,15 @@ pub fn resolve_card_roguelite_state(config: &CardRogueliteConfig) -> Result<Card
     validate_card_roguelite_config(config)?;
     let mut rng = SeededRng::new(config.seed);
     let deck = shuffle_refs(&config.starting_deck, &mut rng);
-    let score = deck
-        .iter()
-        .filter_map(|card_id| config.cards.get(card_id))
-        .map(|card| resolve_card_score(card, &config.modifiers))
-        .sum::<i32>();
+    let score = deck.iter().try_fold(0_i32, |total, card_id| {
+        let Some(card) = config.cards.get(card_id) else {
+            return Ok(total);
+        };
+        let card_score = resolve_card_score_checked(card_id, card, &config.modifiers)?.final_score;
+        total
+            .checked_add(card_score)
+            .ok_or_else(|| anyhow!("score resolution overflow while summing card {card_id}"))
+    })?;
     let ante_step = config
         .run
         .ante_steps
@@ -490,19 +542,50 @@ pub fn resolve_card_roguelite_state(config: &CardRogueliteConfig) -> Result<Card
             algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
             value: String::new(),
         },
-        read_only_inspection: CardRogueliteReadOnlyInspection {
-            trusted_emitter: "rust-card-roguelite-substrate".to_string(),
-            browser_studio_mode: "read-only card-roguelite substrate inspection".to_string(),
-            disallowed_actions: vec![
-                "trusted writes".to_string(),
-                "command bridge".to_string(),
-                "live mutation".to_string(),
-                "automated fun verdict".to_string(),
-            ],
-        },
+        read_only_inspection: read_only_inspection(),
     };
     state.digest = digest_state(&state);
     Ok(state)
+}
+
+pub fn resolve_card_roguelite_score_resolution(
+    config: &CardRogueliteConfig,
+) -> Result<CardRogueliteScoreResolution> {
+    validate_card_roguelite_config(config)?;
+    let card_scores = config
+        .starting_deck
+        .iter()
+        .map(|card_id| {
+            let card = config
+                .cards
+                .get(card_id)
+                .ok_or_else(|| anyhow!("startingDeck references undeclared card {card_id}"))?;
+            resolve_card_score_checked(card_id, card, &config.modifiers)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let total_score = card_scores.iter().try_fold(0_i32, |total, card| {
+        total.checked_add(card.final_score).ok_or_else(|| {
+            anyhow!(
+                "score resolution overflow while summing card {}",
+                card.card_id
+            )
+        })
+    })?;
+    let mut resolution = CardRogueliteScoreResolution {
+        schema_version: CARD_ROGUELITE_SCORE_RESOLUTION_SCHEMA_VERSION.to_string(),
+        config_id: config.config_id.clone(),
+        variant: config.variant.clone(),
+        seed: config.seed,
+        total_score,
+        card_scores,
+        digest: CardRogueliteDigest {
+            algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+            value: String::new(),
+        },
+        read_only_inspection: read_only_inspection(),
+    };
+    resolution.digest = digest_score_resolution(&resolution);
+    Ok(resolution)
 }
 
 pub fn card_roguelite_probe_state(config: &CardRogueliteConfig) -> Result<CardRogueliteProbeState> {
@@ -728,28 +811,84 @@ pub fn default_engine_builder_deckbuilder_substrate_config(seed: u32) -> CardRog
     }
 }
 
-fn resolve_card_score(
+fn resolve_card_score_checked(
+    card_id: &str,
     card: &CardRogueliteCard,
     modifiers: &BTreeMap<String, CardRogueliteModifier>,
-) -> i32 {
-    let base = card
-        .actions
-        .iter()
-        .map(|effect| match effect {
+) -> Result<CardRogueliteCardScoreTrace> {
+    let base_score = card.actions.iter().try_fold(0_i32, |score, effect| {
+        let amount = match effect {
             CardRogueliteEffect::Damage { amount }
             | CardRogueliteEffect::Block { amount }
             | CardRogueliteEffect::Score { amount } => *amount,
-        })
-        .sum::<i32>();
+        };
+        score
+            .checked_add(amount)
+            .ok_or_else(|| anyhow!("score resolution overflow in card {card_id} base score"))
+    })?;
     let mut ordered = card
         .modifier_refs
         .iter()
-        .filter_map(|modifier_ref| modifiers.get(modifier_ref))
-        .collect::<Vec<_>>();
-    ordered.sort_by_key(|modifier| modifier.order);
-    ordered.into_iter().fold(base, |score, modifier| {
-        (score + modifier.add_score) * modifier.multiply_score
+        .map(|modifier_id| {
+            modifiers
+                .get(modifier_id)
+                .map(|modifier| (modifier_id, modifier))
+                .ok_or_else(|| {
+                    anyhow!("card {card_id} references undeclared modifier {modifier_id}")
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    ordered.sort_by(|(left_id, left), (right_id, right)| {
+        (left.order, left_id.as_str()).cmp(&(right.order, right_id.as_str()))
+    });
+    let mut score = base_score;
+    let mut steps = Vec::with_capacity(ordered.len());
+    for (modifier_id, modifier) in ordered {
+        let before_score = score;
+        let after_add_score = before_score.checked_add(modifier.add_score).ok_or_else(|| {
+            anyhow!(
+                "score resolution overflow applying additive modifier {modifier_id} to card {card_id}"
+            )
+        })?;
+        let after_multiply_score =
+            after_add_score
+                .checked_mul(modifier.multiply_score)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "score resolution overflow applying multiplicative modifier {modifier_id} to card {card_id}"
+                    )
+                })?;
+        steps.push(CardRogueliteScoreStep {
+            modifier_id: modifier_id.clone(),
+            order: modifier.order,
+            add_score: modifier.add_score,
+            multiply_score: modifier.multiply_score,
+            before_score,
+            after_add_score,
+            after_multiply_score,
+            effect_text: modifier.effect.as_ref().map(|effect| effect.text.clone()),
+        });
+        score = after_multiply_score;
+    }
+    Ok(CardRogueliteCardScoreTrace {
+        card_id: card_id.to_string(),
+        base_score,
+        final_score: score,
+        steps,
     })
+}
+
+fn read_only_inspection() -> CardRogueliteReadOnlyInspection {
+    CardRogueliteReadOnlyInspection {
+        trusted_emitter: "rust-card-roguelite-substrate".to_string(),
+        browser_studio_mode: "read-only card-roguelite substrate inspection".to_string(),
+        disallowed_actions: vec![
+            "trusted writes".to_string(),
+            "command bridge".to_string(),
+            "live mutation".to_string(),
+            "automated fun verdict".to_string(),
+        ],
+    }
 }
 
 fn shuffle_refs(cards: &[String], rng: &mut SeededRng) -> Vec<String> {
@@ -776,6 +915,22 @@ fn digest_state(state: &CardRogueliteState) -> CardRogueliteDigest {
         shop_offers: &state.shop_offers,
         score: state.score,
         status: state.status,
+    })
+    .unwrap_or_default();
+    CardRogueliteDigest {
+        algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+        value: format!("{:016x}", fnv1a64(&canonical)),
+    }
+}
+
+fn digest_score_resolution(resolution: &CardRogueliteScoreResolution) -> CardRogueliteDigest {
+    let canonical = serde_json::to_vec(&ScoreResolutionDigestInput {
+        schema_version: &resolution.schema_version,
+        config_id: &resolution.config_id,
+        variant: &resolution.variant,
+        seed: resolution.seed,
+        total_score: resolution.total_score,
+        card_scores: &resolution.card_scores,
     })
     .unwrap_or_default();
     CardRogueliteDigest {
