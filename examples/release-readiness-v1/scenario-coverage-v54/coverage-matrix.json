@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v54",
+  "suiteId": "scenario-coverage-v54-release-readiness",
+  "issue": 1873,
+  "scope": "Balance Tuning Co-Pilot and Release Readiness Go/No-Go Surface v1 regression coverage",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this coverage matrix is fixture-scoped regression evidence.",
+  "assertionMode": "state-and-shape-only",
+  "networkRequired": false,
+  "liveBrowserRequired": false,
+  "rows": [
+    {
+      "id": "v54-copilot-recommend",
+      "area": "balance-copilot",
+      "expectedState": "recommendation-surfaced",
+      "fixtureRefs": [
+        "examples/engine-builder-balance-v1/dominant-build/dominant-build.fixture.json",
+        "examples/balance-copilot-v1/recommendation-set-v1.json"
+      ]
+    },
+    {
+      "id": "v54-copilot-approve",
+      "area": "balance-copilot",
+      "expectedState": "human-approved-with-tweak",
+      "fixtureRefs": ["examples/balance-copilot-v1/human-approval-v1.json"]
+    },
+    {
+      "id": "v54-copilot-reverify",
+      "area": "balance-copilot",
+      "expectedState": "reverified-improved-no-auto-apply",
+      "fixtureRefs": [
+        "examples/engine-builder-balance-v1/dominant-build/balanced-builds.fixture.json",
+        "examples/balance-copilot-v1/reverification-v1.json"
+      ]
+    },
+    {
+      "id": "v54-readiness-ready",
+      "area": "release-readiness",
+      "expectedState": "ready-human-go-no-go-required",
+      "fixtureRefs": [
+        "examples/release-readiness-v1/complete-ready-bundle.input.json",
+        "examples/release-readiness-v1/complete-ready-bundle.fixture.json"
+      ]
+    },
+    {
+      "id": "v54-readiness-missing-gate",
+      "area": "release-readiness",
+      "expectedState": "blocked-missing-gate",
+      "fixtureRefs": [
+        "examples/release-readiness-v1/missing-gate.input.json",
+        "examples/release-readiness-v1/missing-gate.fixture.json"
+      ]
+    },
+    {
+      "id": "v54-go-no-go-record",
+      "area": "release-readiness",
+      "expectedState": "human-go-recorded-read-only",
+      "fixtureRefs": [
+        "examples/release-readiness-v1/go-no-go.input.json",
+        "examples/release-readiness-v1/go-no-go.fixture.json"
+      ]
+    },
+    {
+      "id": "v54-m25-provenance-backcompat",
+      "area": "provenance-backcompat",
+      "expectedState": "milestone-25-complete-valid",
+      "fixtureRefs": ["examples/provenance-bundle-v1/bundle.complete.fixture.json"]
+    },
+    {
+      "id": "v54-m44-release-provenance-backcompat",
+      "area": "provenance-backcompat",
+      "expectedState": "milestone-44-release-complete-valid",
+      "fixtureRefs": ["examples/release-provenance-bundle-v1/bundle.complete.fixture.json"]
+    }
+  ],
+  "boundary": "Rust/local state-and-shape-only regression suite; browser/Studio read-only; no network/live browser; no auto-apply; no auto-merge; no release authority; no automated fun score; no quality/production/Godot claim; #1 and #23 remain open"
+}
