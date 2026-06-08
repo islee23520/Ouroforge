@@ -19,6 +19,8 @@ defmodule OuroforgeExecutor.MixProject do
   end
 
   defp deps do
-    []
+    [
+      {:telemetry, "~> 1.3"}
+    ]
   end
 end
