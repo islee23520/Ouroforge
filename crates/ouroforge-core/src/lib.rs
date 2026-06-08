@@ -101,6 +101,7 @@ pub mod plugin_manifest;
 pub mod plugin_permission;
 pub mod plugin_registry;
 pub mod plugin_threat_model;
+pub mod producer_plan;
 pub mod production_handoff;
 pub mod production_qa_matrix;
 pub mod production_qa_verdict;

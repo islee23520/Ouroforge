@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "producer-plan-v1",
+  "intentId": "collect-and-exit-producer-intent",
+  "sourceRef": "examples/gdd-design-brief-v1/design-brief.valid.fixture.json",
+  "designBrief": {
+    "schemaVersion": "gdd-design-brief-v1",
+    "briefId": "collect-and-exit-brief",
+    "status": "ready",
+    "gameTitle": "Collect and Exit",
+    "genre": "local 2D puzzle platformer prototype",
+    "targetGameClass": "small2d-prototype",
+    "playerFantasy": "A nimble explorer collects a key and reaches an exit while avoiding a timed hazard.",
+    "coreLoop": {
+      "summary": "Explore, collect the key, avoid the hazard pulse, unlock the exit, and leave.",
+      "steps": [
+        "read objective",
+        "move and jump",
+        "collect key",
+        "avoid hazard",
+        "reach exit"
+      ]
+    },
+    "mechanics": [
+      {
+        "id": "move-jump",
+        "summary": "Player moves horizontally and jumps over one hazard."
+      },
+      {
+        "id": "collect-key",
+        "summary": "A local key collectible enables the exit."
+      }
+    ],
+    "controls": [
+      {
+        "action": "move",
+        "input": "left/right or A/D"
+      },
+      {
+        "action": "jump",
+        "input": "space"
+      }
+    ],
+    "winLossConditions": {
+      "win": [
+        "Player reaches the exit after collecting the key."
+      ],
+      "loss": [
+        "Player touches the hazard pulse before reaching the exit."
+      ]
+    },
+    "scenesLevels": [
+      {
+        "id": "level-one",
+        "summary": "Single-screen level with start, key, hazard, and exit."
+      }
+    ],
+    "entities": [
+      {
+        "id": "player",
+        "role": "Controlled explorer."
+      },
+      {
+        "id": "key",
+        "role": "Collectible gate item."
+      },
+      {
+        "id": "exit",
+        "role": "Win target."
+      }
+    ],
+    "assetStyleRefs": [
+      {
+        "id": "placeholder-shapes",
+        "kind": "placeholder",
+        "source": "assets/placeholders/basic-shapes.json",
+        "license": "repo-fixture-placeholder"
+      }
+    ],
+    "constraints": [
+      {
+        "id": "local-only",
+        "text": "Use local deterministic fixtures only."
+      }
+    ],
+    "nonGoals": [
+      {
+        "id": "no-production-game",
+        "text": "No shipped game, commercial readiness, or native export claim."
+      }
+    ],
+    "acceptanceGoals": [
+      {
+        "id": "scenario-pass",
+        "text": "A trusted scenario can verify collect-key then exit."
+      }
+    ],
+    "blockedReasons": [],
+    "boundary": "Input validation contract only, not generation authority. GDD-derived output is untrusted until Rust/local validation and review-gated apply; no autonomous unrestricted game creation."
+  },
+  "requestedFunctions": [
+    "review",
+    "qa",
+    "assets",
+    "design-brief",
+    "scenarios",
+    "behavior",
+    "scene-level",
+    "scaffold",
+    "mechanics",
+    "requirements"
+  ],
+  "boundary": "Reuses Milestone 30 and GDD/design-brief surfaces; decomposes intent into a plan; proposal-only; review/apply/trust-gradient path; browser/Studio read-only; no direct trusted writes; no auto-apply; no auto-merge; no production-ready claim; no engine replacement claim."
+}
