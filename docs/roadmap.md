@@ -2492,6 +2492,23 @@ autonomous studio:
   **#1 and #23 remain open governance anchors** and are not closed, narrowed, or
   modified by this milestone.
 
+- **Era I Milestone 49 — Escalating Run Structure and Shop Economy v1** (#1805–#1810):
+  records a bounded run/shop chain over the existing card-roguelite substrate,
+  including the scope contract, escalating quota/ante run report, deterministic
+  shop buy/sell/reroll/remove economy, fixture-scoped run-shop demo, Scenario
+  Coverage v44, and this governance refresh (PRs #1998/#2050/#2103/#2106/#2108;
+  Scenario Coverage v44). The milestone verifies mechanical run/shop state only:
+  runs are bounded and seed-reproducible, quota curves are state/shape locked,
+  shop actions expose levers over probability, and the demo remains
+  fixture-scoped. It is not a new parallel engine, not an automated fun/quality/
+  release verdict, and not a production-ready or Godot replacement/parity claim.
+  Trusted validation stays Rust/local; browser, dashboard, cockpit, and Studio
+  surfaces remain read-only; generation remains proposal-only through the
+  existing review/apply/trust-gradient path; generated runs/artifacts stay
+  untracked unless explicitly fixture-scoped. **#1 and #23 remain open
+  governance anchors** and are not closed, narrowed, or modified by this
+  milestone.
+
 ### Multiplicative Scoring-Engine and Modifier Composition v1 governance refresh (Era I Milestone 48)
 
 Multiplicative Scoring-Engine and Modifier Composition v1 is recorded as
@@ -2532,6 +2549,52 @@ runtime, probe, evaluator, evolve/campaign, compare, provenance-bundle, asset,
 dashboard, cockpit, and CLI contracts remain backward-compatible; generated
 runs/assets/builds remain ignored unless explicitly fixture-scoped. Scenario
 Coverage numbering continues through v43.
+
+The recommended next milestone is not expanded by this completion; any later Era
+I/J work requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same human fun/release, read-only UI,
+and Layer-3 boundaries.
+
+### Escalating Run Structure and Shop Economy v1 governance refresh (Era I Milestone 49)
+
+Escalating Run Structure and Shop Economy v1 is recorded as **complete for Era I
+Milestone 49** under #1, on merged evidence, as a conservative, additive,
+Rust/local mechanical run/shop milestone. It extends the existing
+card-roguelite substrate with bounded escalating ante/quota run reports,
+deterministic shop economy transactions, a fixture-scoped run-shop demo, and
+Scenario Coverage v44. It does not claim that a game is fun, balanced for
+release, shippable, production-ready, or a Godot replacement.
+
+The merged evidence chain is the scope/design gate #1805 (PR #1998) — records
+the run/shop boundaries, substrate reuse, proposal-only generation path, and
+human Era J fun/release gates; Escalating Quota and Ante Run v1 #1806 (PR #2050)
+— adds bounded run reports, non-decreasing quota validation, terminal win/loss
+states, deterministic digests, and read-only inspection shape; Shop Economy v1
+#1807 (PR #2103) — adds deterministic buy/sell/reroll/remove reports so shop
+choices are probability levers rather than hidden trusted writes; Run and Shop
+Demo v1 #1808 (PR #2106) — proves a local fixture-scoped demo over the run/shop
+surface without network, live browser, or browser trusted writes; and Scenario
+Coverage v44 #1809 (PR #2108) — locks state/shape-only regression coverage for
+run escalation/win/loss, shop buy/sell/reroll/remove, substrate run/economy
+backward compatibility, generated-state wording, and governance. #1 and #23
+remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. Run/shop behavior is mechanical
+state evidence over the Card-Roguelite Substrate, not a new parallel engine or
+browser/Studio writer. Trusted validation, persistence, substrate scoring,
+balance/export/provenance logic, evidence writing, run/project binding,
+review/apply/trust-gradient path, and CLI behavior remain Rust/local.
+JavaScript/browser/Studio surfaces remain deterministic or read-only inspection
+surfaces for trusted state and do not gain trusted writes, command bridges,
+autonomous apply, auto-merge, self-approval, reviewer bypass, or hidden mutation
+authority. Generation remains proposal-only through the existing
+review/apply/trust-gradient path. The fun/feel verdict, Steam account/signing/
+release, content survey, market demand, hosted/cloud/mobile Layer-3 capability,
+and release go/no-go stay human or deferred as previously scoped. Existing
+runtime, probe, evaluator, evolve/campaign, compare, provenance-bundle, asset,
+dashboard, cockpit, and CLI contracts remain backward-compatible; generated
+runs/assets/builds remain ignored unless explicitly fixture-scoped. Scenario
+Coverage numbering continues through v44.
 
 The recommended next milestone is not expanded by this completion; any later Era
 I/J work requires a separate scope issue with explicit non-goals, regression
