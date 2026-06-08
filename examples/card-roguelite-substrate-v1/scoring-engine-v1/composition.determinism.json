@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "scoring-composition-determinism",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4808,
+  "cards": {
+    "starter-gear": {
+      "cost": 1,
+      "tags": ["starter", "gear"],
+      "actions": [{ "type": "score", "amount": 7 }],
+      "modifierRefs": ["reactor-loop", "overdrive"]
+    },
+    "pressure-valve": {
+      "cost": 1,
+      "tags": ["pressure"],
+      "actions": [{ "type": "score", "amount": 4 }],
+      "modifierRefs": ["overdrive"]
+    }
+  },
+  "startingDeck": ["starter-gear", "pressure-valve", "starter-gear"],
+  "modifiers": {
+    "overdrive": {
+      "order": 10,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": { "text": "double score after tuning", "scope": "scoringPhase", "operation": "multiplicative" }
+    },
+    "reactor-loop": {
+      "order": 20,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": { "text": "multiply score by two", "scope": "scoringPhase", "operation": "multiplicative" }
+    }
+  },
+  "run": { "startingHp": 20, "startingQuota": 10, "anteSteps": [{ "ante": 1, "quota": 10, "rewardGold": 4 }] },
+  "shop": { "baseGold": 5, "offerCount": 1, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "scoring-composition-degenerate",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4807,
+  "cards": {
+    "starter-gear": {
+      "cost": 1,
+      "tags": ["starter", "gear"],
+      "actions": [{ "type": "score", "amount": 10 }],
+      "modifierRefs": ["overdrive", "reactor-loop", "tuned"]
+    }
+  },
+  "startingDeck": ["starter-gear"],
+  "modifiers": {
+    "tuned": {
+      "order": 5,
+      "addScore": 5,
+      "multiplyScore": 1,
+      "effect": { "text": "add +5 before multipliers", "scope": "card", "operation": "additive" }
+    },
+    "overdrive": {
+      "order": 10,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": { "text": "double score after tuning", "scope": "scoringPhase", "operation": "multiplicative" }
+    },
+    "reactor-loop": {
+      "order": 20,
+      "addScore": 0,
+      "multiplyScore": 3,
+      "effect": { "text": "multiply score by three", "scope": "scoringPhase", "operation": "multiplicative" }
+    }
+  },
+  "run": { "startingHp": 20, "startingQuota": 10, "anteSteps": [{ "ante": 1, "quota": 10, "rewardGold": 4 }] },
+  "shop": { "baseGold": 5, "offerCount": 1, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

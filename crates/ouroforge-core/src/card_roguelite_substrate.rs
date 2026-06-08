@@ -24,6 +24,8 @@ pub const CARD_ROGUELITE_SUBSTRATE_PROBE_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-substrate-probe.v1";
 pub const CARD_ROGUELITE_SCORE_RESOLUTION_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-score-resolution.v1";
+pub const CARD_ROGUELITE_SCORE_COMPOSITION_SCHEMA_VERSION: &str =
+    "ouroforge.card-roguelite-score-composition.v1";
 pub const CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM: &str = "fnv1a64-canonical-json-v1";
 
 const MAX_CARDS: usize = 128;
@@ -244,6 +246,34 @@ pub struct CardRogueliteScoreStep {
     pub effect_text: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteScoreComposition {
+    pub schema_version: String,
+    pub config_id: String,
+    pub variant: String,
+    pub seed: u32,
+    pub degenerate_threshold: i32,
+    pub total_score: i32,
+    pub findings: Vec<CardRogueliteCompositionFinding>,
+    pub digest: CardRogueliteDigest,
+    pub read_only_inspection: CardRogueliteReadOnlyInspection,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteCompositionFinding {
+    pub card_id: String,
+    pub modifier_ids: Vec<String>,
+    pub readable_effects: Vec<String>,
+    pub base_score: i32,
+    pub final_score: i32,
+    pub power_delta: i32,
+    pub modifier_count: u32,
+    pub multiplicative_count: u32,
+    pub degenerate: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DigestInput<'a> {
@@ -271,6 +301,18 @@ struct ScoreResolutionDigestInput<'a> {
     seed: u32,
     total_score: i32,
     card_scores: &'a [CardRogueliteCardScoreTrace],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScoreCompositionDigestInput<'a> {
+    schema_version: &'a str,
+    config_id: &'a str,
+    variant: &'a str,
+    seed: u32,
+    degenerate_threshold: i32,
+    total_score: i32,
+    findings: &'a [CardRogueliteCompositionFinding],
 }
 
 fn one() -> i32 {
@@ -586,6 +628,84 @@ pub fn resolve_card_roguelite_score_resolution(
     };
     resolution.digest = digest_score_resolution(&resolution);
     Ok(resolution)
+}
+
+pub fn analyze_card_roguelite_score_composition(
+    config: &CardRogueliteConfig,
+) -> Result<CardRogueliteScoreComposition> {
+    const DEGENERATE_THRESHOLD: i32 = 4;
+
+    let resolution = resolve_card_roguelite_score_resolution(config)?;
+    let findings = resolution
+        .card_scores
+        .iter()
+        .map(|trace| {
+            let modifier_ids = trace
+                .steps
+                .iter()
+                .map(|step| step.modifier_id.clone())
+                .collect::<Vec<_>>();
+            let readable_effects = trace
+                .steps
+                .iter()
+                .filter_map(|step| step.effect_text.clone())
+                .collect::<Vec<_>>();
+            let multiplicative_count = trace
+                .steps
+                .iter()
+                .filter(|step| step.multiply_score > 1)
+                .count() as u32;
+            let modifier_count = trace.steps.len() as u32;
+            let threshold_score = trace
+                .base_score
+                .checked_mul(DEGENERATE_THRESHOLD)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "score composition overflow while checking card {} threshold",
+                        trace.card_id
+                    )
+                })?;
+            let power_delta = trace
+                .final_score
+                .checked_sub(trace.base_score)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "score composition overflow while computing card {} delta",
+                        trace.card_id
+                    )
+                })?;
+            Ok(CardRogueliteCompositionFinding {
+                card_id: trace.card_id.clone(),
+                modifier_ids,
+                readable_effects,
+                base_score: trace.base_score,
+                final_score: trace.final_score,
+                power_delta,
+                modifier_count,
+                multiplicative_count,
+                degenerate: modifier_count >= 2
+                    && multiplicative_count >= 2
+                    && trace.final_score >= threshold_score,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut composition = CardRogueliteScoreComposition {
+        schema_version: CARD_ROGUELITE_SCORE_COMPOSITION_SCHEMA_VERSION.to_string(),
+        config_id: config.config_id.clone(),
+        variant: config.variant.clone(),
+        seed: config.seed,
+        degenerate_threshold: DEGENERATE_THRESHOLD,
+        total_score: resolution.total_score,
+        findings,
+        digest: CardRogueliteDigest {
+            algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+            value: String::new(),
+        },
+        read_only_inspection: read_only_inspection(),
+    };
+    composition.digest = digest_score_composition(&composition);
+    Ok(composition)
 }
 
 pub fn card_roguelite_probe_state(config: &CardRogueliteConfig) -> Result<CardRogueliteProbeState> {
@@ -931,6 +1051,23 @@ fn digest_score_resolution(resolution: &CardRogueliteScoreResolution) -> CardRog
         seed: resolution.seed,
         total_score: resolution.total_score,
         card_scores: &resolution.card_scores,
+    })
+    .unwrap_or_default();
+    CardRogueliteDigest {
+        algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+        value: format!("{:016x}", fnv1a64(&canonical)),
+    }
+}
+
+fn digest_score_composition(composition: &CardRogueliteScoreComposition) -> CardRogueliteDigest {
+    let canonical = serde_json::to_vec(&ScoreCompositionDigestInput {
+        schema_version: &composition.schema_version,
+        config_id: &composition.config_id,
+        variant: &composition.variant,
+        seed: composition.seed,
+        degenerate_threshold: composition.degenerate_threshold,
+        total_score: composition.total_score,
+        findings: &composition.findings,
     })
     .unwrap_or_default();
     CardRogueliteDigest {

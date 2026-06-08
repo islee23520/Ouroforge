@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "scoring-composition-baseline",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4806,
+  "cards": {
+    "starter-gear": {
+      "cost": 1,
+      "tags": ["starter", "gear"],
+      "actions": [{ "type": "score", "amount": 10 }],
+      "modifierRefs": ["overdrive"]
+    }
+  },
+  "startingDeck": ["starter-gear"],
+  "modifiers": {
+    "overdrive": {
+      "order": 10,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": {
+        "text": "double score as single modifier",
+        "scope": "scoringPhase",
+        "operation": "multiplicative"
+      }
+    }
+  },
+  "run": { "startingHp": 20, "startingQuota": 10, "anteSteps": [{ "ante": 1, "quota": 10, "rewardGold": 4 }] },
+  "shop": { "baseGold": 5, "offerCount": 1, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}
