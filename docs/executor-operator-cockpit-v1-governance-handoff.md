@@ -14,7 +14,7 @@ M67 completed the local read-only executor operator cockpit v1. This handoff rec
 | #2008 | PR #2019 | Golden parity and manual fallback panel |
 | #2009 | PR #2020 | Minimal local read-only cockpit demo |
 | #2010 | PR #2021 | Scenario Coverage v59 regression suite |
-| #2011 | this PR | Roadmap/#1 governance refresh and next design gate |
+| #2011 | PR #2022 | Roadmap/#1 governance refresh and next design gate |
 
 ## Preserved two-plane contract
 
@@ -45,7 +45,7 @@ M67 intentionally did not add:
 
 Use this concise status note in #1 while keeping #1 open:
 
-> M67 — Executor Operator Cockpit v1 is complete as of PRs #2013, #2014, #2015, #2017, #2018, #2019, #2020, #2021, and #2011. The landed scope is a local read-only Studio/executor cockpit: boundary contract, campaign status, task DAG/progress, copy-only blocked runbook, local telemetry/utilization, golden parity/manual fallback, minimal demo, and Scenario Coverage v59. The two-plane contract remains unchanged: Elixir/OTP is local control plane only; Rust is the data plane/source of truth behind the frozen `ouroforge` CLI; no direct trusted artifact/ledger/evidence/trust-gradient/apply/release/merge/deploy writes were introduced. #1 and #23 remain open governance anchors.
+> M67 — Executor Operator Cockpit v1 is complete as of PRs #2013, #2014, #2015, #2017, #2018, #2019, #2020, #2021, and #2022. The landed scope is a local read-only Studio/executor cockpit: boundary contract, campaign status, task DAG/progress, copy-only blocked runbook, local telemetry/utilization, golden parity/manual fallback, minimal demo, and Scenario Coverage v59. The two-plane contract remains unchanged: Elixir/OTP is local control plane only; Rust is the data plane/source of truth behind the frozen `ouroforge` CLI; no direct trusted artifact/ledger/evidence/trust-gradient/apply/release/merge/deploy writes were introduced. #1 and #23 remain open governance anchors.
 
 ## Next design-gate question
 

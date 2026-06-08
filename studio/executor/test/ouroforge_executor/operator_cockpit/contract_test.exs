@@ -15,6 +15,11 @@ defmodule OuroforgeExecutor.OperatorCockpit.ContractTest do
     refute contract.remote_workers?
     refute contract.remote_telemetry?
     assert Contract.read_only?(contract)
+
+    refute Contract.read_only?(%{contract | remote_workers?: true})
+    refute Contract.read_only?(%{contract | hosted_dashboard?: true})
+    refute Contract.read_only?(%{contract | remote_telemetry?: true})
+    refute Contract.read_only?(%{contract | local_only?: false})
   end
 
   test "M67-1 contract enumerates all required local executor states" do

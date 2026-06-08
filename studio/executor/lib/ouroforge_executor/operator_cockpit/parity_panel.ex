@@ -92,8 +92,18 @@ defmodule OuroforgeExecutor.OperatorCockpit.ParityPanel do
 
   defp fallback_commands(transcripts) do
     transcripts
-    |> Enum.map(fn entry -> "ouroforge #{Enum.join(entry.argv, " ")}" end)
+    |> Enum.map(fn entry -> "ouroforge #{Enum.map_join(entry.argv, " ", &shell_quote/1)}" end)
     |> Enum.uniq()
+  end
+
+  defp shell_quote(value) do
+    value = to_string(value)
+
+    if String.match?(value, ~r/^[A-Za-z0-9_@%+=:,\.\/\-]+$/) do
+      value
+    else
+      "'" <> String.replace(value, "'", "'\''") <> "'"
+    end
   end
 
   defp mismatches(manual, executor) do

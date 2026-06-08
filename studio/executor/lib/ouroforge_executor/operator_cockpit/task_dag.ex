@@ -112,7 +112,7 @@ defmodule OuroforgeExecutor.OperatorCockpit.TaskDAG do
     plan.tasks
     |> Enum.reject(&(&1.id in completed or &1.id in skipped))
     |> Enum.flat_map(fn task ->
-      missing = Enum.reject(task.depends_on, &(&1 in completed or &1 in skipped))
+      missing = Enum.reject(task.depends_on, &(&1 in completed))
       if missing == [], do: [], else: [%{task_id: task.id, waiting_for: missing}]
     end)
   end

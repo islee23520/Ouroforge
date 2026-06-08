@@ -61,7 +61,12 @@ defmodule OuroforgeExecutor.OperatorCockpit.TelemetryPanel do
       stop_gate: %{
         decision: stop_decision,
         human_judgment_required?:
-          stop_decision in [:budget_exhausted, :human_decision_required, :ambiguous]
+          stop_decision in [
+            :budget_exhausted,
+            :human_decision_required,
+            :ambiguous,
+            :unknown_untrusted_input
+          ]
       },
       notes: notes(queue_depth, backpressure_depth, retry_attempts, stop_decision)
     }
@@ -171,9 +176,26 @@ defmodule OuroforgeExecutor.OperatorCockpit.TelemetryPanel do
   defp atomish(map, keys, default) do
     Enum.find_value(keys, default, fn key ->
       case Map.get(map, key) do
-        value when is_atom(value) -> value
-        value when is_binary(value) -> String.to_atom(value)
-        _ -> nil
+        value when value in [:none, :budget_exhausted, :human_decision_required, :ambiguous] ->
+          value
+
+        "none" ->
+          :none
+
+        "budget_exhausted" ->
+          :budget_exhausted
+
+        "human_decision_required" ->
+          :human_decision_required
+
+        "ambiguous" ->
+          :ambiguous
+
+        value when is_binary(value) ->
+          :unknown_untrusted_input
+
+        _ ->
+          nil
       end
     end)
   end

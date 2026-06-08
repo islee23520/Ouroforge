@@ -29,6 +29,34 @@ defmodule OuroforgeExecutor.OperatorCockpit.ParityPanelTest do
     assert [%{reason: :byte_mismatch, step_id: "seed-validate"}] = panel.mismatches
   end
 
+  test "M67-6 shell-quotes copy-only fallback command arguments" do
+    panel =
+      ParityPanel.from_transcripts(
+        [
+          %{
+            step_id: "space-path",
+            argv: ["seed", "validate", "path with spaces/seed's.yaml"],
+            status: 0,
+            stdout: "ok",
+            evidence_ref: "seed.yaml"
+          }
+        ],
+        [
+          %{
+            step_id: "space-path",
+            argv: ["seed", "validate", "path with spaces/seed's.yaml"],
+            status: 0,
+            stdout: "ok",
+            evidence_ref: "seed.yaml"
+          }
+        ]
+      )
+
+    assert panel.manual_fallback_commands == [
+             "ouroforge seed validate 'path with spaces/seed'\''s.yaml'"
+           ]
+  end
+
   test "M67-6 render exposes copy-only manual fallback commands" do
     rendered = :matching |> ParityPanel.fixture() |> ParityPanel.render()
 

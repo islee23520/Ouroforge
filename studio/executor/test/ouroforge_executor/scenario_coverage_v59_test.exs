@@ -60,6 +60,9 @@ defmodule OuroforgeExecutor.ScenarioCoverageV59Test do
              "No direct artifact, ledger, evidence, trust-gradient, apply, release, merge, or deploy writes"
 
     assert doc =~ "#1 and #23 remain open governance anchors"
+    assert doc =~ "PR #2022"
+    refute doc =~ "#2011 | this PR"
+    refute doc =~ "and #2011."
     assert doc =~ "Next design-gate question"
   end
 

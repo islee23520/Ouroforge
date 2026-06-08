@@ -68,7 +68,11 @@ defmodule OuroforgeExecutor.OperatorCockpit.Contract do
   def supported_states, do: @states
 
   def read_only?(%__MODULE__{} = contract) do
-    contract.trusted_write_authority? == false and
+    contract.local_only? == true and
+      contract.remote_workers? == false and
+      contract.hosted_dashboard? == false and
+      contract.remote_telemetry? == false and
+      contract.trusted_write_authority? == false and
       contract.browser_execution_authority? == false and
       contract.self_certification_authority? == false
   end

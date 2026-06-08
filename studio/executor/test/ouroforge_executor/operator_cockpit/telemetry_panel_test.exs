@@ -28,6 +28,18 @@ defmodule OuroforgeExecutor.OperatorCockpit.TelemetryPanelTest do
     assert fixtures.blocked.stop_gate.decision == :human_decision_required
   end
 
+  test "M67-5 treats unknown stop-gate strings as untrusted human-review input" do
+    panel =
+      TelemetryPanel.from_inputs(
+        OuroforgeExecutor.OperatorCockpit.CampaignStatus.fixture(:normal),
+        OuroforgeExecutor.OperatorCockpit.TaskDAG.fixture(:waiting),
+        %{"stopGate" => "not-a-known-stop-gate"}
+      )
+
+    assert panel.stop_gate.decision == :unknown_untrusted_input
+    assert panel.stop_gate.human_judgment_required?
+  end
+
   test "M67-5 render is operator-friendly and local-only" do
     rendered = :budget_limited |> TelemetryPanel.fixture() |> TelemetryPanel.render()
 
