@@ -203,11 +203,24 @@ writes the explicit ADR.
 
 # ADR: Elixir/BEAM adoption decision
 
-Status: **NO-GO for implementation now**
+Status: **PARTIAL GO (language direction) — BUILD TIMING GATED.** Superseded in part by the 2026-06-08 update below; the original 2026-06-02 NO-GO analysis is retained as context.
 
-Decision date: 2026-06-02
+Decision date: 2026-06-02 (original); 2026-06-08 (update)
 
-## ADR question
+## 2026-06-08 Update: Studio Executor Control Plane — language GO, build timing gated
+
+Context that changed since 2026-06-02: the roadmap now defines a **Studio executor** (Era K, Milestones 62–66) — the production-orchestration runtime that drives the producer/role agents end-to-end. This is a **single-machine, local-first control plane**, distinct from the *distributed/multi-machine* orchestration that the original ADR rejected.
+
+Decision:
+
+- **Language direction: GO for Elixir/OTP as the Studio executor *control plane* only.** Elixir/OTP may own worker supervision (spawn/crash-isolation/restart), task scheduling over the production plan and its dependency graph, runtime enforcement of budgets/stop-conditions, retry/backoff, backpressure, concurrency control, and live telemetry fanout derived from kernel artifacts.
+- **Build timing: still GATED on evidence (DEFER by default).** Building the executor proceeds only when the manual/ad-hoc orchestration shows measurable pain — operator-authored task assignment, manual restart/budget/conflict handling, hand-rolled supervision reinventing OTP. Milestone 62 is the design gate that records this GO/DEFER timing with evidence and the two-plane CLI contract.
+- **The Rust kernel is unchanged and remains the data plane.** Elixir must never own seed/run/ledger/evidence/verdict/mutation schemas or validation, the evaluator gates, deterministic runtime/simulation, trusted-write acceptance, releases, or local file artifact contracts. The executor reaches the kernel only via the `ouroforge` CLI; the kernel validates everything; trusted writes flow only through review/apply/trust-gradient; the executor never self-certifies.
+- **Still NO-GO / DEFER (unchanged):** distributed/multi-machine orchestration, hosted/cloud, servers/databases, and live-ops remain Layer-3 and deferred per Milestone 45 / #1508. Era K is local single-machine; the manual Rust-CLI loop remains a tested first-class fallback.
+
+The remainder of this document (the 2026-06-02 NO-GO analysis and its "if adopted later, what it may own / must not own" boundaries) stands as the still-binding constraint set for everything *except* the narrowly-scoped Studio executor control plane authorized above.
+
+## ADR question (2026-06-02, original)
 
 Should Ouroforge introduce Elixir/BEAM now for distributed orchestration?
 
