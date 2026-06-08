@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::fnv1a64;
 use crate::seeded_rng::{SeededRng, SeededRngState, SEEDED_RNG_ALGORITHM};
@@ -193,6 +194,123 @@ struct DigestInput<'a> {
 
 fn one() -> i32 {
     1
+}
+
+pub fn deck_roguelike_spec_to_substrate_config(spec: &Value) -> Result<CardRogueliteConfig> {
+    let obj = spec
+        .as_object()
+        .ok_or_else(|| anyhow!("deck roguelike spec must be an object"))?;
+    if spec.get("schemaVersion").and_then(Value::as_str) != Some("ouroforge.deck-roguelike.v1") {
+        return Err(anyhow!("schemaVersion must be ouroforge.deck-roguelike.v1"));
+    }
+    let seed = spec.get("seed").and_then(Value::as_u64).unwrap_or(0) as u32;
+    let config_id = spec
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("deck-roguelike-classic")
+        .to_string();
+    let cards_obj = spec
+        .get("cards")
+        .and_then(Value::as_object)
+        .filter(|cards| !cards.is_empty())
+        .ok_or_else(|| anyhow!("cards vocabulary must be a non-empty object"))?;
+    let mut cards = BTreeMap::new();
+    for (id, card) in cards_obj {
+        let card_obj = card
+            .as_object()
+            .ok_or_else(|| anyhow!("card {id} must be an object"))?;
+        let card_type = card_obj
+            .get("type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("card {id} must declare type"))?;
+        let cost = card_obj
+            .get("cost")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| anyhow!("card {id} cost must be a non-negative integer"))?
+            as u32;
+        let (tag, effect) = match card_type {
+            "attack" => (
+                "attack".to_string(),
+                CardRogueliteEffect::Damage {
+                    amount: card_obj
+                        .get("damage")
+                        .and_then(Value::as_i64)
+                        .ok_or_else(|| anyhow!("attack card {id} must declare damage"))?
+                        as i32,
+                },
+            ),
+            "skill" => (
+                "skill".to_string(),
+                CardRogueliteEffect::Block {
+                    amount: card_obj
+                        .get("block")
+                        .and_then(Value::as_i64)
+                        .ok_or_else(|| anyhow!("skill card {id} must declare block"))?
+                        as i32,
+                },
+            ),
+            other => return Err(anyhow!("card {id} has unknown type {other}")),
+        };
+        cards.insert(
+            id.clone(),
+            CardRogueliteCard {
+                cost,
+                tags: vec![tag, "deck-roguelike-classic".to_string()],
+                actions: vec![effect],
+                modifier_refs: Vec::new(),
+            },
+        );
+    }
+    let starting_deck = spec
+        .get("deck")
+        .and_then(Value::as_array)
+        .filter(|deck| !deck.is_empty())
+        .ok_or_else(|| anyhow!("deck must be a non-empty array of card ids"))?
+        .iter()
+        .map(|card_id| {
+            card_id
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| anyhow!("deck card id must be a string"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let player_hp =
+        spec.get("player")
+            .and_then(|player| player.get("maxHp"))
+            .and_then(Value::as_i64)
+            .ok_or_else(|| anyhow!("player.maxHp must be a positive integer"))? as i32;
+    let enemy_hp =
+        spec.get("enemy")
+            .and_then(|enemy| enemy.get("maxHp"))
+            .and_then(Value::as_i64)
+            .ok_or_else(|| anyhow!("enemy.maxHp must be a positive integer"))? as i32;
+    let config = CardRogueliteConfig {
+        schema_version: CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION.to_string(),
+        config_id,
+        variant: "deck-roguelike-classic".to_string(),
+        seed,
+        cards,
+        starting_deck,
+        modifiers: BTreeMap::new(),
+        run: CardRogueliteRunConfig {
+            starting_hp: player_hp,
+            starting_quota: enemy_hp,
+            ante_steps: vec![CardRogueliteAnteStep {
+                ante: 1,
+                quota: enemy_hp,
+                reward_gold: 0,
+            }],
+        },
+        shop: CardRogueliteShopConfig {
+            base_gold: 0,
+            offer_count: 1,
+            price_floor: 0,
+        },
+        meta: CardRogueliteMetaConfig::default(),
+    };
+    let _ = obj;
+    validate_card_roguelite_config(&config)?;
+    Ok(config)
 }
 
 pub fn validate_card_roguelite_config(config: &CardRogueliteConfig) -> Result<()> {

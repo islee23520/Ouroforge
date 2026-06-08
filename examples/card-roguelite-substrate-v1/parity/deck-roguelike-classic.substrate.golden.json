@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "deck-roguelike-trial-v1",
+  "variant": "deck-roguelike-classic",
+  "seed": 12345,
+  "cards": {
+    "bash": {
+      "cost": 2,
+      "tags": [
+        "attack",
+        "deck-roguelike-classic"
+      ],
+      "actions": [
+        {
+          "type": "damage",
+          "amount": 10
+        }
+      ],
+      "modifierRefs": []
+    },
+    "defend": {
+      "cost": 1,
+      "tags": [
+        "skill",
+        "deck-roguelike-classic"
+      ],
+      "actions": [
+        {
+          "type": "block",
+          "amount": 5
+        }
+      ],
+      "modifierRefs": []
+    },
+    "strike": {
+      "cost": 1,
+      "tags": [
+        "attack",
+        "deck-roguelike-classic"
+      ],
+      "actions": [
+        {
+          "type": "damage",
+          "amount": 6
+        }
+      ],
+      "modifierRefs": []
+    }
+  },
+  "startingDeck": [
+    "strike",
+    "strike",
+    "strike",
+    "strike",
+    "strike",
+    "bash",
+    "bash",
+    "defend",
+    "defend",
+    "defend"
+  ],
+  "modifiers": {},
+  "run": {
+    "startingHp": 30,
+    "startingQuota": 20,
+    "anteSteps": [
+      {
+        "ante": 1,
+        "quota": 20,
+        "rewardGold": 0
+      }
+    ]
+  },
+  "shop": {
+    "baseGold": 0,
+    "offerCount": 1,
+    "priceFloor": 0
+  },
+  "meta": {
+    "unlocks": []
+  }
+}

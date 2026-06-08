@@ -134,10 +134,10 @@ pub mod runtime_frame_budget;
 pub mod visual_regression_scale;
 pub use card_roguelite_substrate::{
     card_roguelite_probe_state, card_roguelite_seed_algorithm,
-    default_deck_roguelike_substrate_config, digest_card_roguelite_state,
-    resolve_card_roguelite_state, validate_card_roguelite_config, CardRogueliteAnteStep,
-    CardRogueliteCard, CardRogueliteConfig, CardRogueliteDigest, CardRogueliteEffect,
-    CardRogueliteMetaConfig, CardRogueliteModifier, CardRogueliteProbeState,
+    deck_roguelike_spec_to_substrate_config, default_deck_roguelike_substrate_config,
+    digest_card_roguelite_state, resolve_card_roguelite_state, validate_card_roguelite_config,
+    CardRogueliteAnteStep, CardRogueliteCard, CardRogueliteConfig, CardRogueliteDigest,
+    CardRogueliteEffect, CardRogueliteMetaConfig, CardRogueliteModifier, CardRogueliteProbeState,
     CardRogueliteReadOnlyInspection, CardRogueliteRunConfig, CardRogueliteShopConfig,
     CardRogueliteShopOffer, CardRogueliteState, CardRogueliteStatus, CardRogueliteUnlock,
     CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION, CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM,
