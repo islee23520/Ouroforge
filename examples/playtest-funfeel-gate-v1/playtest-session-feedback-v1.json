@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "ouroforge.playtest-capture.v1",
+  "captureId": "playtest-capture-feedback-only-v1",
+  "projectId": "signal-gate",
+  "runId": "playtest-run-local-002",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": ["docs/playtest-funfeel-gate-v1.md#structured-human-playtest-capture-contract"],
+  "playtestBuildRef": "examples/qa-playtest-demo-v1/playtest-demo-manifest.json",
+  "actor": {
+    "actorId": "human-playtester-local-002",
+    "role": "human-playtester",
+    "humanConfirmed": true
+  },
+  "recordedAtUnixMs": 1786000200000,
+  "signals": {
+    "durationBucket": "5m-15m",
+    "runCount": 1,
+    "endReason": "timebox-ended",
+    "oneMoreRun": "maybe",
+    "retentionProxy": "unknown",
+    "replayRequested": false,
+    "confusionMarkers": []
+  },
+  "feedback": {
+    "notes": "Short session produced clear qualitative feedback but no human verdict.",
+    "likedMoments": ["fast restart"],
+    "dislikedMoments": [],
+    "frictionTags": ["needs-more-context"],
+    "severity": "low",
+    "suggestedFollowUp": null
+  },
+  "evidenceRefs": [
+    { "kind": "playtest-log", "path": "evidence/playtest/run-002/human-notes.json" }
+  ],
+  "boundary": "human-playtest-capture-evidence-only",
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped",
+  "trustedWriteRequested": false,
+  "releaseAuthority": false
+}

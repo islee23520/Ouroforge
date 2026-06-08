@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "ouroforge.playtest-capture.v1",
+  "captureId": "playtest-capture-malformed-v1",
+  "projectId": "signal-gate",
+  "runId": "playtest-run-local-bad",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": [],
+  "playtestBuildRef": "../outside-build.json",
+  "actor": {
+    "actorId": "automated-agent",
+    "role": "bot",
+    "humanConfirmed": false
+  },
+  "recordedAtUnixMs": 0,
+  "signals": {
+    "durationBucket": "instant-fun",
+    "runCount": 0,
+    "endReason": "auto-scored",
+    "oneMoreRun": "definitely-fun",
+    "retentionProxy": "guaranteed-retention",
+    "replayRequested": false,
+    "confusionMarkers": [""]
+  },
+  "feedback": {
+    "notes": "",
+    "likedMoments": [],
+    "dislikedMoments": [],
+    "frictionTags": [],
+    "severity": "fun-score",
+    "suggestedFollowUp": ""
+  },
+  "evidenceRefs": [
+    { "kind": "release-approval", "path": "../release.json" }
+  ],
+  "boundary": "automated-fun-verdict",
+  "generatedStatePolicy": "commit every generated run",
+  "trustedWriteRequested": true,
+  "releaseAuthority": true
+}

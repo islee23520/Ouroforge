@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "ouroforge.playtest-capture.v1",
+  "captureId": "playtest-capture-signal-gate-local-v1",
+  "projectId": "signal-gate",
+  "runId": "playtest-run-local-001",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": [
+    "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+  ],
+  "playtestBuildRef": "examples/qa-playtest-demo-v1/playtest-demo-manifest.json",
+  "actor": {
+    "actorId": "human-playtester-local-001",
+    "role": "human-playtester",
+    "humanConfirmed": true
+  },
+  "recordedAtUnixMs": 1786000100000,
+  "signals": {
+    "durationBucket": "15m-30m",
+    "runCount": 3,
+    "endReason": "completed",
+    "oneMoreRun": "yes",
+    "retentionProxy": "returned-within-local-window",
+    "replayRequested": true,
+    "confusionMarkers": ["shop-choice-copy", "enemy-intent-readability"]
+  },
+  "feedback": {
+    "notes": "Player understood the loop after the first run and asked for another attempt; this is evidence only, not a fun verdict.",
+    "likedMoments": ["rivet-strike combo turn", "clear block feedback"],
+    "dislikedMoments": ["shop labels were easy to skim past"],
+    "frictionTags": ["ui-readability", "shop-choice"],
+    "severity": "medium",
+    "suggestedFollowUp": "Improve shop label contrast before requesting a human fun-feel verdict."
+  },
+  "evidenceRefs": [
+    { "kind": "runtime-probe", "path": "evidence/playtest/run-001/runtime-probe.json" },
+    { "kind": "evaluator-verdict", "path": "evidence/playtest/run-001/evaluator-verdict.json" },
+    { "kind": "playtest-log", "path": "evidence/playtest/run-001/human-notes.json" }
+  ],
+  "boundary": "human-playtest-capture-evidence-only",
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped",
+  "trustedWriteRequested": false,
+  "releaseAuthority": false
+}
