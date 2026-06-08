@@ -383,9 +383,15 @@ fn validate_functions(functions: &[String]) -> Result<()> {
 }
 
 fn canonical_functions(functions: &[String]) -> Vec<String> {
+    // `review` is a mandatory gate: every derived plan must terminate in a review
+    // task (enforced by `validate_tasks`). Include it even when the intent's
+    // `requestedFunctions` omits it, so any valid intent decomposes into a plan
+    // that preserves the review/apply/human gate rather than failing derivation.
     SUPPORTED_FUNCTIONS
         .iter()
-        .filter(|function| functions.iter().any(|requested| requested == **function))
+        .filter(|function| {
+            **function == "review" || functions.iter().any(|requested| requested == **function)
+        })
         .map(|function| (*function).to_string())
         .collect()
 }

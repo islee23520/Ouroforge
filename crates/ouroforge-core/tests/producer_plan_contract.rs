@@ -69,6 +69,32 @@ fn malformed_intent_is_rejected_fail_closed() {
 }
 
 #[test]
+fn supported_subset_without_review_still_derives_a_plan_with_the_review_gate() {
+    // Regression for #1884/#1683: a design intent can validate with a supported
+    // `requestedFunctions` subset that omits `review`; derivation must still
+    // produce a plan terminating in the mandatory review gate rather than failing
+    // its own `validate_tasks` check.
+    let mut intent =
+        ProducerDesignIntent::from_json_str(&read_fixture("design-intent.valid.fixture.json"))
+            .expect("valid design intent parses");
+    intent.requested_functions = vec!["requirements".to_string(), "mechanics".to_string()];
+    intent.validate().expect("subset intent validates");
+
+    let plan = derive_producer_plan(&intent).expect("subset intent still derives a plan");
+    assert_eq!(
+        plan.tasks.last().unwrap().function_agent,
+        "review",
+        "derived plan must terminate in the mandatory review gate"
+    );
+    assert!(
+        plan.tasks
+            .iter()
+            .any(|task| task.function_agent == "review"),
+        "derived plan must include a review task even when not requested"
+    );
+}
+
+#[test]
 fn decomposition_is_deterministic_and_order_independent_for_requested_functions() {
     let mut first =
         ProducerDesignIntent::from_json_str(&read_fixture("design-intent.valid.fixture.json"))
