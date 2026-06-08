@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v46.runtime-feedback-backcompat.v1",
+  "issue": "1823",
+  "generatedStatePolicy": "fixture-scoped only; generated runtime feedback snapshots remain untracked outside this golden",
+  "boundary": "state/shape-only backward compatibility for existing runtime feedback; not a live browser run, not a timing assertion, not a trusted write, and not a fun/quality verdict",
+  "expected": {
+    "runtimeIndexScript": "<script src=\"juice.js\"></script>",
+    "runtimeFeedbackEvent": "runtime.juice.feedback",
+    "runtimeFeedbackUpdateEvent": "runtime.juice.feedback_update",
+    "probeNamespace": "__OUROFORGE__",
+    "worldStateField": "state.juice",
+    "juiceSchemaVersion": "ouroforge.runtime-juice-probe.v1",
+    "requiredPrimitiveKinds": ["tween", "shake", "hit-stop", "sfx"],
+    "disallowedActions": ["trusted writes", "command bridge", "automated fun verdict"]
+  }
+}

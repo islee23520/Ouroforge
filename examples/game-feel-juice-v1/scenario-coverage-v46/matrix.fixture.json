@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v46.game-feel-juice.v1",
+  "issue": "1823",
+  "anchor": "#1 Era I Milestone 51",
+  "generatedStatePolicy": "fixture-scoped only; generated runs, responsiveness reports, cascade traces, and browser snapshots remain untracked outside this scenario coverage fixture",
+  "boundary": "Rust/local state/shape checks only; browser/Studio read-only; generated runs/artifacts remain untracked unless fixture-scoped; no timing flakes, no trusted writes, no auto-apply, no auto-merge, no fun/quality/production/Godot-replacement claim; #1 and #23 remain open",
+  "rows": [
+    {
+      "id": "V46.juice.primitives",
+      "surface": "#1819 runtime juice primitives",
+      "fixtureRef": "examples/game-runtime/juice-scene-v1.json",
+      "expectedShape": "four deterministic primitive declarations: tween, shake, hit-stop, and sfx"
+    },
+    {
+      "id": "V46.cascade.order",
+      "surface": "#1820 score-cascade payoff feedback",
+      "fixtureRef": "examples/game-runtime/score-cascade-feedback-v1.json",
+      "expectedShape": "ordered cascade events with score_cascade juice trigger and final score 24"
+    },
+    {
+      "id": "V46.responsiveness.pass",
+      "surface": "#1821 responsiveness verifier",
+      "fixtureRef": "examples/game-runtime/responsiveness-v1.json#responsiveness-within-budget",
+      "expectedShape": "80ms latency passes the 100ms budget"
+    },
+    {
+      "id": "V46.responsiveness.fail",
+      "surface": "#1821 responsiveness verifier",
+      "fixtureRef": "examples/game-runtime/responsiveness-v1.json#responsiveness-over-budget",
+      "expectedShape": "112ms latency fails the 100ms budget"
+    },
+    {
+      "id": "V46.demo.smoke",
+      "surface": "#1822 Game-Feel and Juice demo",
+      "fixtureRef": "examples/game-feel-juice-v1/demo/game-feel-juice-demo-v1.json",
+      "expectedShape": "demo manifest references existing deterministic fixtures and no live browser dependency"
+    },
+    {
+      "id": "V46.runtime.backcompat",
+      "surface": "existing runtime feedback compatibility",
+      "fixtureRef": "examples/game-feel-juice-v1/scenario-coverage-v46/runtime-feedback-backcompat-golden.json",
+      "expectedShape": "runtime still exposes juice.js, runtime.juice.feedback events, and window.__OUROFORGE__ read-only probe wiring"
+    }
+  ]
+}
