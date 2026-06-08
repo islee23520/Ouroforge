@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v45.engine-builder-balance.v1",
+  "issue": "1816",
+  "suiteId": "scenario-coverage-v45-engine-builder-balance",
+  "boundary": "Rust/local state and shape regression coverage; browser/Studio read-only; generated runs/artifacts remain untracked unless fixture-scoped; no auto-apply; no auto-merge; no fun/quality/production/Godot claim; #1 and #23 remain open.",
+  "rows": [
+    { "id": "V45.combo.detect", "kind": "combo", "fixture": "examples/engine-builder-balance-v1/combo-detector/degenerate-combo.fixture.json", "expected": "degenerate-combo" },
+    { "id": "V45.combo.balanced", "kind": "combo", "fixture": "examples/engine-builder-balance-v1/combo-detector/balanced-build.fixture.json", "expected": "no-finding" },
+    { "id": "V45.dominant.detect", "kind": "dominant", "fixture": "examples/engine-builder-balance-v1/dominant-build/dominant-build.fixture.json", "expected": "dominant-and-dead" },
+    { "id": "V45.dominant.balanced", "kind": "dominant", "fixture": "examples/engine-builder-balance-v1/dominant-build/balanced-builds.fixture.json", "expected": "no-finding" },
+    { "id": "V45.fairness.unfair", "kind": "fairness", "fixture": "examples/engine-builder-balance-v1/fairness/fairness.fixture.json", "expected": "unfair-daily-seed" },
+    { "id": "V45.demo.smoke", "kind": "demo", "fixture": "examples/engine-builder-balance-v1/demo/demo-manifest.json", "expected": "demo-manifest" },
+    { "id": "V45.m32.backcompat", "kind": "m32-backcompat", "fixture": "examples/game-runtime/balance-telemetry-report-v1.json", "expected": "milestone-32-balance-report" }
+  ]
+}
