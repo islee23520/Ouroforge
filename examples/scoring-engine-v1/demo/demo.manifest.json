@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "ouroforge.scoring-engine-demo.v1",
+  "issue": "1802",
+  "title": "Scoring-Engine Demo v1",
+  "boundary": "Fixture-scoped Rust/local scoring demo; browser/Studio read-only; no network/live browser; no trusted writes; no auto-apply; no auto-merge; no automated fun or quality verdict; generated runs/artifacts remain untracked unless fixture-scoped; #1 and #23 remain open.",
+  "readableComposedScore": {
+    "config": "examples/scoring-engine-v1/demo/readable-composed-score.config.json",
+    "expectedTotalScore": 30,
+    "expectedFinalScore": 30,
+    "expectedModifierOrder": ["tuned", "overdrive"],
+    "expectedDegenerate": false
+  },
+  "degenerateCombo": {
+    "config": "examples/scoring-engine-v1/demo/degenerate-combo.config.json",
+    "expectedTotalScore": 90,
+    "expectedFinalScore": 90,
+    "expectedModifierOrder": ["tuned", "overdrive", "reactor-loop"],
+    "expectedDegenerate": true,
+    "replaySeed": 5803
+  }
+}
