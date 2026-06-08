@@ -1558,6 +1558,66 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Multi-Agent Production Pipeline v1 governance refresh (Era H Milestone 42)
+
+Multi-Agent Production Pipeline v1 is recorded as **complete for Era H Milestone
+42** under #1, on merged evidence, as a conservative, additive, local-only
+milestone. It realizes the Milestone 13 role model as **evidence-gated,
+proposal-only collaboration**: role-specialized agents propose artifacts, hand
+work off to one another, and a reviewer/critic gate blocks promotion until an
+independent review passes. Every contract **reuses an existing surface** — the
+Milestone 13 agent role set, the evidence/journal refs, and the Milestone 22
+trust gradient and review/apply path; it adds **no new orchestration engine,
+runtime, writer, scheduler, or worker pool**, and **no role agent ever performs a
+direct trusted write**.
+
+The merged evidence chain is the scope/design gate #1674
+(`docs/production-pipeline-design.md`, PR #1704) — records the GO/DEFER decision,
+the role-agent model, artifact ownership, handoff/conflict-resolution, and
+reviewer/critic promotion-gate contracts, with DEFER as the default outside the
+bounded scope; Role Agent Model and Artifact Ownership v1 #1675
+(`crates/ouroforge-core/src/production_roles.rs`, PR #1790) — per-artifact
+ownership where each class has a single owning role, an unauthorized non-owner
+write and a direct trusted write are rejected fail-closed, and ownership and
+outcomes are recorded as observability evidence; Handoff Artifacts and Conflict
+Resolution v1 #1676 (`crates/ouroforge-core/src/production_handoff.rs`, PR #1876)
+— role-to-role handoffs with deterministic conflict resolution where concurrent
+edits to one base are blocked and preserved (never auto-merged) and stale-ref
+handoffs are needs-fix, failing closed on any declared/computed mismatch;
+Reviewer/Critic Promotion Gates v1 #1678
+(`crates/ouroforge-core/src/production_review_gates.rs`, PR #1877) — gates that
+block promotion until an independent reviewer approves and the critic does not
+veto, with higher trust-gradient risk requiring stronger review and
+`promote-allowed` never auto-applying, across distinct implementer/reviewer/critic
+actors (no self-approval); the Multi-Agent Production Pipeline Demo v1 #1679
+(`docs/production-pipeline-v1-demo.md`, PR #1878) — a deterministic,
+fixture-scoped slice where three role agents collaborate with handoffs and the
+same gate progresses from blocked to promote-allowed only after review; and
+Scenario Coverage v39 #1680 (`docs/scenario-coverage-v39.md`, PR #1879) — an
+enumerated, state/shape-only regression suite over the role/handoff/gate
+behaviors plus a backward-compatibility golden proving the existing single-agent
+evolve/apply flows remain valid. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. Role agents, generation, and the
+producer emit **proposals only** through the existing review/apply/trust-gradient
+path — never a direct trusted write, auto-apply, auto-merge, self-approval, or
+reviewer bypass; high-risk and source-affecting changes are never auto-applied.
+Handoff conflicts are surfaced and preserved, never silently merged, and
+promotion requires an independent review/critic gate over the trust gradient with
+the human release go/no-go preserved. Generated assets/audio/content require
+license/provenance and the function-specific QA gate before promotion. Trusted
+logic is **Rust/local**; the runtime, `window.__OUROFORGE__` probe, and
+dashboard/cockpit/Studio surfaces remain **read-only**. The suite asserts states
+and shapes only, with no flaky/timing-based assertions, no network, and no live
+browser. Existing contracts remain backward-compatible, and generated
+runs/assets/content/artifacts remain ignored unless explicitly fixture-scoped.
+Shipping/hosted/cloud/live-ops stays **DEFER until a #1508 Layer-3 GO**
+(distributed orchestration / Elixir remains NO-GO under ADR #92). No
+production-readiness, quality, fun, Godot replacement/parity, or autonomous
+shipping claim is introduced — this is an accountability and review-governance
+framework, not an autonomous studio. Scenario Coverage numbering continues from
+the Era F sequence (v39).
+
 ### Production-Scale QA Matrix v1 governance refresh
 
 Production-Scale QA Matrix v1 is recorded as **complete for Era G Milestone 40**
@@ -2099,6 +2159,28 @@ Godot replacement/parity claim is introduced. **#1 and #23 remain open governanc
 anchors** and are not modified, closed, or narrowed by this refresh; Scenario
 Coverage numbering continues from v33 (Era F) onward through the Era G suite
 (v34–v38).
+
+**Era H opens — Milestone 42 (descriptive, not a maturity claim).** Era H begins
+the autonomous-orchestration work that Era G deliberately deferred, and does so
+as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
+
+- **Era H Milestone 42 — Multi-Agent Production Pipeline v1** (#1674–#1681):
+  realizes the Milestone 13 role model as role-specialized agents that propose
+  artifacts, own a single artifact class each, hand work off with deterministic
+  conflict resolution, and clear an independent reviewer/critic promotion gate
+  over the Milestone 22 trust gradient before anything routes through the
+  existing review/apply path — no role agent ever performs a direct trusted
+  write, `promote-allowed` never auto-applies, and the human release go/no-go is
+  preserved. Every contract reuses an existing surface (the M13 role set, the
+  evidence/journal refs, the trust gradient and review/apply path); no new
+  orchestration engine, runtime, writer, or scheduler is added (PRs
+  #1704/#1790/#1876/#1877/#1878/#1879; Scenario Coverage v39). It is an
+  accountability and review-governance framework only; autonomous producer
+  orchestration, scaled trust/provenance, shipping, hosted/cloud, real-player
+  telemetry, and live-ops stay **DEFER until a #1508 Layer-3 GO**, and
+  distributed orchestration / Elixir remains NO-GO under ADR #92. **#1 and #23
+  remain open governance anchors** and are not modified, closed, or narrowed by
+  this milestone.
 
 ## Product direction
 
