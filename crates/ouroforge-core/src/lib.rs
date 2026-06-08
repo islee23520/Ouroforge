@@ -91,6 +91,7 @@ pub mod generative_intake;
 pub mod generative_promotion_guard;
 pub use evolve_campaign::*;
 pub mod economy_system;
+pub mod funfeel_gate;
 pub mod meta_progression;
 pub mod narrative_system;
 pub mod playtest_capture;
