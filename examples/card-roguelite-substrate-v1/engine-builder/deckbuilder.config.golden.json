@@ -100,12 +100,22 @@
     "overdrive": {
       "order": 20,
       "addScore": 0,
-      "multiplyScore": 2
+      "multiplyScore": 2,
+      "effect": {
+        "text": "double score after additive tuning",
+        "scope": "scoringPhase",
+        "operation": "multiplicative"
+      }
     },
     "tuned": {
       "order": 10,
       "addScore": 2,
-      "multiplyScore": 1
+      "multiplyScore": 1,
+      "effect": {
+        "text": "add +2 before multipliers",
+        "scope": "card",
+        "operation": "additive"
+      }
     }
   },
   "run": {

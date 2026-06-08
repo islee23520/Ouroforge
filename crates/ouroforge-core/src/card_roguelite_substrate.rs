@@ -29,6 +29,7 @@ const MAX_MODIFIERS: usize = 128;
 const MAX_DECK: usize = 128;
 const MAX_SHOP_OFFERS: usize = 16;
 const MAX_META_UNLOCKS: usize = 64;
+const MAX_MODIFIER_EFFECT_TEXT_CHARS: usize = 96;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,6 +76,38 @@ pub struct CardRogueliteModifier {
     pub add_score: i32,
     #[serde(default = "one")]
     pub multiply_score: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect: Option<CardRogueliteModifierEffect>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteModifierEffect {
+    pub text: String,
+    pub scope: CardRogueliteModifierEffectScope,
+    pub operation: CardRogueliteModifierEffectOperation,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CardRogueliteModifierEffectScope {
+    Card,
+    Tag,
+    Hand,
+    Deck,
+    Run,
+    Shop,
+    ScoringPhase,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CardRogueliteModifierEffectOperation {
+    Additive,
+    Multiplicative,
+    Clamp,
+    Selector,
+    Gate,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -356,6 +389,9 @@ pub fn validate_card_roguelite_config(config: &CardRogueliteConfig) -> Result<()
         if modifier.multiply_score < 1 {
             return Err(anyhow!("modifier {modifier_id} multiplyScore must be >= 1"));
         }
+        if let Some(effect) = &modifier.effect {
+            validate_modifier_effect(modifier_id, effect)?;
+        }
     }
     if config.run.starting_hp <= 0 {
         return Err(anyhow!("run.startingHp must be positive"));
@@ -556,6 +592,11 @@ pub fn default_engine_builder_deckbuilder_substrate_config(seed: u32) -> CardRog
             order: 10,
             add_score: 2,
             multiply_score: 1,
+            effect: Some(CardRogueliteModifierEffect {
+                text: "add +2 before multipliers".to_string(),
+                scope: CardRogueliteModifierEffectScope::Card,
+                operation: CardRogueliteModifierEffectOperation::Additive,
+            }),
         },
     );
     modifiers.insert(
@@ -564,6 +605,11 @@ pub fn default_engine_builder_deckbuilder_substrate_config(seed: u32) -> CardRog
             order: 20,
             add_score: 0,
             multiply_score: 2,
+            effect: Some(CardRogueliteModifierEffect {
+                text: "double score after additive tuning".to_string(),
+                scope: CardRogueliteModifierEffectScope::ScoringPhase,
+                operation: CardRogueliteModifierEffectOperation::Multiplicative,
+            }),
         },
     );
 
@@ -736,6 +782,81 @@ fn digest_state(state: &CardRogueliteState) -> CardRogueliteDigest {
         algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
         value: format!("{:016x}", fnv1a64(&canonical)),
     }
+}
+
+fn validate_modifier_effect(modifier_id: &str, effect: &CardRogueliteModifierEffect) -> Result<()> {
+    let text = effect.text.trim();
+    if text != effect.text {
+        return Err(anyhow!(
+            "modifier {modifier_id} effect text must not have leading or trailing whitespace"
+        ));
+    }
+    if text.is_empty()
+        || text.chars().count() > MAX_MODIFIER_EFFECT_TEXT_CHARS
+        || text.contains('\n')
+        || text.contains('\r')
+        || !text.chars().all(|ch| ch.is_ascii_graphic() || ch == ' ')
+    {
+        return Err(anyhow!(
+            "modifier {modifier_id} effect text must be one readable ASCII line up to {MAX_MODIFIER_EFFECT_TEXT_CHARS} chars"
+        ));
+    }
+    if text.split_whitespace().count() < 2 {
+        return Err(anyhow!(
+            "modifier {modifier_id} effect text must be individually legible"
+        ));
+    }
+    let lower = text.to_ascii_lowercase();
+    let blocked_tokens = [
+        "http://",
+        "https://",
+        "javascript:",
+        "<script",
+        "shell",
+        "exec",
+        "write file",
+        "auto-merge",
+        "fun score",
+        "production-ready",
+    ];
+    if blocked_tokens.iter().any(|token| lower.contains(token)) {
+        return Err(anyhow!(
+            "modifier {modifier_id} effect text crosses the readable mechanical boundary"
+        ));
+    }
+    let operation_hint_present = match effect.operation {
+        CardRogueliteModifierEffectOperation::Additive => {
+            lower.contains("add") || lower.contains('+')
+        }
+        CardRogueliteModifierEffectOperation::Multiplicative => {
+            lower.contains("double")
+                || lower.contains("multiply")
+                || lower.contains("multiplier")
+                || lower.contains("times")
+                || lower.contains('x')
+        }
+        CardRogueliteModifierEffectOperation::Clamp => {
+            lower.contains("clamp")
+                || lower.contains("cap")
+                || lower.contains("floor")
+                || lower.contains("limit")
+        }
+        CardRogueliteModifierEffectOperation::Selector => {
+            lower.contains("select")
+                || lower.contains("card")
+                || lower.contains("tag")
+                || lower.contains("matching")
+        }
+        CardRogueliteModifierEffectOperation::Gate => {
+            lower.contains("if") || lower.contains("when") || lower.contains("unless")
+        }
+    };
+    if !operation_hint_present {
+        return Err(anyhow!(
+            "modifier {modifier_id} effect text must describe its declared operation"
+        ));
+    }
+    Ok(())
 }
 
 fn validate_id(label: &str, value: &str) -> Result<()> {

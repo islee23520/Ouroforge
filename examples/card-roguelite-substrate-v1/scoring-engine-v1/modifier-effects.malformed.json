@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "scoring-modifier-effects-malformed",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4802,
+  "cards": {
+    "starter-gear": {
+      "cost": 1,
+      "tags": ["starter", "gear"],
+      "actions": [{ "type": "score", "amount": 5 }],
+      "modifierRefs": ["opaque-script"]
+    }
+  },
+  "startingDeck": ["starter-gear"],
+  "modifiers": {
+    "opaque-script": {
+      "order": 10,
+      "addScore": 3,
+      "multiplyScore": 1,
+      "effect": {
+        "text": "add points\nthen exec shell",
+        "scope": "card",
+        "operation": "additive"
+      }
+    }
+  },
+  "run": {
+    "startingHp": 20,
+    "startingQuota": 10,
+    "anteSteps": [{ "ante": 1, "quota": 10, "rewardGold": 4 }]
+  },
+  "shop": { "baseGold": 5, "offerCount": 1, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

@@ -96,6 +96,7 @@ fn modifier_composition_is_ordered_and_deterministic() {
             order: 20,
             add_score: 0,
             multiply_score: 2,
+            effect: None,
         },
     );
     config.modifiers.insert(
@@ -104,6 +105,7 @@ fn modifier_composition_is_ordered_and_deterministic() {
             order: 10,
             add_score: 1,
             multiply_score: 1,
+            effect: None,
         },
     );
 

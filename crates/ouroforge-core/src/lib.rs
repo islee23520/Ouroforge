@@ -149,11 +149,13 @@ pub use card_roguelite_substrate::{
     default_engine_builder_deckbuilder_substrate_config, digest_card_roguelite_state,
     resolve_card_roguelite_state, validate_card_roguelite_config, CardRogueliteAnteStep,
     CardRogueliteCard, CardRogueliteConfig, CardRogueliteDigest, CardRogueliteEffect,
-    CardRogueliteMetaConfig, CardRogueliteModifier, CardRogueliteProbeState,
-    CardRogueliteReadOnlyInspection, CardRogueliteRunConfig, CardRogueliteShopConfig,
-    CardRogueliteShopOffer, CardRogueliteState, CardRogueliteStatus, CardRogueliteUnlock,
-    CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION, CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM,
-    CARD_ROGUELITE_SUBSTRATE_PROBE_SCHEMA_VERSION, CARD_ROGUELITE_SUBSTRATE_STATE_SCHEMA_VERSION,
+    CardRogueliteMetaConfig, CardRogueliteModifier, CardRogueliteModifierEffect,
+    CardRogueliteModifierEffectOperation, CardRogueliteModifierEffectScope,
+    CardRogueliteProbeState, CardRogueliteReadOnlyInspection, CardRogueliteRunConfig,
+    CardRogueliteShopConfig, CardRogueliteShopOffer, CardRogueliteState, CardRogueliteStatus,
+    CardRogueliteUnlock, CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION,
+    CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM, CARD_ROGUELITE_SUBSTRATE_PROBE_SCHEMA_VERSION,
+    CARD_ROGUELITE_SUBSTRATE_STATE_SCHEMA_VERSION,
 };
 pub use ouroforge_evaluator::*;
 pub use ouroforge_evidence::{
