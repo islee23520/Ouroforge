@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "steamworks-daily-seed-leaderboard-payload-v1",
+  "leaderboardId": "daily-seed-v1",
+  "dailySeed": "2026-06-08-daily",
+  "runId": "run-steam-fixture-001",
+  "projectId": "proj_steam_export_fixture",
+  "score": 4242,
+  "scoreSource": "trusted-local-run-evidence",
+  "evidenceRef": "runs/fixtures/steamworks/daily-seed-run.json",
+  "replayDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "submittedBy": "steam-user-id-pseudonymous",
+  "boundary": "Steamworks leaderboard over the existing runtime; Rust/local owns trusted validation; JS/browser/Studio/Electron/Steamworks are read-only with no direct trusted writes; graceful no-Steam fallback is mandatory; Steam desktop is not Layer-3 cloud/mobile; Steam account/signing/Release button remain human/Ring-3."
+}

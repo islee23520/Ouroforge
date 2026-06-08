@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "steam-desktop-export-demo-v1",
+  "issue": 1841,
+  "demoId": "steam-desktop-export-demo-001",
+  "description": "Deterministic fixture-scoped demo showing packaged descriptor, mocked Steamworks wiring, no-Steam fallback, trusted local leaderboard payload, and Steam store asset proposals.",
+  "requiresNetwork": false,
+  "requiresLiveBrowser": false,
+  "requiresRealSteamConnection": false,
+  "fixtures": {
+    "buildManifest": "examples/steam-desktop-export-v1/demo/build-manifest.fixture.json",
+    "depotConfig": "examples/steam-desktop-export-v1/demo/depot-config.fixture.json",
+    "steamworksWiring": "examples/steam-desktop-export-v1/demo/steamworks-wiring.fixture.json",
+    "noSteamFallback": "examples/steam-desktop-export-v1/demo/no-steam-fallback.fixture.json",
+    "dailySeedLeaderboard": "examples/steam-desktop-export-v1/demo/daily-seed-leaderboard.fixture.json",
+    "storeAssets": "examples/steam-desktop-export-v1/demo/store-assets.fixture.json"
+  },
+  "assertions": [
+    "packaged artifact descriptor is deterministic and human-ring3-required",
+    "Steamworks features are wired through a mockable steamworks.js bridge over the existing runtime",
+    "no-Steam fallback preserves local play without network or a real Steam connection",
+    "store assets are proposal-only and generated through the Milestone 36 asset pipeline"
+  ],
+  "boundary": "Rust/local owns trusted validation; demo fixtures are deterministic and fixture-scoped; browser/Studio/Electron/Steamworks surfaces are read-only; no network, no live browser, no real Steam connection, no trusted write, no upload, no release authority; #1 and #23 remain open. This demo asserts behavior and gate states, not subjective fun or production readiness."
+}

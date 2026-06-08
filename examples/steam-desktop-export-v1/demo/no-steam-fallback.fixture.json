@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "steamworks-no-steam-fallback-v1",
+  "mode": "no-steam",
+  "steamAvailable": false,
+  "disabledFeatures": ["overlay", "achievements", "cloud-saves", "daily-seed-leaderboard"],
+  "localOnlyFeatures": ["local-save", "local-achievement-evidence", "local-run-evidence"],
+  "userMessage": "Steam is unavailable; continuing with local play and local evidence only.",
+  "boundary": "Steamworks fallback over the existing runtime; Rust/local owns trusted validation; JS/browser/Studio/Electron/Steamworks are read-only with no direct trusted writes; graceful no-Steam fallback is mandatory; Steam desktop is not Layer-3 cloud/mobile; Steam account/signing/Release button remain human/Ring-3."
+}
