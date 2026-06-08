@@ -657,3 +657,105 @@ only: scheduler shape, CLI invocation wrapper, demo parity harness, coverage
 update, supervision/budget/recovery, concurrency/backpressure/telemetry, and the
 final governance handoff. Distributed/multi-machine, hosted/cloud, servers,
 databases, and live ops remain Layer-3 DEFER.
+
+---
+
+## Milestone 64 supervision, budget, and recovery contract
+
+Issue: #1939 — Supervised Workers, Budgets, and Crash-Recovery Scope & Contract v1
+
+Status: **M64 CONTRACT — TESTABLE SCOPE ONLY.** This section fixes the local
+Elixir/OTP control-plane contract for supervised workers, runtime budgets, stop
+conditions, and crash recovery before implementation. Elixir/OTP = executor
+control plane only; Rust kernel = data plane. The Rust kernel is unchanged and
+is reached only through the frozen `ouroforge` CLI surface recorded above.
+
+### Supervision strategy
+
+The M64 executor may add a small local OTP supervision tree under
+`OuroforgeExecutor.Application` with these boundaries:
+
+- A top-level supervisor owns executor control-plane workers only. It must not
+  supervise Rust kernel processes as long-lived data-plane services; each kernel
+  action is a bounded `ouroforge` CLI invocation through the executor CLI
+  adapter.
+- Worker crashes are isolated to the task/command attempt that crashed. A crash
+  may restart the control-plane worker state, but it must not replay a trusted
+  write blindly or mark Rust-owned artifacts as valid.
+- Restart policy is conservative: use bounded transient/per-task restarts for
+  scheduler, budget, retry, and telemetry workers; repeated failures trip a
+  stopped/blocked control-plane state for operator review instead of escalating
+  into unbounded restart storms.
+- Supervisors may hold ephemeral local state such as in-flight assignments,
+  attempt counters, and telemetry snapshots. Canonical run, ledger, evidence,
+  verdict, mutation, and review state remains Rust-owned.
+- No distributed supervisors, node clustering, remote workers, databases,
+  hosted queues, or live-ops control loops are in scope.
+
+### Runtime budget and stop-condition enforcement
+
+M64 budget enforcement maps M43 producer-plan budget and stop-condition fields
+to executor control-plane checkpoints. The executor may consume the Rust-owned
+M43 plan/read-model shape, but it does not redefine that schema.
+
+Budget enforcement points:
+
+1. **Before assignment** — refuse to assign new ready work when plan-level or
+   task-level budget is exhausted, when a mandatory human gate is pending, or
+   when a stop condition is already satisfied.
+2. **Before CLI invocation** — check per-command attempt limits, elapsed local
+   runtime, retry count, and declared worker/concurrency caps before spawning
+   `ouroforge`.
+3. **After CLI result** — classify the control-plane attempt as succeeded,
+   failed, retryable, budget-exhausted, or blocked using CLI exit status and
+   Rust-owned evidence references; do not infer product truth from executor
+   process success alone.
+4. **Before trusted-write route** — require the existing review/apply/trust-gradient
+   evidence path and block executor self-certification, even when budget remains.
+
+Stop-condition outcomes are control-plane decisions only: `continue`, `blocked`,
+`budget-exhausted`, `human-gate-required`, `completed-by-rust-evidence`, or
+`failed`. The executor must cite Rust-owned artifacts or operator-visible
+control-plane diagnostics for each non-continue outcome.
+
+### Resume-from-ledger recovery invariant
+
+Crash recovery is ledger/read-model based and idempotent:
+
+- On startup or resume, the executor reconstructs completed, in-flight, blocked,
+  and retryable work from Rust-owned run/ledger/evidence/read-model outputs plus
+  any ephemeral executor checkpoint that is clearly subordinate to those outputs.
+- If Rust-owned ledger/evidence says a trusted write was accepted/applied, the
+  executor treats it as completed and never emits a duplicate trusted-write
+  command for the same transaction id, mutation id, review id, or evidence ref.
+- If executor-local state claims completion but Rust-owned evidence is absent,
+  the executor treats the work as not trusted/completed and requires rerun or
+  operator review according to the M43 budget/stop policy.
+- If a CLI attempt crashed after spawning but before result capture, resume must
+  inspect Rust-owned outputs first. It may retry only when the idempotency key is
+  absent and the budget policy still permits another attempt.
+- Recovery must preserve the manual Rust-CLI fallback: an operator can inspect
+  the same ledger/evidence outputs without starting the executor.
+
+The invariant is: **no duplicate trusted writes, no lost trusted writes, and no
+executor-authored product truth.** Ambiguous recovery states fail closed to a
+blocked/operator-review state.
+
+### Testable downstream requirements
+
+M64 implementation PRs must add tests proving:
+
+- A crashed worker does not take down unrelated scheduled work.
+- Restart attempts are bounded and become a blocked/budget-exhausted state when
+  limits are crossed.
+- M43 budget and stop-condition data prevents new assignment and new CLI drive at
+  the defined checkpoints.
+- Resume from Rust-owned ledger/evidence marks completed work without duplicate
+  trusted-write commands.
+- Missing or ambiguous Rust-owned evidence fails closed instead of accepting
+  executor-local state.
+- #1 and #23 remain open.
+
+These tests may use fixture-shaped CLI/read-model data. Any real kernel action
+must go through `ouroforge` CLI and must preserve golden parity with the manual
+CLI path.
