@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "scenario-coverage-v49-steam-desktop-export-v1",
+  "issue": 1842,
+  "coverageId": "scenario-coverage-v49-steam-desktop-export",
+  "scope": "Steam Desktop Export and Steamworks v1 regression suite",
+  "assertionMode": "state-shape-only",
+  "requiresNetwork": false,
+  "requiresLiveBrowser": false,
+  "requiresRealSteamConnection": false,
+  "cases": [
+    {
+      "id": "v49.build-depot.valid",
+      "kind": "build-depot-config",
+      "fixtures": [
+        "examples/steam-export-build-v1/build-manifest.valid.fixture.json",
+        "examples/steam-export-build-v1/depot-config.valid.fixture.json"
+      ],
+      "expectedState": "valid-package-descriptor-human-ring3-required"
+    },
+    {
+      "id": "v49.steamworks.valid",
+      "kind": "steamworks-wiring-fallback",
+      "fixtures": [
+        "examples/steamworks-integration-v1/wiring.valid.fixture.json",
+        "examples/steamworks-integration-v1/no-steam-fallback.valid.fixture.json",
+        "examples/steamworks-integration-v1/daily-seed-leaderboard.valid.fixture.json"
+      ],
+      "expectedState": "mocked-features-wired-with-local-evidence-fallback"
+    },
+    {
+      "id": "v49.store-assets.valid",
+      "kind": "store-assets",
+      "fixtures": ["examples/steam-store-assets-v1/store-assets.valid.fixture.json"],
+      "expectedState": "proposal-only-steam-spec-assets"
+    },
+    {
+      "id": "v49.demo.composed",
+      "kind": "deterministic-demo",
+      "fixtures": ["examples/steam-desktop-export-v1/demo/demo-index.fixture.json"],
+      "expectedState": "descriptor-wiring-assets-composed-without-network-browser-or-steam"
+    },
+    {
+      "id": "v49.web-build-standalone-backcompat",
+      "kind": "backward-compatibility-golden",
+      "fixtures": [
+        "examples/game-runtime/index.html",
+        "examples/asset-pipeline-v1-regression/asset-manifest.json"
+      ],
+      "expectedState": "existing-web-runtime-remains-valid-standalone"
+    }
+  ],
+  "boundary": "Rust/local owns trusted validation; coverage asserts deterministic states and shapes only; browser/Studio/Electron/Steamworks surfaces are read-only; no trusted write, no upload, no release authority, no network, no live browser, no real Steam connection; generated artifacts stay untracked unless fixture-scoped; #1 and #23 remain open."
+}

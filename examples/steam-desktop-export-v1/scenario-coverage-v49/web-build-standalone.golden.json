@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "scenario-coverage-v49-web-build-standalone-golden-v1",
+  "runtime": "existing-web-runtime",
+  "entryHtml": "examples/game-runtime/index.html",
+  "assetManifest": "examples/asset-pipeline-v1-regression/asset-manifest.json",
+  "probeMode": "standalone-read-only",
+  "expectedState": "valid-standalone-web-build",
+  "boundary": "Backward compatibility golden only; the web build remains valid without Electron, Steamworks, Steam account, signing, upload, release, network, or live browser."
+}
