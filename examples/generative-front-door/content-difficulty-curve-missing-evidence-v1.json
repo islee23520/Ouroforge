@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ouroforge.difficulty-curve-input.v1",
+  "campaignId": "curve-missing-evidence-v1",
+  "tolerances": { "spike": 4.0, "regression": 0.5 },
+  "stages": [
+    {
+      "stageId": "lvl-1",
+      "source": "m28-difficulty",
+      "difficultyMetric": {
+        "solutionLength": 3,
+        "branchingFactor": 2.0,
+        "deadEndDensity": 0.1,
+        "reachableStates": 18
+      }
+    },
+    {
+      "stageId": "encounter-missing",
+      "source": "m32-balance",
+      "balanceReport": {
+        "schemaVersion": "ouroforge.balance-report.v1",
+        "scene": "encounter-missing"
+      }
+    }
+  ]
+}

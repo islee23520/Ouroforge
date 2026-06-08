@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "ouroforge.difficulty-curve-input.v1",
+  "campaignId": "curve-pass-v1",
+  "tolerances": { "spike": 4.0, "regression": 0.5 },
+  "stages": [
+    {
+      "stageId": "lvl-1",
+      "source": "m28-difficulty",
+      "difficultyMetric": {
+        "solutionLength": 3,
+        "branchingFactor": 2.0,
+        "deadEndDensity": 0.1,
+        "reachableStates": 18
+      }
+    },
+    {
+      "stageId": "lvl-2",
+      "source": "m28-difficulty",
+      "difficultyMetric": {
+        "solutionLength": 5,
+        "branchingFactor": 2.5,
+        "deadEndDensity": 0.15,
+        "reachableStates": 40
+      }
+    },
+    {
+      "stageId": "encounter-1",
+      "source": "m32-balance",
+      "balanceReport": {
+        "schemaVersion": "ouroforge.balance-report.v1",
+        "scene": "encounter-1",
+        "winRate": { "wins": 4, "total": 5 },
+        "difficultyCurve": [
+          { "persona": "cautious-novice", "turns": 4 },
+          { "persona": "balanced-veteran", "turns": 4 }
+        ]
+      }
+    },
+    {
+      "stageId": "boss",
+      "source": "m32-balance",
+      "balanceReport": {
+        "schemaVersion": "ouroforge.balance-report.v1",
+        "scene": "boss",
+        "winRate": { "wins": 3, "total": 5 },
+        "difficultyCurve": [
+          { "persona": "cautious-novice", "turns": 6 },
+          { "persona": "balanced-veteran", "turns": 6 }
+        ]
+      }
+    }
+  ]
+}
