@@ -2262,6 +2262,55 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   remain open governance anchors** and are not modified, closed, or narrowed by
   this milestone.
 
+**Era I Milestone 50 — Engine-Builder Balance Verification v1 (descriptive, not a fun claim).** Era I records a bounded mechanical balance verification chain for an engine-builder/card-roguelite variant over the existing substrate, not a new engine and not an automated fun verdict:
+
+- **Era I Milestone 50 — Engine-Builder Balance Verification v1** (#1811–#1817): records the scope contract, combo/degenerate detector, dominant-build analyzer, fairness/daily-seed verifier, deterministic engine-builder balance demo, Scenario Coverage v45, and this governance refresh (PRs #1900/#1904/#1907/#1912/#1913). The milestone verifies descriptive mechanical surfaces: degenerate combo signatures, dominant-build concentration, and daily-seed fairness attribution. It does not assert that the game is good, fun, shippable, production-ready, or a Godot replacement/parity target. Balance verdicts are descriptive and evidence-linked; the human fun/release gate remains Era J. Trusted validation stays Rust/local; browser, dashboard, cockpit, and Studio surfaces remain read-only; generation remains proposal-only through the existing review/apply/trust-gradient path. Generated runs/artifacts remain untracked unless explicitly fixture-scoped. **#1 and #23 remain open governance anchors** and are not closed, narrowed, or modified by this milestone.
+
+### Engine-Builder Balance Verification v1 governance refresh (Era I Milestone 50)
+
+Engine-Builder Balance Verification v1 is recorded as **complete for Era I
+Milestone 50** under #1, on merged evidence, as a conservative, additive,
+local-only mechanical balance milestone. It treats a deckbuilder / engine-builder
+variant as configuration over the existing card-roguelite substrate and verifies
+only descriptive balance signals: degenerate combo risk, dominant-build
+concentration, and skilled-player fairness attribution across deterministic daily
+seeds. It is not a new parallel engine and not an automated quality, fun, or
+release-readiness judgment.
+
+The merged evidence chain is Combo / Degenerate Detector v1 #1812 (PR #1900) —
+adds Rust/local detection for repeated low-cost/high-payoff loops and degenerate
+combo signatures; Dominant-Build Analyzer v1 #1813 (PR #1904) — adds descriptive
+build-concentration and payoff-skew analysis; Fairness and Daily-Seed Verifier v1
+#1814 (PR #1907) — checks deterministic daily seeds for attribution-oriented
+fairness evidence; Engine-Builder Balance Demo v1 #1815 (PR #1912) — documents and
+proves a deterministic fixture-scoped demo over the composed balance surfaces;
+and Scenario Coverage v45 #1816 (PR #1913) — locks state/shape-only regression
+coverage across the detector, analyzer, verifier, demo fixture, and governance
+boundaries. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. Balance verdicts are **descriptive**
+mechanical evidence, never a fun guarantee, popularity forecast, release gate, or
+production-readiness claim. Fairness means a skilled player can attribute losses
+to decisions rather than opaque luck; it does not guarantee that the experience is
+enjoyable. Generation and producer output remain proposal-only through the
+existing review/apply/trust-gradient path — never a direct trusted write,
+auto-apply, auto-merge, self-approval, reviewer bypass, or hidden trusted
+mutation. Trusted validation stays **Rust/local**; the deterministic JS runtime,
+`window.__OUROFORGE__` probe, dashboard, cockpit, and Studio surfaces remain
+**read-only** with respect to trusted state. Existing substrate, runtime, probe,
+evaluator, evolve/campaign, compare, provenance-bundle, asset-manifest,
+dashboard, cockpit, source-apply, and CLI contracts remain backward-compatible,
+and generated runs/artifacts remain ignored unless explicitly fixture-scoped.
+Shipping, hosted/cloud/mobile, live-ops, Steam account/signing/release, and market
+demand remain human/Ring-3 or Layer-3-gated work outside this milestone; distributed
+orchestration / Elixir remains NO-GO under ADR #92. No production-ready, quality,
+fun, shippable, Godot replacement/parity, or autonomous-shipping claim is
+introduced. Scenario Coverage numbering continues through v45.
+
+The recommended next milestone is not expanded by this completion; later Era I/J
+work requires separate scope issues with explicit non-goals, regression coverage,
+generated-state audits, and the same human fun/release and Layer-3 boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
