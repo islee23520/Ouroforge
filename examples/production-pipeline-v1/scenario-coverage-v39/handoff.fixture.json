@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "production-handoff-v1",
+  "milestone": "era-h-milestone-42",
+  "handoffs": [
+    { "handoffId": "v39-handoff-001", "fromRole": "designer", "toRole": "level-designer", "artifactClass": "design-brief", "baseRef": "evidence/v39/design-brief.json", "proposalRef": "evidence/v39/handoff-001.json", "staleRefs": [], "conflictsWith": [], "status": "clean", "resolution": "accepted" },
+    { "handoffId": "v39-handoff-002", "fromRole": "level-designer", "toRole": "reviewer", "artifactClass": "scene-draft", "baseRef": "evidence/v39/scene-draft.json", "proposalRef": "evidence/v39/handoff-002.json", "staleRefs": [], "conflictsWith": ["v39-handoff-003"], "status": "conflict", "resolution": "blocked" },
+    { "handoffId": "v39-handoff-003", "fromRole": "gameplay-engineer", "toRole": "reviewer", "artifactClass": "scene-draft", "baseRef": "evidence/v39/scene-draft.json", "proposalRef": "evidence/v39/handoff-003.json", "staleRefs": [], "conflictsWith": ["v39-handoff-002"], "status": "conflict", "resolution": "blocked" },
+    { "handoffId": "v39-handoff-004", "fromRole": "asset-import-planner", "toRole": "qa-agent", "artifactClass": "asset-proposal", "baseRef": "evidence/v39/asset-proposal.json", "proposalRef": "evidence/v39/handoff-004.json", "staleRefs": ["evidence/v39/asset-proposal.json"], "conflictsWith": [], "status": "stale", "resolution": "needs-fix" }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["handoffId", "fromRole", "toRole", "status", "resolution"]
+  },
+  "boundary": "Role handoffs are proposal-only; conflict resolution is deterministic; conflicting and stale handoffs fail closed and are routed through the review/apply path under the trust gradient, not auto-merged and not auto-applied; dashboards stay read-only with no self-approval."
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "scenario-coverage-v39",
+  "title": "Multi-Agent Production Pipeline v1 Regression Suite",
+  "milestone": "era-h-milestone-42",
+  "scenarios": [
+    { "id": "roles-single-owner", "system": "roles", "kind": "ownership", "expect": "each artifact class has exactly one owning role" },
+    { "id": "roles-unauthorized-write-rejected", "system": "roles", "kind": "negative", "expect": "a non-owner proposal is rejected fail-closed" },
+    { "id": "roles-trusted-write-rejected", "system": "roles", "kind": "negative", "expect": "a direct trusted write is never authorized" },
+    { "id": "roles-duplicate-ownership-fails-closed", "system": "roles", "kind": "negative", "expect": "duplicate ownership of a class fails closed" },
+    { "id": "handoff-clean-accepted", "system": "handoff", "kind": "state", "expect": "a clean handoff is accepted (routes through review/apply)" },
+    { "id": "handoff-concurrent-conflict-blocked", "system": "handoff", "kind": "state", "expect": "concurrent edits to one base conflict and block deterministically" },
+    { "id": "handoff-stale-needs-fix", "system": "handoff", "kind": "state", "expect": "a stale-ref handoff is needs-fix" },
+    { "id": "handoff-status-mismatch-fails-closed", "system": "handoff", "kind": "negative", "expect": "a declared/computed status mismatch fails closed" },
+    { "id": "gates-blocked-until-reviewed", "system": "gates", "kind": "state", "expect": "promotion is blocked until the reviewer approves" },
+    { "id": "gates-critic-veto-blocks", "system": "gates", "kind": "state", "expect": "a critic veto blocks promotion" },
+    { "id": "gates-high-risk-requires-critic", "system": "gates", "kind": "state", "expect": "medium/high risk requires an explicit critic approval" },
+    { "id": "gates-promote-allowed-not-auto-applied", "system": "gates", "kind": "state", "expect": "promote-allowed only routes through review/apply, never auto-applied" },
+    { "id": "gates-self-approval-rejected", "system": "gates", "kind": "negative", "expect": "self-approval (reviewer == implementer) is rejected" },
+    { "id": "demo-end-to-end-progression", "system": "demo", "kind": "state", "expect": "the demo gate progresses from blocked to promote-allowed only after review" },
+    { "id": "backcompat-single-agent-evolve", "system": "backcompat", "kind": "golden", "expect": "the existing single-agent evolve campaign remains valid" },
+    { "id": "backcompat-single-agent-apply", "system": "backcompat", "kind": "golden", "expect": "the existing single-agent safe source-apply remains valid" }
+  ]
+}

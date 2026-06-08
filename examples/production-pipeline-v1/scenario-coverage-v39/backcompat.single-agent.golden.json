@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "scenario-coverage-v39-backcompat",
+  "description": "Backward-compatibility golden: the existing single-agent evolve and safe source-apply flows remain valid after the Multi-Agent Production Pipeline v1 additions. Each reference is validated through its existing contract; the multi-agent role/handoff/gate modules are additive and must not change these outcomes.",
+  "references": [
+    {
+      "id": "backcompat-single-agent-evolve",
+      "contract": "evolve-campaign-v1",
+      "ref": "examples/evolve-campaign-v1/contract/acceptance-reached.fixture.json",
+      "expectValid": true
+    },
+    {
+      "id": "backcompat-single-agent-apply",
+      "contract": "safe-source-apply-demo-v1",
+      "ref": "examples/safe-source-apply-demo-v1/demo.valid.fixture.json",
+      "expectValid": true
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "production-roles-v1",
+  "milestone": "era-h-milestone-42",
+  "roles": [
+    {
+      "role": "designer",
+      "purpose": "designer proposes design briefs and requirements for review",
+      "ownsArtifactClasses": ["design-brief", "requirement-extraction"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/scenario-coverage-v39.md",
+      "forbiddenActions": [
+        "no self-approval of its own proposals",
+        "no auto-apply or trusted write",
+        "no hidden agent or unreviewed handoff"
+      ]
+    },
+    {
+      "role": "level-designer",
+      "purpose": "level-designer proposes scene drafts for review",
+      "ownsArtifactClasses": ["scene-draft"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/scenario-coverage-v39.md",
+      "forbiddenActions": [
+        "no self-approval of its own proposals",
+        "no auto-apply or trusted write",
+        "no hidden agent or unreviewed handoff"
+      ]
+    }
+  ],
+  "ownership": [
+    { "artifactClass": "design-brief", "ownerRole": "designer", "evidenceRef": "docs/scenario-coverage-v39.md" },
+    { "artifactClass": "requirement-extraction", "ownerRole": "designer", "evidenceRef": "docs/scenario-coverage-v39.md" },
+    { "artifactClass": "scene-draft", "ownerRole": "level-designer", "evidenceRef": "docs/scenario-coverage-v39.md" }
+  ],
+  "attempts": [
+    { "attemptId": "v39-attempt-001", "artifactClass": "design-brief", "actorRole": "designer", "writeKind": "proposal", "proposalRef": "evidence/v39/attempt-001.json", "declaredOutcome": "authorized" },
+    { "attemptId": "v39-attempt-002", "artifactClass": "design-brief", "actorRole": "level-designer", "writeKind": "proposal", "proposalRef": "evidence/v39/attempt-002.json", "declaredOutcome": "rejected" },
+    { "attemptId": "v39-attempt-003", "artifactClass": "scene-draft", "actorRole": "level-designer", "writeKind": "trusted-write", "proposalRef": "evidence/v39/attempt-003.json", "declaredOutcome": "rejected" }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["attemptId", "artifactClass", "actorRole", "outcome"]
+  },
+  "boundary": "Role agents are proposal-only; each artifact class has a single owning role; unauthorized writes fail closed; promotion flows through the review/apply path under the trust gradient; dashboards stay read-only with no auto-apply, no auto-merge, and no self-approval."
+}
