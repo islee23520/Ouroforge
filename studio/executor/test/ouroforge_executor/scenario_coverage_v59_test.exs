@@ -12,6 +12,10 @@ defmodule OuroforgeExecutor.ScenarioCoverageV59Test do
   }
 
   @coverage_doc Path.expand("../../../../docs/scenario-coverage-v59.md", __DIR__)
+  @governance_doc Path.expand(
+                    "../../../../docs/executor-operator-cockpit-v1-governance-handoff.md",
+                    __DIR__
+                  )
 
   def runner("ouroforge", argv, _opts), do: {"#{Enum.join(argv, " ")} valid\n", 0}
 
@@ -38,6 +42,25 @@ defmodule OuroforgeExecutor.ScenarioCoverageV59Test do
     assert doc =~ "Rust kernel = data plane and source of truth"
     assert doc =~ "frozen `ouroforge` CLI surface"
     assert doc =~ "#1 and #23 remain open"
+  end
+
+  test "v59 governance handoff records M67-9 evidence and next design gate" do
+    doc = File.read!(@governance_doc)
+
+    assert doc =~ "Executor Operator Cockpit v1 Governance Handoff"
+    assert doc =~ "M67-9"
+    assert doc =~ "#2002"
+    assert doc =~ "#2011"
+    assert doc =~ "PR #2013"
+    assert doc =~ "PR #2021"
+    assert doc =~ "Elixir/OTP remains the local executor control plane"
+    assert doc =~ "Rust remains the data plane and source of truth"
+
+    assert doc =~
+             "No direct artifact, ledger, evidence, trust-gradient, apply, release, merge, or deploy writes"
+
+    assert doc =~ "#1 and #23 remain open governance anchors"
+    assert doc =~ "Next design-gate question"
   end
 
   test "v59 composed cockpit remains read-only across every panel" do
