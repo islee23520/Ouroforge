@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.generative-intake.v1",
+  "briefId": "demo-brief-blocked-v1",
+  "title": "Demo: sokoban micro with a shortcut (blocked)",
+  "description": "The crate is already one push from the target, so a single move wins, yet the brief's intended solution takes a longer scenic route. A strictly shorter unintended solution exists, so the engine room blocks promotion with a replayable counterexample.",
+  "gameClass": "grid-puzzle",
+  "puzzleId": "demo-sokoban-blocked-v1",
+  "rows": [
+    "#####",
+    "#@*P#",
+    "#...#",
+    "#####"
+  ],
+  "intendedSolution": ["down", "up", "left"]
+}
