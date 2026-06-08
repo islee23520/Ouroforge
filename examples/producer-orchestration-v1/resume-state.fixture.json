@@ -1,0 +1,1 @@
+{"fixture":"resume-state","completionEvidenceRefs":["evidence/producer-orchestration-v1/design-brief.completed.json","evidence/producer-orchestration-v1/requirements.completed.json"],"expectedCompletedTaskCount":2,"expectedResumeToken":"collect-and-exit-whole-game:completed-2","expectedCurrentFunctionAgent":"mechanics"}
