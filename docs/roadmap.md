@@ -29,7 +29,12 @@ v1 milestone for local evidence-gated collaboration/accountability artifacts:
 role models, task boards, ownership, work packages, handoffs, shared state,
 review/critic gates, QA queues, performance/regression lanes, decision ledgers,
 production evidence bundles, read-only Studio/dashboard/cockpit inspection, a
-deterministic demo, and Scenario Coverage v12, and a completed 3D Capability Gate
+deterministic demo, and Scenario Coverage v12, and a completed Autonomous Producer
+and Whole-Game Orchestration v1 milestone for proposal-only game-scale production
+planning and orchestration evidence: design-intent decomposition, whole-game
+orchestration state, budget/stop-condition/human approval gates, a deterministic
+autonomous producer demo, Scenario Coverage v40, and this conservative governance
+refresh, and a completed 3D Capability Gate
 v1 milestone for bounded local 3D evidence: scene graph/transform validation,
 camera/projection contracts, mesh/material local refs, renderer smoke evidence,
 collision/trigger evidence, animation/probe/evaluator compatibility, deterministic
@@ -1558,6 +1563,65 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Autonomous Producer and Whole-Game Orchestration v1 governance refresh (Era H Milestone 43)
+
+Autonomous Producer and Whole-Game Orchestration v1 is recorded as **complete for
+Era H Milestone 43** under #1, on merged evidence, as a conservative, additive,
+local-only milestone. It extends the Era H accountability framework from
+role-agent collaboration into proposal-only whole-game production orchestration:
+a human design intent can be decomposed into a deterministic production plan,
+tracked through game-scale orchestration state, constrained by explicit budgets,
+stop conditions, and mandatory human approval gates, demonstrated in a
+fixture-scoped autonomous producer slice, and locked by Scenario Coverage v40.
+The producer is a coordinator of evidence and proposals, not a release authority
+or trusted writer.
+
+The merged evidence chain is the scope/contract gate #1682
+(`docs/autonomous-producer-v1.md`, PR #1701) — records the autonomous producer
+GO/DEFER decision, whole-game orchestration contract, human-gate boundaries, and
+proposal-only release-candidate path; Design-Intent Decomposition and Production
+Plan v1 #1683 (`crates/ouroforge-core/src/producer_plan.rs`, PR #1884) — turns a
+human design intent into a deterministic, Rust/local production task graph while
+reusing the existing GDD/design-brief and Milestone 30 generation-planning
+surfaces; Whole-Game Orchestration State v1 #1684
+(`crates/ouroforge-core/src/producer_orchestration.rs`, PR #1885) — tracks
+producer state over existing evolve-campaign and Milestone 42 handoff/review
+evidence instead of adding a parallel orchestrator; Budgets, Stop Conditions and
+Human Approval Gates v1 #1685 (`crates/ouroforge-core/src/producer_budget_gates.rs`,
+PR #1888) — fails closed on budget exhaustion, mandatory human-gate blocks, and
+no-progress stops using the existing campaign-budget and stop-condition shapes;
+Autonomous Producer Demo v1 #1686 (`docs/autonomous-producer-v1-demo.md`, PR
+#1890) — proves a deterministic intent-to-release-candidate audit trail with a
+pending human release gate and safe budget halt; and Scenario Coverage v40 #1687
+(`docs/scenario-coverage-v40.md`, PR #1891) — enumerates state/shape-only
+regression coverage across planning, orchestration, gates, demo evidence, and
+single-artifact campaign backward compatibility. #1 and #23 remain open
+governance anchors.
+
+The boundaries stay explicit and reaffirmed. Producer, generation, and role-agent
+outputs are **proposals only** through the existing review/apply/trust-gradient
+path — never a direct trusted write, release, auto-apply, auto-merge,
+self-approval, reviewer bypass, or hidden trusted mutation. High-risk and
+source-affecting changes remain blocked until explicit review and human approval;
+the release go/no-go is human. Budgets, stop conditions, and approval gates are
+mandatory and bounded; no unbounded autonomy is introduced. Generated
+assets/audio/content require license/provenance and the function-specific QA gate
+before promotion. Trusted logic is **Rust/local**; the deterministic JS runtime,
+`window.__OUROFORGE__` probe, dashboard, cockpit, and Studio surfaces remain
+**read-only** with respect to trusted state. Existing runtime, probe, evaluator,
+evolve/campaign, compare, provenance-bundle, asset-manifest, QA-swarm, dashboard,
+cockpit, source-apply, and CLI contracts remain backward-compatible, and
+generated runs/assets/content/artifacts remain ignored unless explicitly
+fixture-scoped. Shipping/hosted/cloud/live-ops stays **DEFER until a #1508
+Layer-3 GO** (distributed orchestration / Elixir remains NO-GO under ADR #92). No
+production-readiness, quality, fun, Godot replacement/parity, or autonomous
+shipping claim is introduced. Scenario Coverage numbering continues from the Era
+F/G/H sequence through v40.
+
+The recommended next milestone is not expanded by this completion; any later Era
+H/I rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Multi-Agent Production Pipeline v1 governance refresh (Era H Milestone 42)
 
 Multi-Agent Production Pipeline v1 is recorded as **complete for Era H Milestone
@@ -2179,6 +2243,22 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   orchestration, scaled trust/provenance, shipping, hosted/cloud, real-player
   telemetry, and live-ops stay **DEFER until a #1508 Layer-3 GO**, and
   distributed orchestration / Elixir remains NO-GO under ADR #92. **#1 and #23
+  remain open governance anchors** and are not modified, closed, or narrowed by
+  this milestone.
+
+- **Era H Milestone 43 — Autonomous Producer and Whole-Game Orchestration v1**
+  (#1682–#1688): extends the Era H accountability framework into bounded
+  whole-game producer orchestration. The merged chain records the scope contract,
+  deterministic design-intent decomposition, whole-game orchestration state,
+  budget/stop-condition/human approval gates, deterministic autonomous producer
+  demo, Scenario Coverage v40, and this governance refresh (PRs
+  #1701/#1884/#1885/#1888/#1890/#1891; Scenario Coverage v40). The producer never
+  directly writes trusted files or releases; it emits proposal/evidence artifacts
+  through the existing review/apply/trust-gradient path, with mandatory budgets,
+  stop conditions, and human approval gates. Browser/Studio surfaces remain
+  read-only, generated state remains untracked unless fixture-scoped, shipping and
+  live-ops remain Layer-3 gated, and no production-ready, quality/fun, Godot
+  replacement/parity, or autonomous-shipping claim is introduced. **#1 and #23
   remain open governance anchors** and are not modified, closed, or narrowed by
   this milestone.
 
