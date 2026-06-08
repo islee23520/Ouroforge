@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "save-profile-v9",
+  "profileId": "future-profile",
+  "runHistory": [
+    {
+      "runId": "run-future-001",
+      "recordedAt": "2026-06-08T00:00:00Z",
+      "replayDigest": "future-digest-001"
+    }
+  ]
+}

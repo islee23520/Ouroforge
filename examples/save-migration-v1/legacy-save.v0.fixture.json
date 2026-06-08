@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "save-profile-v0",
+  "profileId": "legacy-hero",
+  "runHistory": [
+    {
+      "runId": "run-001",
+      "recordedAt": "2026-01-01T00:00:00Z",
+      "replayDigest": "0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    {
+      "runId": "run-002",
+      "recordedAt": "2026-01-02T00:00:00Z",
+      "replayDigest": "0000000000000000000000000000000000000000000000000000000000000002"
+    }
+  ]
+}

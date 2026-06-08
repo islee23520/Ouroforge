@@ -109,6 +109,7 @@ pub mod playtest_capture;
 pub mod plugin_asset_metadata;
 pub mod plugin_compatibility;
 pub mod plugin_conflicts;
+pub mod save_migration;
 pub mod save_profile_scale;
 pub use ouroforge_source_apply::source_apply_highrisk_blocker;
 pub mod trust_gradient_risk_tier;
