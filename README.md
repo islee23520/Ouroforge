@@ -205,29 +205,29 @@ their full evidence chain and per-issue records in
 [`docs/roadmap.md`](docs/roadmap.md); only the current Era's snapshot is
 summarised below.
 
-**Current state.** Era E (Milestones 20–25) is recorded as complete: Loop
-Coverage Metric v1 (M20), Second Game Class and Loop Generalization v1 (M21),
-Trust Gradient v1 (M22, a GO design gate for bounded auto-apply), Multi-Iteration
-Evolve Campaigns v1 (M23), Game Complexity Ladder v1 (M24), and End-to-End
-Provenance Bundle and Audit Surface v1 (M25). Against #1's north-star (loop
-coverage × game complexity × trust), the descriptive, evidence-cited posture is:
-loop coverage across two game classes (collect-and-exit and the Signal Gate
-Platformer), one Game Complexity Ladder rung satisfied (collect-and-exit), and a
-GO Trust Gradient for bounded, reversible, audited, default-off auto-apply. These
-are descriptive metrics, not maturity, production, or Godot-replacement claims.
+**Current state.** Era H (Milestones 42–46) is recorded complete on merged
+evidence in [`docs/roadmap.md`](docs/roadmap.md): Multi-Agent Production Pipeline
+v1 (M42), Autonomous Producer and Whole-Game Orchestration v1 (M43), Scaled Trust
+Gradient / Release Provenance / Compliance v1 (M44), the Shipping and LiveOps
+Layer-3 Re-evaluation Design Gate (M45), and the Era H closing autonomy
+assessment (M46). The descriptive autonomy posture is in
+[`docs/era-h-autonomy-assessment.md`](docs/era-h-autonomy-assessment.md): agents
+and local Rust contracts can carry proposal, evidence, orchestration, QA,
+provenance, and release-candidate preparation work, but vision, taste/fun, legal
+compliance acceptance, and release go/no-go remain human decisions.
 
-**Earlier foundations remain recorded.** The **GDD-to-Playable Prototype v1**
-milestone is complete (including **Autonomous QA / Playtest Swarm v1**), while the
-#1 and #23 anchors are deliberately kept open as ongoing north-star tracks. The
-full per-era completion history and evidence chains live in
+**Earlier foundations remain recorded.** Era E established bounded local trust and
+Layer-3 DEFER in [`docs/layer3-reevaluation-v1.md`](docs/layer3-reevaluation-v1.md);
+Era F/G added genre/function evidence and specialized production gates. The #1 and
+#23 anchors are deliberately kept open as ongoing north-star tracks. The full
+per-era completion history and evidence chains live in
 [`docs/roadmap.md`](docs/roadmap.md) and the matching `docs/*.md` contracts.
 
-**Next.** Era E Milestone 26: Era E Refresh and Layer-3 Re-evaluation. Engine
-growth stays demand-driven and rung-justified. The Layer-3 go/defer decision
-(native export, plugin runtime, hosted/cloud, and distributed orchestration /
-Elixir) is **DEFER** per
-[`docs/layer3-reevaluation-v1.md`](docs/layer3-reevaluation-v1.md), reaffirming
-the ADR #92 NO-GO; Rust-first / local-first is preserved absent a GO.
+**Next.** Era I/J work continues only through bounded, issue-scoped genre and
+human-judgment milestones. Shipping/native-store export, hosted/cloud,
+real-player telemetry, live balancing, update/patch pipelines, and distributed
+Layer-3 behavior remain **DEFER** absent a separate #1508 Layer-3 GO; Rust-first /
+local-first is preserved absent that GO.
 
 ## Contributor guide
 

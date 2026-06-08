@@ -1614,6 +1614,59 @@ The recommended next milestone is not expanded by this completion; any later Era
 I/J work requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Era H closing governance and final autonomy assessment (Era H Milestone 46)
+
+Era H Milestones 42-45 are recorded as **complete for Era H** under #1 only after
+merged evidence for each milestone. This closing refresh is documentation and
+governance only: it reviews #1, README, the roadmap, and the Era H milestone docs
+for drift; records the completed evidence chain; and publishes the final autonomy
+assessment in `docs/era-h-autonomy-assessment.md`. It adds no new capability, no
+runtime behavior, and no shipping/liveops implementation.
+
+The merged evidence chain is Multi-Agent Production Pipeline v1 / Milestone 42
+#1674-#1681 (PRs #1704/#1790/#1876/#1877/#1878/#1879/#1880; Scenario Coverage
+v39) — role agents, handoff/conflict resolution, reviewer/critic gates, demo,
+regression coverage, and governance; Autonomous Producer and Whole-Game
+Orchestration v1 / Milestone 43 #1682-#1688 (PRs #1701/#1884/#1885/#1888/#1890/
+#1891/#1902; Scenario Coverage v40) — design-intent decomposition, orchestration
+state, budgets, stop conditions, human approval gates, demo, coverage, and
+governance; Scaled Trust Gradient, Release Provenance and Compliance v1 /
+Milestone 44 #1689-#1696 (PRs #1702/#1906/#1910/#1956/#1964/#1973/#1987;
+Scenario Coverage v41) — broadened-but-bounded low-risk rollback-backed
+auto-apply, per-release provenance, compliance gate, demo, coverage, and
+governance; and Shipping and LiveOps Layer-3 Re-evaluation Design Gate v1 /
+Milestone 45 #1697 (PR #1997) — DEFER for native/store export, real-player
+telemetry, live balancing, and update/patch pipelines absent a separate #1508
+Layer-3 GO. #1 and #23 remain open governance anchors.
+
+The final autonomy assessment is descriptive and evidence-scoped. For the two
+tracked genre lines (the collect-and-exit / grid-puzzle line and the Signal Gate
+/ deck-roguelike-to-deckbuilder line), the local evidence stack can automate or
+agent-coordinate deterministic proposal creation, run/evidence capture,
+mechanical evaluation, regression comparison, role handoff, producer planning,
+source/release-candidate provenance, and blocked compliance/readiness reporting.
+It does **not** automate vision, target audience judgment, taste, art/audio/UX/
+narrative direction, fun/quality verdicts, legal/compliance acceptance,
+market/distribution decisions, or release go/no-go. Concept-to-release autonomy
+therefore stops at a **local web release candidate with synthetic and
+fixture-scoped evidence**; the release decision remains human.
+
+The permanent boundaries stay explicit. Generation, role-agent, and producer
+outputs remain proposal-only through the existing review/apply/trust-gradient
+path. High-risk and source-affecting changes never auto-apply. Browser, Studio,
+dashboard, and cockpit surfaces remain read-only for trusted state. No
+auto-merge, self-approval, reviewer bypass, hidden trusted writes, automated
+quality/fun/taste claim, production-ready claim, Godot replacement/parity claim,
+or autonomous-shipping claim is introduced. Shipping/native-store export,
+hosted/cloud, real-player telemetry, live balancing, update/patch pipelines, and
+live-ops remain **DEFER absent a separate #1508 Layer-3 GO**; distributed/Elixir
+remains NO-GO for Layer-3 under ADR #92. Generated runs/assets/content/release
+artifacts remain untracked unless explicitly fixture-scoped.
+
+The recommended next work is not expanded by Era H closure. Later Era I/J work
+must remain issue-scoped, evidence-backed, and human-gated, with the same
+Layer-3, generated-state, and conservative-wording audits.
+
 ### Scaled Trust Gradient, Release Provenance and Compliance v1 governance refresh (Era H Milestone 44)
 
 Scaled Trust Gradient, Release Provenance and Compliance v1 is recorded as **complete for
@@ -2328,9 +2381,10 @@ anchors** and are not modified, closed, or narrowed by this refresh; Scenario
 Coverage numbering continues from v33 (Era F) onward through the Era G suite
 (v34–v38).
 
-**Era H opens — Milestone 42 (descriptive, not a maturity claim).** Era H begins
-the autonomous-orchestration work that Era G deliberately deferred, and does so
-as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
+**Era H complete — Milestones 42-46 (descriptive, not a maturity claim).** Era H
+built the autonomous-orchestration accountability layer that Era G deliberately
+deferred, and kept it as **evidence-gated, proposal-only collaboration**, not an
+autonomous studio:
 
 - **Era H Milestone 42 — Multi-Agent Production Pipeline v1** (#1674–#1681):
   realizes the Milestone 13 role model as role-specialized agents that propose
@@ -2356,7 +2410,7 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   deterministic design-intent decomposition, whole-game orchestration state,
   budget/stop-condition/human approval gates, deterministic autonomous producer
   demo, Scenario Coverage v40, and this governance refresh (PRs
-  #1701/#1884/#1885/#1888/#1890/#1891; Scenario Coverage v40). The producer never
+  #1701/#1884/#1885/#1888/#1890/#1891/#1902; Scenario Coverage v40). The producer never
   directly writes trusted files or releases; it emits proposal/evidence artifacts
   through the existing review/apply/trust-gradient path, with mandatory budgets,
   stop conditions, and human approval gates. Browser/Studio surfaces remain
@@ -2373,7 +2427,7 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   contract, broadened-but-bounded low-risk rollback-backed auto-apply,
   per-release provenance bundle, compliance reviewer gate, fixture-scoped
   release-trust demo, Scenario Coverage v41, and this governance refresh (PRs
-  #1702/#1906/#1910/#1956/#1964/#1973; Scenario Coverage v41). High-risk and
+  #1702/#1906/#1910/#1956/#1964/#1973/#1987; Scenario Coverage v41). High-risk and
   source-affecting changes never auto-apply; release requires compliance plus a
   human go/no-go. Rust/local owns trusted provenance/compliance/review/apply
   logic; browser/Studio/dashboard/cockpit surfaces remain read-only and gain no
@@ -2383,6 +2437,30 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   quality/fun, Godot replacement/parity, or autonomous-shipping claim is
   introduced. **#1 and #23 remain open governance anchors** and are not modified,
   closed, or narrowed by this milestone.
+
+- **Era H Milestone 45 — Shipping and LiveOps Layer-3 Re-evaluation Design Gate v1**
+  (#1697): decides the shipping/liveops Layer-3 question after Era F-H evidence.
+  The merged ADR records DEFER for native/store export, real-player telemetry,
+  live balancing, and update/patch pipelines absent a separate #1508 Layer-3 GO
+  (PR #1997). No implementation is added; Rust-first/local-first remains;
+  autonomy ends at a local web release candidate with synthetic and
+  fixture-scoped evidence; human release governance remains mandatory;
+  distributed/Elixir remains NO-GO for Layer-3 under ADR #92. **#1 and #23 remain
+  open governance anchors** and are not modified, closed, or narrowed by this
+  milestone.
+
+- **Era H Milestone 46 — Era H closing governance and final autonomy assessment**
+  (#1698): records M42-M45 completion only on merged evidence, updates README and
+  roadmap drift, and publishes the final autonomy assessment. The assessment is
+  descriptive: local agents and Rust contracts can coordinate proposal, evidence,
+  QA, provenance, compliance-blocking, and release-candidate preparation across
+  the two tracked genre lines, but vision, taste/fun, legal/compliance
+  acceptance, market/distribution choices, and release go/no-go remain human. No
+  new capability, shipping/liveops implementation, production-ready claim,
+  quality/fun claim, Godot replacement/parity claim, auto-merge, self-approval,
+  reviewer bypass, or hidden trusted write is introduced. **#1 and #23 remain
+  open governance anchors** and are not modified, closed, or narrowed by this
+  milestone.
 
 - **Era I Milestone 47 — Card-Roguelite Substrate v1** (#1791–#1797):
   generalizes the existing deck-roguelike class into a validated Rust/local
