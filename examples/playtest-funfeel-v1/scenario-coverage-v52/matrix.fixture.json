@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v52.playtest-funfeel.v1",
+  "issue": "1861",
+  "anchor": "#1 Era J Milestone 58 Human Playtest Harness and Fun-Feel Gate v1",
+  "boundary": "Rust/local owns playtest capture and human fun-feel gate validation; browser/Studio surfaces are read-only; generated runs/artifacts remain untracked unless fixture-scoped; state/shape checks only; no automated fun score, no auto-apply, no auto-merge, no self-approval, trusted write, release button, production claim, quality claim, or Godot replacement claim; #1 and #23 remain open.",
+  "rows": [
+    {
+      "id": "V52.capture.shape",
+      "surface": "#1858 structured playtest capture",
+      "fixture": "examples/playtest-funfeel-v1/demo/playtest-session-demo-v1.json",
+      "expected": "capture-valid-evidence-only"
+    },
+    {
+      "id": "V52.gate.no_verdict_blocks",
+      "surface": "#1859 no human verdict gate",
+      "fixture": "examples/playtest-funfeel-v1/demo/funfeel-gate-no-verdict-demo-v1.json",
+      "expected": "needs-human-review"
+    },
+    {
+      "id": "V52.gate.recorded_verdict_unblocks",
+      "surface": "#1859 recorded human verdict gate",
+      "fixture": "examples/playtest-funfeel-v1/demo/funfeel-gate-recorded-verdict-demo-v1.json",
+      "expected": "approved-by-human"
+    },
+    {
+      "id": "V52.gate.no_auto_score",
+      "surface": "#1859 automated score drift guard",
+      "fixture": "examples/playtest-funfeel-gate-v1/funfeel-gate-no-auto-score-v1.json",
+      "expected": "blocked"
+    },
+    {
+      "id": "V52.demo.smoke",
+      "surface": "#1860 deterministic demo manifest",
+      "fixture": "examples/playtest-funfeel-v1/demo/playtest-funfeel-demo-manifest-v1.json",
+      "expected": "capture-valid->needs-human-review->approved-by-human"
+    },
+    {
+      "id": "V52.evaluator_aggregation.backcompat",
+      "surface": "existing evaluator gate aggregation",
+      "fixture": "crates/ouroforge-evaluator/tests/verdict_schema_contract.rs",
+      "expected": "existing gate field names and writer ownership remain valid"
+    }
+  ]
+}
