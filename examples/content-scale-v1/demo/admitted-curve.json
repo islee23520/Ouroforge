@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.difficulty-curve-input.v1",
+  "campaignId": "content-scale-demo-admitted-v1",
+  "tolerances": { "spike": 4.0, "regression": 0.5 },
+  "stages": [
+    { "stageId": "demo-admit-3", "source": "m28-difficulty", "difficultyMetric": { "solutionLength": 1, "branchingFactor": 1.5, "deadEndDensity": 0.0, "reachableStates": 6 } },
+    { "stageId": "demo-admit-1", "source": "m28-difficulty", "difficultyMetric": { "solutionLength": 4, "branchingFactor": 2.0, "deadEndDensity": 0.1, "reachableStates": 18 } },
+    { "stageId": "demo-admit-2", "source": "m28-difficulty", "difficultyMetric": { "solutionLength": 4, "branchingFactor": 2.0, "deadEndDensity": 0.1, "reachableStates": 18 } }
+  ]
+}

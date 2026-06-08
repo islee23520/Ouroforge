@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "content-scale-demo-low-novelty-v1",
+  "title": "Content-scale demo: repetitive campaign",
+  "description": "Three copies of the same solvable grid-puzzle layout (distinct ids); curation rejects it as low-novelty.",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-low-1",
+      "title": "Demo low 1",
+      "description": "Base layout.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-low-1",
+      "rows": ["######", "#@...#", "#.*P.#", "#....#", "######"],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-low-2",
+      "title": "Demo low 2",
+      "description": "Same layout, different id.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-low-2",
+      "rows": ["######", "#@...#", "#.*P.#", "#....#", "######"],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-low-3",
+      "title": "Demo low 3",
+      "description": "Same layout, different id.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-low-3",
+      "rows": ["######", "#@...#", "#.*P.#", "#....#", "######"],
+      "intendedSolution": ["left", "down", "left", "up"]
+    }
+  ]
+}

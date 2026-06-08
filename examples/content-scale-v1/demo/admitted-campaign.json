@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "content-scale-demo-admitted-v1",
+  "title": "Content-scale demo: admitted campaign",
+  "description": "Three distinct, solvable grid-puzzle levels generated through the front door; the admitted set for the demo.",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-admit-1",
+      "title": "Demo admit 1",
+      "description": "Push one crate up-left onto the target.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-admit-1",
+      "rows": ["######", "#@...#", "#.*P.#", "#....#", "######"],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-admit-2",
+      "title": "Demo admit 2",
+      "description": "Mirror layout: push one crate up-right onto the target.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-admit-2",
+      "rows": ["######", "#...@#", "#.P*.#", "#....#", "######"],
+      "intendedSolution": ["right", "down", "right", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-demo-admit-3",
+      "title": "Demo admit 3",
+      "description": "Vertical push: one crate straight up onto the target.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "demo-admit-3",
+      "rows": ["######", "#.@..#", "#.*..#", "#.P..#", "######"],
+      "intendedSolution": ["up"]
+    }
+  ]
+}
