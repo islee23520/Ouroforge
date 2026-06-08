@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "ouroforge.run-shop-demo.v1",
+  "demoId": "run-shop-v1-demo",
+  "issue": 1808,
+  "milestone": "#1 Era I Milestone 49",
+  "buildsAgainst": {
+    "deckbuilderTreeRef": "examples/deckbuilder-ui-v1/demo/demo-manifest.json",
+    "substrateRef": "examples/card-roguelite-substrate-v1/engine-builder/deckbuilder.config.golden.json"
+  },
+  "execution": {
+    "mode": "rust-local-fixture-smoke",
+    "network": "disabled",
+    "liveBrowser": "not-required",
+    "browserStudioMode": "read-only inspection only",
+    "trustedWrites": "none",
+    "funVerdict": "human-era-j-only"
+  },
+  "escalatingRun": {
+    "configRef": "../fixtures/escalating.win.json",
+    "expectedStatus": "won",
+    "expectedQuotaCurve": [40, 64, 84],
+    "expectedTotalScore": 84,
+    "expectedFinalGold": 47
+  },
+  "shopLever": {
+    "configRef": "../fixtures/shop.remove.json",
+    "steps": [
+      { "type": "reroll" },
+      { "type": "removeCardId", "card_id": "wound" }
+    ],
+    "expectedRerollCount": 1,
+    "expectedRemovalLeverUsed": true,
+    "expectedRemovedCardId": "wound"
+  },
+  "governance": {
+    "anchorsRemainOpen": [1, 23],
+    "claimBoundary": "mechanical deterministic run/shop behavior only; no subjective fun, production, release, or Godot parity claim",
+    "generatedStatePolicy": "fixture-scoped demo artifacts only"
+  }
+}
