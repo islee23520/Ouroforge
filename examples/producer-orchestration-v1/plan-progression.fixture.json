@@ -1,0 +1,1 @@
+{"fixture":"plan-progression","orchestrationId":"collect-and-exit-whole-game","planRef":"examples/producer-plan-v1/design-intent.valid.fixture.json","completionEvidenceRef":"evidence/producer-orchestration-v1/design-brief.completed.json","expectedInitialStatus":"in-progress","expectedCompletedAfterOne":1}
