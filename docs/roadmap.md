@@ -2802,6 +2802,16 @@ The boundaries stay explicit and reaffirmed. Candidate generation remains **prop
 
 The recommended next milestone is not expanded by this completion; later Era J work requires separate scope issues with explicit non-goals, regression coverage, generated-state audits, and the same proposal-only, read-only, human fun/release, and Layer-3 boundaries.
 
+### Era J closing governance and creative-leverage assessment (Milestone 61)
+
+Era J Milestones 57-60 are recorded as **complete on merged evidence** under #1, with #1 and #23 preserved as open governance anchors. The closing assessment is documented in [`docs/era-j-creative-leverage-assessment.md`](era-j-creative-leverage-assessment.md). The evidence chain is Candidate Generation and Curation Cockpit v1 (#1851-#1856; PRs #1901/#1914/#1917/#1918/#1921/#1922), Human Playtest Harness and Fun-Feel Gate v1 (#1857-#1862; PRs #1905/#1924/#1928/#1931/#1952/#1954), Narrative and Theme-Arc Authoring Assist v1 (#1863-#1868; PRs #1908/#1965/#1975/#1989/#1990/#1991), and Balance Tuning Co-Pilot and Release Readiness Go/No-Go Surface v1 (#1869-#1874; PRs #1911/#2115/#2116/#2117/#2118/#2119).
+
+Creative-leverage assessment (descriptive, not a maturity claim): Era J increases output per human decision in the proposal/evidence layer. A human can inspect N candidate variants with provenance, capture structured playtest/fun-feel evidence, compare narrative/theme proposals, review balance recommendations with re-verification, and inspect release-readiness bundles plus go/no-go records. That leverage is bounded: the human decision remains the authority, and the system only preserves reproducible local evidence around it.
+
+Permanent human core reaffirmed: fun/feel verdict, taste, tone/soul, creative direction, candidate curation, balance approval, release go/no-go, Steam account/signing/content-survey/release actions, wishlists, UA, discoverability, and market demand remain human/Ring-3 decisions. Rust/local owns trusted validation, evidence composition, provenance, persistence, review/apply/trust-gradient checks, and CLI behavior; browser/dashboard/cockpit/Studio surfaces remain read-only or draft/proposal-only for trusted state. Generated runs/assets/builds/artifacts remain untracked unless fixture-scoped. Hosted/cloud/mobile Layer-3 capability remains DEFER per #1508, and distributed/Elixir remains NO-GO under ADR #92. No automated creativity, automated fun/quality/release verdict, autonomous apply, auto-merge, self-approval, reviewer bypass, production-ready claim, market-demand claim, Godot replacement/parity claim, or autonomous-shipping authority is introduced.
+
+The recommended next work is not expanded by this completion; later work requires separate scope issues with explicit non-goals, regression coverage, generated-state audits, and the same proposal-only, read-only, permanent-human-core, Ring-3 market, and Layer-3 boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
