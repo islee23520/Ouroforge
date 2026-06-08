@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ouroforge.localization.locale.v1",
+  "catalogId": "deckbuilder-ui-localization-v1",
+  "locale": "de-DE",
+  "generatedBy": "ouroforge.localization.generator.v1",
+  "proposalOnly": true,
+  "boundary": "Rust/local localization validation; generation is proposal-only; browser/Studio surfaces remain read-only or draft-only; trusted writes route through the existing review/apply/trust-gradient path; no automated fun, quality, production, release, or Godot replacement claim; generated runs/artifacts remain untracked unless fixture-scoped; #1 and #23 remain open",
+  "translations": {
+    "deckbuilder.ui.title": "Karten-/Hand-/Pipeline-UI",
+    "deckbuilder.shop.balance": "Kontostand: {amount}",
+    "deckbuilder.runmap.blocked": "Erfordert eine abgeschlossene Begegnung",
+    "deckbuilder.score.authority": "Autoritativer Rust/local-Punktestand {finalScore}"
+  }
+}

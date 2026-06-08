@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "ouroforge.localization.string-catalog.v1",
+  "catalogId": "deckbuilder-ui-localization-v1",
+  "sourceLocale": "en-US",
+  "boundary": "Rust/local localization validation; generation is proposal-only; browser/Studio surfaces remain read-only or draft-only; trusted writes route through the existing review/apply/trust-gradient path; no automated fun, quality, production, release, or Godot replacement claim; generated runs/artifacts remain untracked unless fixture-scoped; #1 and #23 remain open",
+  "generatedStatePolicy": "fixture-scoped only; generated localization proposals and validation reports remain untracked unless explicitly committed as fixtures",
+  "entries": [
+    {
+      "id": "deckbuilder.ui.title",
+      "sourceRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi.title",
+      "context": "Deckbuilder UI panel title shown in the in-game JS runtime.",
+      "text": "Card / Hand / Pipeline UI",
+      "placeholders": []
+    },
+    {
+      "id": "deckbuilder.shop.balance",
+      "sourceRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi.shop.balance",
+      "context": "Shop balance label; {amount} is a Rust/local validated integer and {currency} is a localized currency label.",
+      "text": "Balance: {amount} {currency}",
+      "placeholders": ["amount", "currency"]
+    },
+    {
+      "id": "deckbuilder.runmap.blocked",
+      "sourceRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi.runMap.nodes.elite.blockedReason",
+      "context": "Run-map unavailable node explanation shown as read-only route-planning state.",
+      "text": "Requires a completed encounter",
+      "placeholders": []
+    },
+    {
+      "id": "deckbuilder.score.authority",
+      "sourceRef": "examples/game-runtime/deckbuilder-ui.js#scoreDisplay.boundary",
+      "context": "Score-cascade display boundary; {score} is the authoritative Rust/local score already computed outside the browser UI.",
+      "text": "Authoritative Rust/local score {score}",
+      "placeholders": ["score"]
+    }
+  ]
+}

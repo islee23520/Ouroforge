@@ -71,6 +71,13 @@ pub mod trust_gradient_auto_apply;
 pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
+pub mod localization;
+pub use localization::{
+    generate_locale_catalog, validate_locale_catalog, LocaleCatalog, LocalizationValidationReport,
+    LocalizationValidationStatus, StringCatalog, StringCatalogEntry, LOCALIZATION_BOUNDARY,
+    LOCALIZATION_CATALOG_SCHEMA_VERSION, LOCALIZATION_GENERATOR,
+    LOCALIZATION_LOCALE_SCHEMA_VERSION,
+};
 pub mod asset_generation_proposal;
 pub mod asset_import;
 pub mod audio_generation;

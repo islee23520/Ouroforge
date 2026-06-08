@@ -191,3 +191,24 @@ As of this contract, #1 remains the open roadmap anchor and #23 remains the open
 governance/constraint anchor. Localization Pipeline v1 adds a bounded Era I
 mechanical localization layer while preserving those anchors, local/Rust trusted
 ownership, browser/Studio read-only constraints, and the existing trust model.
+
+## String Externalization and Multi-Language Generation v1 implementation (#1833)
+
+Issue: #1833 adds the first executable Rust/local localization surface under the
+Localization Pipeline v1 contract. It externalizes a scoped set of user-facing
+Deckbuilder UI strings into
+`examples/localization-v1/string-catalog.complete.fixture.json`, validates a
+fixture-scoped translated locale proposal at
+`examples/localization-v1/locale.es.fixture.json`, and locks fail-closed fixtures
+for incomplete translations and placeholder drift:
+
+- `examples/localization-v1/invalid/locale.missing.fixture.json`
+- `examples/localization-v1/invalid/locale.placeholder-mismatch.fixture.json`
+
+The implementation stays mechanical and conservative: generated locale catalogs
+are proposal-only, completeness and placeholder integrity are validated by
+Rust/local code, and browser/dashboard/cockpit/Studio surfaces remain read-only
+or draft-only. Generated runs/artifacts remain untracked unless fixture-scoped.
+This adds no new engine, runtime, UI framework, direct trusted browser/Studio
+write, auto-apply, auto-merge, self-approval, reviewer bypass, production-ready
+claim, quality/fun claim, shippability claim, release authority, or Godot replacement/parity claim. #1 and #23 remain open.
