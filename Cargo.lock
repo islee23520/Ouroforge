@@ -291,6 +291,7 @@ dependencies = [
  "base64",
  "ouroforge-evaluator",
  "ouroforge-evidence",
+ "ouroforge-gdd",
  "ouroforge-ledger",
  "serde",
  "serde_json",
@@ -310,6 +311,15 @@ dependencies = [
 
 [[package]]
 name = "ouroforge-evidence"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "ouroforge-gdd"
 version = "0.1.0"
 dependencies = [
  "anyhow",
