@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "scenario-coverage-v42",
+  "issue": 1796,
+  "fixtureScoped": true,
+  "boundary": "Rust/local owns substrate validation and regression coverage. Browser/Studio surfaces are read-only inspection only. Coverage uses state/shape assertions only; no timing, no network, no live browser, trusted writes, auto-apply, auto-merge, automated fun score, production-ready claim, or Godot replacement/parity claim. Generated runs/artifacts remain untracked unless fixture-scoped. #1 and #23 remain open governance anchors.",
+  "scenarios": [
+    {
+      "id": "v42-substrate-determinism-classic",
+      "system": "substrate",
+      "kind": "same-config-determinism",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/fixtures/classic.valid.json",
+      "expect": "same seed/config resolves to identical state, 3 read-only shop offers, and a 16-char digest"
+    },
+    {
+      "id": "v42-substrate-seed-divergence",
+      "system": "substrate",
+      "kind": "seed-divergence",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/fixtures/classic.valid.json",
+      "expect": "seed perturbation changes deck or digest while preserving schema shape"
+    },
+    {
+      "id": "v42-substrate-fail-closed-malformed",
+      "system": "substrate",
+      "kind": "negative-shape",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/fixtures/malformed.missing-card.json",
+      "expect": "undeclared card refs fail closed before state resolution"
+    },
+    {
+      "id": "v42-deck-roguelike-config-golden-parity",
+      "system": "deck-roguelike-config",
+      "kind": "golden-parity",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/parity/deck-roguelike-classic.substrate.golden.json",
+      "expect": "existing deck-roguelike scene migrates to the fixture-scoped substrate golden by value"
+    },
+    {
+      "id": "v42-engine-builder-config-golden-parity",
+      "system": "engine-builder-config",
+      "kind": "golden-parity",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/engine-builder/deckbuilder.config.golden.json",
+      "expect": "engine-builder deckbuilder remains a distinct config over the substrate, not a parallel engine"
+    },
+    {
+      "id": "v42-demo-manifest-both-configs",
+      "system": "demo",
+      "kind": "manifest-shape",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/demo/substrate-demo.manifest.json",
+      "expect": "demo manifest enumerates both fixture-scoped runs without network, live browser, or trusted writes"
+    },
+    {
+      "id": "v42-backcompat-pre-substrate-deck-roguelike",
+      "system": "backcompat",
+      "kind": "pre-substrate-golden",
+      "fixtureRef": "examples/deck-roguelike-game-class-v1/scenario-coverage-v31/non-stochastic-digest.golden.json",
+      "expect": "the pre-substrate deck-roguelike v31 golden remains present and well formed"
+    },
+    {
+      "id": "v42-generated-state-and-governance-audit",
+      "system": "governance",
+      "kind": "wording-audit",
+      "fixtureRef": "docs/scenario-coverage-v42.md",
+      "expect": "docs preserve generated-state boundaries, conservative wording, and #1/#23 open anchors"
+    }
+  ]
+}
