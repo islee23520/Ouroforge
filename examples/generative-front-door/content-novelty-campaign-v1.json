@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "content-novelty-mixed-v1",
+  "title": "Novelty sampler: mostly distinct with one duplicate",
+  "description": "A campaign whose grid-puzzle items are mostly structurally distinct, with one item that duplicates another (same layout, different id) so dedup detection has something to flag.",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-novelty-a-1",
+      "title": "Novelty A (original)",
+      "description": "Base sokoban layout: push one crate onto one target.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "novelty-a-1",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-novelty-a-2",
+      "title": "Novelty A (duplicate)",
+      "description": "Structurally identical to Novelty A apart from its id; must be flagged as a duplicate.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "novelty-a-2",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-novelty-b",
+      "title": "Novelty B",
+      "description": "A distinct layout with the crate and target on the opposite side.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "novelty-b",
+      "rows": [
+        "######",
+        "#.P*.#",
+        "#...@#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["right", "down"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-novelty-c",
+      "title": "Novelty C",
+      "description": "A third distinct layout with a diagonal arrangement.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "novelty-c",
+      "rows": [
+        "######",
+        "#..@.#",
+        "#.*..#",
+        "#P...#",
+        "######"
+      ],
+      "intendedSolution": ["up", "right"]
+    }
+  ]
+}

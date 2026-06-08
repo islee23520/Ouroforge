@@ -74,6 +74,7 @@ pub mod asset_import;
 pub mod audio_generation;
 pub mod audio_hooks;
 pub mod audio_qa;
+pub mod content_novelty;
 pub mod content_scale_generation;
 pub mod evolve_campaign;
 pub mod generative_accessibility;

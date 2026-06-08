@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "content-novelty-low-v1",
+  "title": "Novelty sampler: repetitive (low novelty)",
+  "description": "A campaign whose grid-puzzle items are nearly all the same layout, so the novelty ratio falls below the declared threshold and the set is flagged low-novelty.",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-low-1",
+      "title": "Repeat 1",
+      "description": "Base layout.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "low-1",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-low-2",
+      "title": "Repeat 2",
+      "description": "Same layout as Repeat 1, different id.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "low-2",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-low-3",
+      "title": "Repeat 3",
+      "description": "Same layout as Repeat 1, different id.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "low-3",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    }
+  ]
+}
