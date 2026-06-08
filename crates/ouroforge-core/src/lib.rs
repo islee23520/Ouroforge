@@ -76,6 +76,7 @@ pub mod asset_import;
 pub mod audio_generation;
 pub mod audio_hooks;
 pub mod audio_qa;
+pub mod card_roguelite_substrate;
 pub mod content_difficulty_curve;
 pub mod content_novelty;
 pub mod content_scale_generation;
@@ -118,6 +119,7 @@ pub mod puzzle_oversolution;
 pub mod puzzle_solver;
 pub mod seeded_rng;
 pub use ouroforge_source_apply::source_apply_audit_ledger;
+pub use seeded_rng::SEEDED_RNG_ALGORITHM;
 pub mod trust_gradient_audit;
 pub use source_apply_audit_ledger::*;
 pub mod qa_error_classifier;
@@ -130,6 +132,17 @@ pub mod qa_regression_coverage;
 pub mod qa_run_matrix;
 pub mod runtime_frame_budget;
 pub mod visual_regression_scale;
+pub use card_roguelite_substrate::{
+    card_roguelite_probe_state, card_roguelite_seed_algorithm,
+    default_deck_roguelike_substrate_config, digest_card_roguelite_state,
+    resolve_card_roguelite_state, validate_card_roguelite_config, CardRogueliteAnteStep,
+    CardRogueliteCard, CardRogueliteConfig, CardRogueliteDigest, CardRogueliteEffect,
+    CardRogueliteMetaConfig, CardRogueliteModifier, CardRogueliteProbeState,
+    CardRogueliteReadOnlyInspection, CardRogueliteRunConfig, CardRogueliteShopConfig,
+    CardRogueliteShopOffer, CardRogueliteState, CardRogueliteStatus, CardRogueliteUnlock,
+    CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION, CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM,
+    CARD_ROGUELITE_SUBSTRATE_PROBE_SCHEMA_VERSION, CARD_ROGUELITE_SUBSTRATE_STATE_SCHEMA_VERSION,
+};
 pub use ouroforge_evaluator::*;
 pub use ouroforge_evidence::{
     add_evidence_artifact, list_evidence_artifacts, read_evidence_index,

@@ -1834,7 +1834,10 @@
     const deckRoguelikeDigest = world.deckRoguelike && deckRoguelikeModule
       ? deckRoguelikeModule.digestState(world.deckRoguelike)
       : null;
-    if (deckRoguelikeDigest) state.deckRoguelike = deckRoguelikeDigest;
+    if (deckRoguelikeDigest) {
+      state.deckRoguelike = deckRoguelikeDigest;
+      state.cardRogueliteSubstrate = deckRoguelikeDigest;
+    }
     state.digest = {
       algorithm: 'fnv1a64-canonical-json-v1',
       value: fnv1a64({
@@ -2110,6 +2113,9 @@
         : null;
       state.deckbuilderUi = world.deckbuilderUi && deckbuilderUiModule
         ? deckbuilderUiModule.worldStateView(world.deckbuilderUi)
+        : null;
+      state.cardRogueliteSubstrate = state.deckRoguelike
+        ? state.deckRoguelike.cardRogueliteSubstrate
         : null;
       state.input = clone(input);
       state.rawInput = { directions: clone(input), keys: clone(rawKeys) };

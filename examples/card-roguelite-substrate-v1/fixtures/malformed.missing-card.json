@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "deck-roguelike-classic",
+  "variant": "deck-roguelike-classic",
+  "seed": 12345,
+  "cards": {
+    "strike": {
+      "cost": 1,
+      "tags": ["attack", "classic"],
+      "actions": [{ "type": "damage", "amount": 6 }],
+      "modifierRefs": []
+    }
+  },
+  "startingDeck": ["strike", "missing-card"],
+  "modifiers": {},
+  "run": {
+    "startingHp": 30,
+    "startingQuota": 20,
+    "anteSteps": [{ "ante": 1, "quota": 20, "rewardGold": 10 }]
+  },
+  "shop": { "baseGold": 99, "offerCount": 3, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

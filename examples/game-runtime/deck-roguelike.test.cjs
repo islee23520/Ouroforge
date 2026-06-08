@@ -99,6 +99,10 @@ const scene = readScene('deck-roguelike-scene-v1.json');
     'trusted writes', 'command bridge', 'live mutation',
   ]);
   assert.equal(view.readOnlyInspection.trustedEmitter, 'browser-runtime-deck-roguelike-world-state');
+  assert.equal(view.cardRogueliteSubstrate.schemaVersion, 'ouroforge.card-roguelite-substrate-probe.v1');
+  assert.equal(view.cardRogueliteSubstrate.variant, 'deck-roguelike-classic');
+  assert.match(view.cardRogueliteSubstrate.digest.value, /^[0-9a-f]{16}$/);
+  assert.equal(view.cardRogueliteSubstrate.readOnlyInspection.trustedEmitter, 'browser-runtime-card-roguelite-substrate-probe');
 }
 
 // --- A seeded run is playable and observable ---------------------------------

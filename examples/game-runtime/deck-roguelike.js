@@ -29,6 +29,25 @@
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
+  function stableStringify(value) {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+    if (value && typeof value === 'object') {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+  }
+
+  function fnv1a64Hex(value) {
+    const text = stableStringify(value);
+    let hash = 0xcbf29ce484222325n;
+    const prime = 0x100000001b3n;
+    for (let i = 0; i < text.length; i += 1) {
+      hash ^= BigInt(text.charCodeAt(i));
+      hash = (hash * prime) & 0xffffffffffffffffn;
+    }
+    return hash.toString(16).padStart(16, '0');
+  }
+
 
   function fail(message) {
     throw new Error(`deck roguelike spec invalid: ${message}`);
@@ -333,6 +352,44 @@
     return state;
   }
 
+
+  // Substrate-facing projection for Card-Roguelite Substrate v1 (#1792).
+  // This is a digest-stable, read-only probe view over the existing
+  // deck-roguelike state; it does not add a parallel resolver.
+  function substrateStateView(state) {
+    if (!state) return null;
+    return {
+      schemaVersion: 'ouroforge.card-roguelite-substrate-probe.v1',
+      configId: 'deck-roguelike-classic',
+      variant: 'deck-roguelike-classic',
+      seed: state.seed,
+      rng: clone(state.rng),
+      run: {
+        ante: 1,
+        status: state.status,
+        turn: state.turn,
+        quota: state.enemy.maxHp || 0,
+      },
+      cards: Object.keys(state.cards).sort().map((id) => ({
+        id,
+        cost: state.cards[id].cost,
+        tags: [state.cards[id].type],
+      })),
+      deck: state.drawPile.concat(state.hand, state.discardPile),
+      shop: { offers: [], readOnly: true },
+      meta: { unlocks: [] },
+      digest: {
+        algorithm: 'fnv1a64-canonical-json-v1',
+        value: fnv1a64Hex(digestState(state)),
+      },
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-card-roguelite-substrate-probe',
+        browserStudioMode: 'read-only card-roguelite substrate inspection',
+        disallowedActions: ['trusted writes', 'command bridge', 'live mutation', 'automated fun verdict'],
+      },
+    };
+  }
+
   // Probe-facing read model. The deck world-state is observation-only; the
   // browser never writes back through it.
   function worldStateView(state) {
@@ -360,6 +417,7 @@
         browserStudioMode: 'read-only deck-roguelike world-state inspection',
         disallowedActions: ['trusted writes', 'command bridge', 'live mutation'],
       },
+      cardRogueliteSubstrate: substrateStateView(state),
     };
   }
 
@@ -398,6 +456,7 @@
     createState: normalizeSpec,
     advance,
     worldStateView,
+    substrateStateView,
     digestState,
   };
 
