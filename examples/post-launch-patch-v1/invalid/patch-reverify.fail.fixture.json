@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "patch-reverify-loop-v1",
+  "issue": 1845,
+  "patchId": "post-launch-patch-failing-001",
+  "baselinePackageDescriptorHash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "sourceApplyRef": "examples/source-patch-apply-transaction-v1/apply-transaction.sample.json",
+  "gateSet": [
+    {
+      "kind": "rust-tests",
+      "status": "pass",
+      "evidenceRef": "evidence/post-launch-patch-v1/rust-tests.pass.json",
+      "summary": "cargo test passed for the patch candidate before re-package"
+    },
+    {
+      "kind": "clippy",
+      "status": "pass",
+      "evidenceRef": "evidence/post-launch-patch-v1/clippy.pass.json",
+      "summary": "cargo clippy passed with warnings denied before re-package"
+    },
+    {
+      "kind": "scenario-coverage",
+      "status": "fail",
+      "evidenceRef": "evidence/post-launch-patch-v1/scenario-coverage.fail.json",
+      "summary": "scenario coverage regression blocks re-package"
+    },
+    {
+      "kind": "evaluator-gates",
+      "status": "pass",
+      "evidenceRef": "evidence/post-launch-patch-v1/evaluator-gates.pass.json",
+      "summary": "declared evaluator gates passed without automated fun or quality claims"
+    },
+    {
+      "kind": "compare-provenance",
+      "status": "pass",
+      "evidenceRef": "evidence/post-launch-patch-v1/compare-provenance.pass.json",
+      "summary": "baseline comparison and provenance refs are deterministic and current"
+    },
+    {
+      "kind": "save-compatibility",
+      "status": "pass",
+      "evidenceRef": "evidence/post-launch-patch-v1/save-compatibility.pass.json",
+      "summary": "save compatibility is verified before re-package"
+    },
+    {
+      "kind": "steam-export-package",
+      "status": "pass",
+      "evidenceRef": "examples/steam-export-build-v1/package-descriptor.valid.fixture.json",
+      "summary": "Steam desktop export descriptor can be derived in local dry-run mode"
+    }
+  ],
+  "generatedStatePolicy": "Generated patch runs, package descriptors, and builds remain untracked unless fixture-scoped.",
+  "boundary": "Patch re-verify reuses existing web runtime and Steam export; Rust/local owns trusted validation; browser/Studio/Electron/Steamworks surfaces are read-only with no direct trusted writes; release remains human/Ring-3 with no Release button automation; not Layer-3 cloud/mobile."
+}
