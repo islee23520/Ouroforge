@@ -26,6 +26,7 @@ pub const CARD_ROGUELITE_SCORE_RESOLUTION_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-score-resolution.v1";
 pub const CARD_ROGUELITE_SCORE_COMPOSITION_SCHEMA_VERSION: &str =
     "ouroforge.card-roguelite-score-composition.v1";
+pub const CARD_ROGUELITE_RUN_ANTE_SCHEMA_VERSION: &str = "ouroforge.card-roguelite-run-ante.v1";
 pub const CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM: &str = "fnv1a64-canonical-json-v1";
 
 const MAX_CARDS: usize = 128;
@@ -262,6 +263,37 @@ pub struct CardRogueliteScoreComposition {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CardRogueliteRunAnteReport {
+    pub schema_version: String,
+    pub run_id: String,
+    pub config_id: String,
+    pub variant: String,
+    pub seed: u32,
+    pub seed_algorithm: String,
+    pub bounded: bool,
+    pub max_ante: u32,
+    pub terminal_status: CardRogueliteStatus,
+    pub total_score: i32,
+    pub final_gold: i32,
+    pub rounds: Vec<CardRogueliteRunAnteRound>,
+    pub budget_exhausted: bool,
+    pub digest: CardRogueliteDigest,
+    pub read_only_inspection: CardRogueliteReadOnlyInspection,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardRogueliteRunAnteRound {
+    pub ante: u32,
+    pub quota: i32,
+    pub reward_gold: i32,
+    pub score: i32,
+    pub passed: bool,
+    pub status_after_round: CardRogueliteStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CardRogueliteCompositionFinding {
     pub card_id: String,
     pub modifier_ids: Vec<String>,
@@ -313,6 +345,24 @@ struct ScoreCompositionDigestInput<'a> {
     degenerate_threshold: i32,
     total_score: i32,
     findings: &'a [CardRogueliteCompositionFinding],
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RunAnteDigestInput<'a> {
+    schema_version: &'a str,
+    run_id: &'a str,
+    config_id: &'a str,
+    variant: &'a str,
+    seed: u32,
+    seed_algorithm: &'a str,
+    bounded: bool,
+    max_ante: u32,
+    terminal_status: CardRogueliteStatus,
+    total_score: i32,
+    final_gold: i32,
+    rounds: &'a [CardRogueliteRunAnteRound],
+    budget_exhausted: bool,
 }
 
 fn one() -> i32 {
@@ -708,6 +758,86 @@ pub fn analyze_card_roguelite_score_composition(
     Ok(composition)
 }
 
+pub fn resolve_card_roguelite_run_ante(
+    config: &CardRogueliteConfig,
+) -> Result<CardRogueliteRunAnteReport> {
+    validate_card_roguelite_config(config)?;
+    let mut steps = config.run.ante_steps.clone();
+    steps.sort_by_key(|step| step.ante);
+    let mut previous_quota = config.run.starting_quota;
+    for step in &steps {
+        if step.quota < previous_quota {
+            return Err(anyhow!(
+                "run.anteSteps must use a non-decreasing quota curve for escalating runs"
+            ));
+        }
+        previous_quota = step.quota;
+    }
+
+    let state = resolve_card_roguelite_state(config)?;
+    let total_score = state.score;
+    let mut final_gold = config.shop.base_gold;
+    let mut terminal_status = CardRogueliteStatus::Won;
+    let mut budget_exhausted = false;
+    let mut rounds = Vec::with_capacity(steps.len());
+    for step in steps {
+        let passed = total_score >= step.quota;
+        let status_after_round = if passed {
+            CardRogueliteStatus::Ready
+        } else {
+            CardRogueliteStatus::Lost
+        };
+        if passed {
+            final_gold = final_gold
+                .checked_add(step.reward_gold)
+                .ok_or_else(|| anyhow!("run ante reward gold overflow at ante {}", step.ante))?;
+        } else {
+            terminal_status = CardRogueliteStatus::Lost;
+            budget_exhausted = true;
+        }
+        rounds.push(CardRogueliteRunAnteRound {
+            ante: step.ante,
+            quota: step.quota,
+            reward_gold: step.reward_gold,
+            score: total_score,
+            passed,
+            status_after_round,
+        });
+        if !passed {
+            break;
+        }
+    }
+    if terminal_status == CardRogueliteStatus::Won {
+        if let Some(last) = rounds.last_mut() {
+            last.status_after_round = CardRogueliteStatus::Won;
+        }
+    }
+
+    let max_ante = rounds.iter().map(|round| round.ante).max().unwrap_or(0);
+    let mut report = CardRogueliteRunAnteReport {
+        schema_version: CARD_ROGUELITE_RUN_ANTE_SCHEMA_VERSION.to_string(),
+        run_id: format!("{}-seed-{}", config.config_id, config.seed),
+        config_id: config.config_id.clone(),
+        variant: config.variant.clone(),
+        seed: config.seed,
+        seed_algorithm: SEEDED_RNG_ALGORITHM.to_string(),
+        bounded: true,
+        max_ante,
+        terminal_status,
+        total_score,
+        final_gold,
+        rounds,
+        budget_exhausted,
+        digest: CardRogueliteDigest {
+            algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+            value: String::new(),
+        },
+        read_only_inspection: read_only_inspection(),
+    };
+    report.digest = digest_run_ante(&report);
+    Ok(report)
+}
+
 pub fn card_roguelite_probe_state(config: &CardRogueliteConfig) -> Result<CardRogueliteProbeState> {
     let substrate_state = resolve_card_roguelite_state(config)?;
     Ok(CardRogueliteProbeState {
@@ -1068,6 +1198,29 @@ fn digest_score_composition(composition: &CardRogueliteScoreComposition) -> Card
         degenerate_threshold: composition.degenerate_threshold,
         total_score: composition.total_score,
         findings: &composition.findings,
+    })
+    .unwrap_or_default();
+    CardRogueliteDigest {
+        algorithm: CARD_ROGUELITE_SUBSTRATE_DIGEST_ALGORITHM.to_string(),
+        value: format!("{:016x}", fnv1a64(&canonical)),
+    }
+}
+
+fn digest_run_ante(report: &CardRogueliteRunAnteReport) -> CardRogueliteDigest {
+    let canonical = serde_json::to_vec(&RunAnteDigestInput {
+        schema_version: &report.schema_version,
+        run_id: &report.run_id,
+        config_id: &report.config_id,
+        variant: &report.variant,
+        seed: report.seed,
+        seed_algorithm: &report.seed_algorithm,
+        bounded: report.bounded,
+        max_ante: report.max_ante,
+        terminal_status: report.terminal_status,
+        total_score: report.total_score,
+        final_gold: report.final_gold,
+        rounds: &report.rounds,
+        budget_exhausted: report.budget_exhausted,
     })
     .unwrap_or_default();
     CardRogueliteDigest {

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "run-shop-escalating-loss",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4906,
+  "cards": {
+    "spark-plug": {
+      "cost": 1,
+      "tags": ["engine-builder", "starter", "score"],
+      "actions": [{ "type": "score", "amount": 10 }],
+      "modifierRefs": []
+    },
+    "gear-train": {
+      "cost": 2,
+      "tags": ["engine-builder", "starter", "scaler"],
+      "actions": [{ "type": "score", "amount": 12 }],
+      "modifierRefs": []
+    }
+  },
+  "startingDeck": ["spark-plug", "gear-train", "spark-plug"],
+  "modifiers": {},
+  "run": {
+    "startingHp": 24,
+    "startingQuota": 25,
+    "anteSteps": [
+      { "ante": 1, "quota": 25, "rewardGold": 8 },
+      { "ante": 2, "quota": 40, "rewardGold": 13 }
+    ]
+  },
+  "shop": { "baseGold": 5, "offerCount": 2, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}

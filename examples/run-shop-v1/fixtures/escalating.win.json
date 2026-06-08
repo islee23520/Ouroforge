@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "run-shop-escalating-win",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 4906,
+  "cards": {
+    "spark-plug": {
+      "cost": 1,
+      "tags": ["engine-builder", "starter", "score"],
+      "actions": [{ "type": "score", "amount": 18 }],
+      "modifierRefs": ["tuned"]
+    },
+    "gear-train": {
+      "cost": 2,
+      "tags": ["engine-builder", "starter", "scaler"],
+      "actions": [{ "type": "score", "amount": 22 }],
+      "modifierRefs": ["overdrive"]
+    }
+  },
+  "startingDeck": ["spark-plug", "gear-train", "spark-plug"],
+  "modifiers": {
+    "tuned": {
+      "order": 10,
+      "addScore": 2,
+      "multiplyScore": 1,
+      "effect": {
+        "text": "add +2 before multipliers",
+        "scope": "card",
+        "operation": "additive"
+      }
+    },
+    "overdrive": {
+      "order": 20,
+      "addScore": 0,
+      "multiplyScore": 2,
+      "effect": {
+        "text": "double score after tuning",
+        "scope": "scoringPhase",
+        "operation": "multiplicative"
+      }
+    }
+  },
+  "run": {
+    "startingHp": 24,
+    "startingQuota": 40,
+    "anteSteps": [
+      { "ante": 1, "quota": 40, "rewardGold": 8 },
+      { "ante": 2, "quota": 64, "rewardGold": 13 },
+      { "ante": 3, "quota": 84, "rewardGold": 21 }
+    ]
+  },
+  "shop": { "baseGold": 5, "offerCount": 2, "priceFloor": 1 },
+  "meta": { "unlocks": [] }
+}
