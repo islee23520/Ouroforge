@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "steam-package-descriptor-v1",
+  "buildId": "steam-export-fixture-001",
+  "projectId": "proj_steam_export_fixture",
+  "title": "Collect and Exit Steam Fixture",
+  "version": "0.1.0",
+  "platform": "windows-x64",
+  "wrapper": "electron",
+  "steamBridge": "steamworks.js",
+  "entryHtml": "examples/animation/index.html",
+  "executablePath": "dist/steam/collect-and-exit/OuroforgeFixture.exe",
+  "depotConfigHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "buildManifestHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "artifactHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "releaseAuthority": "human-ring3-required"
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "steam-export-build-manifest-v1",
+  "buildId": "steam-export-fixture-001",
+  "issue": 1838,
+  "projectId": "proj_steam_export_fixture",
+  "title": "Collect and Exit Steam Fixture",
+  "version": "0.1.0",
+  "sourceWebBuild": {
+    "runtime": "existing-web-runtime",
+    "runtimeReuse": "reuse existing web runtime; no new runtime and no new engine",
+    "entryHtml": "examples/animation/index.html",
+    "assetManifest": "examples/asset-pipeline-v1-regression/asset-manifest.json",
+    "probeMode": "preserve-read-only"
+  },
+  "electronWrapper": {
+    "framework": "electron",
+    "steamBridge": "steamworks.js",
+    "mainProcess": "examples/steam-export-build-v1/wrapper/main.cjs",
+    "preload": "examples/steam-export-build-v1/wrapper/preload.cjs",
+    "trustedWritePolicy": "read-only wrapper bridge; Rust/local owns trusted validation; no direct trusted writes"
+  },
+  "windowsArtifact": {
+    "platform": "windows-x64",
+    "executablePath": "src/OuroforgeFixture.exe",
+    "artifactRoot": "dist/steam/collect-and-exit",
+    "descriptorPath": "dist/steam/collect-and-exit/steam-package-descriptor.json"
+  },
+  "depotConfigRef": "examples/steam-export-build-v1/depot-config.valid.fixture.json",
+  "generatedStatePolicy": "Generated Windows artifacts and depot builds stay untracked unless fixture-scoped.",
+  "boundary": "Wrap existing web runtime only; Rust/local owns trusted validation; Electron/browser/Studio surfaces are read-only with no direct trusted writes; Steam account/signing/content survey/Release button are human/Ring-3; no Release button automation; Steam desktop export is not Layer-3 cloud/mobile."
+}
