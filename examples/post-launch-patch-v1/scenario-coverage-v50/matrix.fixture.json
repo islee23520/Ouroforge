@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "scenario-coverage-v50-post-launch-patch-v1",
+  "issue": 1848,
+  "coverageId": "scenario-coverage-v50-post-launch-patch-regression-suite",
+  "scope": "Post-Launch Patch, Re-Verify, and Save-Migration Loop v1 regression suite",
+  "assertionMode": "state-shape-only",
+  "requiresNetwork": false,
+  "requiresLiveBrowser": false,
+  "cases": [
+    {
+      "id": "v50.patch-reverify.pass",
+      "kind": "patch-reverify",
+      "fixtures": ["examples/post-launch-patch-v1/patch-reverify.pass.fixture.json"],
+      "expectedState": "full-gate-set-pass-allows-repackage"
+    },
+    {
+      "id": "v50.patch-reverify.fail",
+      "kind": "patch-reverify",
+      "fixtures": ["examples/post-launch-patch-v1/invalid/patch-reverify.fail.fixture.json"],
+      "expectedState": "non-passing-gate-blocks-repackage"
+    },
+    {
+      "id": "v50.save-migration.forward",
+      "kind": "save-migration",
+      "fixtures": ["examples/save-migration-v1/legacy-save.v0.fixture.json"],
+      "expectedState": "legacy-save-migrates-forward-with-replay-digests-preserved"
+    },
+    {
+      "id": "v50.save-migration.incompatible",
+      "kind": "save-migration",
+      "fixtures": ["examples/save-migration-v1/invalid/incompatible-save.fixture.json"],
+      "expectedState": "incompatible-save-fails-closed-with-explicit-evidence"
+    },
+    {
+      "id": "v50.non-patched-build-save-backcompat",
+      "kind": "backward-compatibility-golden",
+      "fixtures": ["examples/post-launch-patch-v1/scenario-coverage-v50/non-patched-build-save.golden.json"],
+      "expectedState": "existing-web-build-and-save-profile-remain-valid-without-patch"
+    }
+  ],
+  "boundary": "Rust/local owns trusted validation; coverage asserts deterministic state/shape-only regressions; browser/Studio surfaces are read-only; no trusted write, no auto-merge, no self-approval, no network, no live browser; generated artifacts stay untracked unless fixture-scoped; #1 and #23 remain open."
+}

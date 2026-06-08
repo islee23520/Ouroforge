@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "scenario-coverage-v50-non-patched-build-save-golden-v1",
+  "issue": 1848,
+  "runtime": "existing-web-runtime",
+  "entryHtml": "examples/game-runtime/index.html",
+  "assetManifest": "examples/asset-pipeline-v1-regression/asset-manifest.json",
+  "steamBuildManifestRef": "examples/steam-export-build-v1/build-manifest.valid.fixture.json",
+  "steamDepotConfigRef": "examples/steam-export-build-v1/depot-config.valid.fixture.json",
+  "saveProfileRef": "examples/save-profile-scale-v1/legacy/save-profile.v0.json",
+  "expectedBuildState": "valid-existing-web-build-without-post-launch-patch",
+  "expectedSaveState": "legacy-save-profile-remains-forward-compatible",
+  "boundary": "Backward compatibility golden only; an existing web build and legacy save profile remain valid without a post-launch patch, network, live browser, trusted write, upload, release authority, or subjective fun assertion."
+}
