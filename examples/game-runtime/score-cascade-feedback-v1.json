@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "ouroforge.score-cascade-feedback-fixture.v1",
+  "issue": 1820,
+  "generatedStatePolicy": "fixture-scoped only; generated cascade traces remain untracked outside fixtures",
+  "boundary": "mechanical score-cascade payoff feedback only; not a new engine, not a fun/quality verdict, and not browser score authority",
+  "config": {
+    "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+    "configId": "score-cascade-feedback-v1-fixture",
+    "variant": "engine-builder-deckbuilder",
+    "seed": 1820,
+    "cards": {
+      "spark": {
+        "cost": 1,
+        "tags": [
+          "starter"
+        ],
+        "actions": [
+          {
+            "type": "score",
+            "amount": 5
+          }
+        ],
+        "modifierRefs": [
+          "plus-two",
+          "double"
+        ]
+      },
+      "engine": {
+        "cost": 2,
+        "tags": [
+          "payoff"
+        ],
+        "actions": [
+          {
+            "type": "score",
+            "amount": 3
+          },
+          {
+            "type": "damage",
+            "amount": 2
+          }
+        ],
+        "modifierRefs": [
+          "double"
+        ]
+      }
+    },
+    "startingDeck": [
+      "spark",
+      "engine"
+    ],
+    "modifiers": {
+      "plus-two": {
+        "order": 10,
+        "addScore": 2,
+        "multiplyScore": 1
+      },
+      "double": {
+        "order": 20,
+        "addScore": 0,
+        "multiplyScore": 2
+      }
+    },
+    "run": {
+      "startingHp": 20,
+      "startingQuota": 20,
+      "anteSteps": [
+        {
+          "ante": 1,
+          "quota": 20,
+          "rewardGold": 3
+        }
+      ]
+    },
+    "shop": {
+      "baseGold": 5,
+      "offerCount": 2,
+      "priceFloor": 1
+    },
+    "meta": {
+      "unlocks": []
+    }
+  },
+  "expected": {
+    "finalScore": 24,
+    "phases": [
+      "base",
+      "modifier",
+      "modifier",
+      "card-total",
+      "base",
+      "modifier",
+      "card-total",
+      "cascade-complete"
+    ],
+    "modifierOrder": [
+      "plus-two",
+      "double",
+      "double"
+    ],
+    "juiceTrigger": "score_cascade"
+  }
+}
