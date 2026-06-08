@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "production-handoff-v1",
+  "milestone": "era-h-milestone-42",
+  "handoffs": [
+    {
+      "handoffId": "handoff-001",
+      "fromRole": "level-designer",
+      "toRole": "reviewer",
+      "artifactClass": "scene-draft",
+      "baseRef": "evidence/base/scene-draft.json",
+      "proposalRef": "evidence/proposals/handoff-001.json",
+      "staleRefs": [],
+      "conflictsWith": ["handoff-002"],
+      "status": "clean",
+      "resolution": "accepted"
+    },
+    {
+      "handoffId": "handoff-002",
+      "fromRole": "gameplay-engineer",
+      "toRole": "reviewer",
+      "artifactClass": "scene-draft",
+      "baseRef": "evidence/base/scene-draft.json",
+      "proposalRef": "evidence/proposals/handoff-002.json",
+      "staleRefs": [],
+      "conflictsWith": ["handoff-001"],
+      "status": "conflict",
+      "resolution": "blocked"
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["handoffId", "status", "resolution"]
+  },
+  "boundary": "Role handoffs are proposal-only; conflict resolution is deterministic; conflicting and stale handoffs fail closed and are routed through the review/apply path under the trust gradient, not auto-merged and not auto-applied; dashboards stay read-only with no self-approval."
+}
