@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-demo.v1",
+  "demoId": "card-roguelite-substrate-v1-demo",
+  "substrate": "card-roguelite-substrate-v1",
+  "execution": {
+    "mode": "rust-local-fixture-smoke",
+    "network": "disabled",
+    "liveBrowser": "not-required",
+    "browserStudioMode": "read-only inspection",
+    "trustedWrites": "none",
+    "funVerdict": "human-era-j-only"
+  },
+  "runs": [
+    {
+      "id": "deck-roguelike-parity",
+      "configRef": "../parity/deck-roguelike-classic.substrate.golden.json",
+      "variant": "deck-roguelike-classic",
+      "seed": 12345,
+      "parityRef": "../parity/deck-roguelike-classic.substrate.golden.json",
+      "expectedFirstDeckCards": ["strike", "strike", "bash", "defend", "defend"],
+      "expectedOfferCount": 1,
+      "expectedScoreAtLeast": 50
+    },
+    {
+      "id": "engine-builder-deckbuilder",
+      "configRef": "../engine-builder/deckbuilder.config.golden.json",
+      "variant": "engine-builder-deckbuilder",
+      "seed": 424242,
+      "distinctFrom": "deck-roguelike-parity",
+      "expectedOfferCount": 4,
+      "expectedScoreAtLeast": 60
+    }
+  ],
+  "governance": {
+    "anchorsRemainOpen": [1, 23],
+    "issue": 1795,
+    "claimBoundary": "mechanical deterministic fixture demo only; no production, fun, or Godot replacement claim"
+  }
+}
