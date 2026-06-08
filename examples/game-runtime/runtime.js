@@ -45,6 +45,13 @@
   const audio = window.OuroforgeAudio || {
     emitIntentEvents: () => [],
   };
+  const juice = window.OuroforgeJuice || {
+    normalizeJuiceConfig: () => ({ schemaVersion: 'ouroforge.runtime-juice-config.v1', enabled: false, primitives: [] }),
+    createJuiceState: (_config, sceneId) => ({ schemaVersion: 'ouroforge.runtime-juice-state.v1', sceneId, config: { enabled: false, primitives: [] }, active: [], emitted: [] }),
+    emitFeedback: (state) => ({ state, events: [] }),
+    advanceFeedback: (state) => ({ state, events: [] }),
+    worldStateView: (state) => ({ schemaVersion: 'ouroforge.runtime-juice-probe.v1', sceneId: state && state.sceneId, active: [], emitted: [], activeCount: 0, emittedCount: 0 }),
+  };
   const tilemap = window.OuroforgeTilemap || {
     normalizeTilemaps: () => [],
     debugState: () => ({ version: '1', tilemaps: [], layerOrder: [] }),
@@ -145,6 +152,8 @@
     audioEvents: [],
     audioWarnings: [],
     vfxEvents: [],
+    juice: null,
+    juiceEvents: [],
     reloads: [],
     tilemaps: [],
     cameras: [],
@@ -619,6 +628,7 @@
       collisionRules: normalizeCollisionRules(scene.collisionRules),
       gameplayRules: normalizeGameplayRules(scene.gameplayRules),
       sceneTransitions: normalizeSceneTransitions(scene.sceneTransitions),
+      juice: juice.normalizeJuiceConfig(scene.juice),
       assetManifest: scene.assetManifest && typeof scene.assetManifest === 'object' ? objectValue(scene.assetManifest) : null,
       scene3d: sceneKind === '3d' && scene.scene3d && typeof scene.scene3d === 'object' && !Array.isArray(scene.scene3d)
         ? objectValue(scene.scene3d)
@@ -723,6 +733,67 @@
       }
       record('runtime.audio.emitted', emitted);
     }
+  }
+
+  function recordJuiceAudioIntent(event) {
+    const intent = event && event.sample && event.sample.audioIntent;
+    if (!intent) return;
+    const request = {
+      kind: 'audio_request',
+      requestId: `${event.feedbackId}-audio`,
+      tick: world.tick,
+      sceneId: world.sceneId,
+      name: intent.name,
+      trigger: `juice:${event.trigger}`,
+      action: intent.action || 'play',
+      intentKind: intent.kind || 'sound',
+      busId: intent.bus || null,
+      busKind: intent.kind || 'sound',
+      volume: 100,
+      busMuted: true,
+      entityId: event.targetEntityId || null,
+      asset: intent.asset || null,
+      muted: true,
+      playback: 'intent',
+      limitationWarnings: ['browser_audio_intent_only', 'audible_output_not_verified', 'juice_sfx_hook'],
+      sourceFeedbackId: event.feedbackId,
+    };
+    world.audioEvents.push(request);
+    if (world.audioEvents.length > 64) world.audioEvents.shift();
+    for (const warning of request.limitationWarnings) {
+      const warningRecord = { tick: world.tick, sceneId: world.sceneId, requestId: request.requestId, warning };
+      world.audioWarnings.push(warningRecord);
+      if (world.audioWarnings.length > 64) world.audioWarnings.shift();
+    }
+    record('runtime.audio.emitted', request);
+  }
+
+  function storeJuiceEvents(emitted = []) {
+    for (const event of emitted) {
+      world.juiceEvents.push(event);
+      if (world.juiceEvents.length > 64) world.juiceEvents.shift();
+      record('runtime.juice.feedback', event);
+      recordJuiceAudioIntent(event);
+    }
+  }
+
+  function emitJuiceEvents(trigger, sourceEvent = null) {
+    if (!world.juice) return [];
+    const result = juice.emitFeedback(world.juice, trigger, { tick: world.tick, sceneId: world.sceneId, sourceEvent });
+    world.juice = result.state || world.juice;
+    const emitted = result.events || [];
+    storeJuiceEvents(emitted);
+    return emitted;
+  }
+
+  function advanceJuiceEvents() {
+    if (!world.juice) return [];
+    const result = juice.advanceFeedback(world.juice, world.tick);
+    world.juice = result.state || world.juice;
+    for (const event of result.events || []) {
+      record('runtime.juice.feedback_update', event);
+    }
+    return result.events || [];
   }
 
   function keyAlias(key) {
@@ -1490,6 +1561,8 @@
     animation.advanceAnimations(world.entities, 1);
     world.tick += 1;
     recordAnimationTransitions(beforeAnimationStates);
+    advanceJuiceEvents();
+    emitJuiceEvents('tick');
     const scene3dAnimation = scene3dAnimationSummary({ advanceFrames: 1, frameId: `tick-${world.tick}` });
     for (const event of world.scene3dAnimationEvents) record(event.type, event);
     const physicsEntities = world.entities.concat(typeof tilemap.collisionEntities === 'function' ? tilemap.collisionEntities(world.tilemaps) : []);
@@ -1515,6 +1588,7 @@
       world.collisionEvents.push(event);
       if (world.collisionEvents.length > 64) world.collisionEvents.shift();
       record(event.type, event);
+      emitJuiceEvents('collision', event);
     }
     const physics2dCollisions = collisionEventsFor2dPhysics(currentCollisionEvents);
     refreshGroundedState(physics2dCollisions);
@@ -1604,6 +1678,8 @@
     world.audioEvents = [];
     world.audioWarnings = [];
     world.vfxEvents = [];
+    world.juice = juice.createJuiceState(normalized.juice, normalized.id);
+    world.juiceEvents = [];
     world.gridPuzzle = normalized.gridPuzzle ? clone(normalized.gridPuzzle) : null;
     world.uiux = normalized.uiux ? clone(normalized.uiux) : null;
     world.deckRoguelike = normalized.deckRoguelike ? clone(normalized.deckRoguelike) : null;
@@ -1622,6 +1698,7 @@
       assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
     });
     emitAudioEvents('scene_loaded');
+    emitJuiceEvents('scene_loaded');
     renderDebug();
     return api.getWorldState();
   }
@@ -2068,6 +2145,8 @@
       collisionPairCount: Array.isArray(world.physics && world.physics.contactPairs) ? world.physics.contactPairs.length : 0,
       activeAnimationCount: world.entities.filter((entity) => entity.components && entity.components.animation && entity.components.animation.state).length,
       activeVfxCount: Array.isArray(world.vfxEvents) ? world.vfxEvents.length : 0,
+      activeJuiceCount: world.juice && Array.isArray(world.juice.active) ? world.juice.active.length : 0,
+      juiceEventCount: Array.isArray(world.juiceEvents) ? world.juiceEvents.length : 0,
       audioEventCount: Array.isArray(world.audioEvents) ? world.audioEvents.length : 0,
     };
   }
@@ -2114,6 +2193,7 @@
       state.deckbuilderUi = world.deckbuilderUi && deckbuilderUiModule
         ? deckbuilderUiModule.worldStateView(world.deckbuilderUi)
         : null;
+      state.juice = world.juice ? juice.worldStateView(world.juice) : null;
       state.cardRogueliteSubstrate = state.deckRoguelike
         ? state.deckRoguelike.cardRogueliteSubstrate
         : null;
@@ -2225,6 +2305,8 @@
         runtimeFrameBudgetViolationCount: runtimeFrameBudget.violations.length,
         runtimeFrameBudgetFrameId: runtimeFrameBudget.frameId,
         runtimeFrameBudgetCounts: runtimeFrameBudget.counts,
+        juiceEventCount: Array.isArray(world.juiceEvents) ? world.juiceEvents.length : 0,
+        activeJuiceCount: world.juice && Array.isArray(world.juice.active) ? world.juice.active.length : 0,
       });
     },
     getEvents() {

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1",
+  "id": "juice-primitives-v1-fixture",
+  "seed": 51,
+  "bounds": { "width": 320, "height": 180 },
+  "metadata": {
+    "issue": 1819,
+    "scenarioId": "juice-primitives-v1",
+    "generatedStatePolicy": "fixture-scoped only; no generated runs/artifacts committed",
+    "boundary": "mechanical juice feedback evidence only; human Era J owns feel/fun judgment"
+  },
+  "juice": {
+    "schemaVersion": "ouroforge.runtime-juice-config.v1",
+    "enabled": true,
+    "primitives": [
+      {
+        "id": "spawn-pop",
+        "kind": "tween",
+        "trigger": "scene_loaded",
+        "targetEntityId": "player",
+        "property": "scale",
+        "from": 0.85,
+        "to": 1,
+        "durationFrames": 6,
+        "easing": "ease-out"
+      },
+      {
+        "id": "tick-shake",
+        "kind": "shake",
+        "trigger": "tick",
+        "targetEntityId": "player",
+        "intensity": 3,
+        "durationFrames": 4,
+        "axis": "both",
+        "easing": "ease-out"
+      },
+      {
+        "id": "impact-stop",
+        "kind": "hit-stop",
+        "trigger": "collision",
+        "targetEntityId": "player",
+        "durationFrames": 2
+      },
+      {
+        "id": "pickup-sfx",
+        "kind": "sfx",
+        "trigger": "scene_loaded",
+        "durationFrames": 1,
+        "sfx": {
+          "name": "pickup",
+          "kind": "ui",
+          "bus": "ui",
+          "asset": "assets/audio/spawn.ogg"
+        }
+      }
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4", "layer": "actors" },
+      "components": {
+        "transform": { "x": 32, "y": 72 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "audio": {
+          "buses": [{ "id": "ui", "kind": "ui", "volume": 80, "muted": true }],
+          "events": []
+        }
+      },
+      "metadata": {}
+    }
+  ]
+}
