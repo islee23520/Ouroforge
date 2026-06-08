@@ -86,6 +86,7 @@ pub mod audio_generation;
 pub mod audio_hooks;
 pub mod audio_qa;
 pub mod balance_combo_detector;
+pub mod balance_copilot;
 pub mod balance_dominant_build;
 pub mod balance_fairness;
 pub mod candidate_generation;

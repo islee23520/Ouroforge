@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "ouroforge.balance-copilot.v1",
+  "approvalId": "balance-copilot-approval-auto-apply-violation",
+  "recommendationSetId": "balance-copilot-recset-1870",
+  "recommendationId": "balance-rec-dominant-loop-engine",
+  "decision": "approved",
+  "humanActor": "era-j-human-gate",
+  "rationale": "This fixture intentionally violates the no-auto-apply boundary and must fail validation.",
+  "recordedAtUnixMs": 1870000000001,
+  "reverifyRequired": true,
+  "autoApplyRequested": true,
+  "trustedWriteAuthority": true,
+  "boundary": "Rust/local advisory recommendations only; human approval required; re-verify before review/apply/trust-gradient; browser/Studio read-only; no auto-apply; no auto-merge; no fun/quality/production/Godot claim; #1 and #23 remain open"
+}

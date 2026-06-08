@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "ouroforge.balance-copilot.v1",
+  "recommendationSetId": "balance-copilot-recset-1870",
+  "sourceReportFixtureId": "planted-dominant-build",
+  "sourceReportDigest": "dominant-build|fixture=planted-dominant-build|runs=5|wins=3|metrics=armor-engine:1/0:2000:0:94,loop-engine:3/3:6000:10000:233,starter-engine:1/0:2000:0:88|dominant=loop-engine|dead=rusty-bearing",
+  "generator": "balance-tuning-copilot-v1",
+  "recommendations": [
+    {
+      "recommendationId": "balance-rec-dominant-loop-engine",
+      "findingKind": "dominant-build",
+      "targetBuildId": "loop-engine",
+      "sourceReplayDeckSeed": 510,
+      "sourceReplayPersona": "smith",
+      "pickRateBps": 6000,
+      "winRateBps": 10000,
+      "recommendedAction": "reduce-dominant-build-synergy",
+      "rationale": "Dominant build loop-engine was picked 6000 bps with 10000 bps win rate; propose a human-reviewed tuning draft and re-verify before any trusted apply.",
+      "status": "reverify-required",
+      "reviewApplyRequired": true,
+      "autoApplyAllowed": false,
+      "trustedWriteAuthority": false
+    }
+  ],
+  "proposalOnly": true,
+  "humanApprovalRequired": true,
+  "autoApplyAllowed": false,
+  "trustedWriteAuthority": false,
+  "boundary": "Rust/local advisory recommendations only; human approval required; re-verify before review/apply/trust-gradient; browser/Studio read-only; no auto-apply; no auto-merge; no fun/quality/production/Godot claim; #1 and #23 remain open"
+}
