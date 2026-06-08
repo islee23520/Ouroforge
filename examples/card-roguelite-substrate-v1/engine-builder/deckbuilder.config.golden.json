@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "ouroforge.card-roguelite-substrate-config.v1",
+  "configId": "engine-builder-deckbuilder",
+  "variant": "engine-builder-deckbuilder",
+  "seed": 424242,
+  "cards": {
+    "blueprint-cache": {
+      "cost": 3,
+      "tags": [
+        "engine-builder",
+        "unlock",
+        "planning"
+      ],
+      "actions": [
+        {
+          "type": "score",
+          "amount": 9
+        }
+      ],
+      "modifierRefs": []
+    },
+    "coolant-loop": {
+      "cost": 1,
+      "tags": [
+        "engine-builder",
+        "starter",
+        "stabilizer"
+      ],
+      "actions": [
+        {
+          "type": "block",
+          "amount": 6
+        }
+      ],
+      "modifierRefs": []
+    },
+    "gear-train": {
+      "cost": 2,
+      "tags": [
+        "engine-builder",
+        "starter",
+        "scaler"
+      ],
+      "actions": [
+        {
+          "type": "score",
+          "amount": 7
+        }
+      ],
+      "modifierRefs": [
+        "overdrive"
+      ]
+    },
+    "pressure-valve": {
+      "cost": 2,
+      "tags": [
+        "engine-builder",
+        "shop",
+        "control"
+      ],
+      "actions": [
+        {
+          "type": "damage",
+          "amount": 5
+        }
+      ],
+      "modifierRefs": [
+        "tuned"
+      ]
+    },
+    "spark-plug": {
+      "cost": 1,
+      "tags": [
+        "engine-builder",
+        "starter",
+        "score"
+      ],
+      "actions": [
+        {
+          "type": "score",
+          "amount": 4
+        }
+      ],
+      "modifierRefs": [
+        "tuned"
+      ]
+    }
+  },
+  "startingDeck": [
+    "spark-plug",
+    "spark-plug",
+    "spark-plug",
+    "coolant-loop",
+    "coolant-loop",
+    "gear-train",
+    "gear-train",
+    "pressure-valve"
+  ],
+  "modifiers": {
+    "overdrive": {
+      "order": 20,
+      "addScore": 0,
+      "multiplyScore": 2
+    },
+    "tuned": {
+      "order": 10,
+      "addScore": 2,
+      "multiplyScore": 1
+    }
+  },
+  "run": {
+    "startingHp": 24,
+    "startingQuota": 48,
+    "anteSteps": [
+      {
+        "ante": 1,
+        "quota": 48,
+        "rewardGold": 12
+      },
+      {
+        "ante": 2,
+        "quota": 72,
+        "rewardGold": 18
+      }
+    ]
+  },
+  "shop": {
+    "baseGold": 35,
+    "offerCount": 4,
+    "priceFloor": 2
+  },
+  "meta": {
+    "unlocks": [
+      {
+        "id": "blueprint-cache",
+        "requiredAnte": 2,
+        "cardRef": "blueprint-cache"
+      }
+    ]
+  }
+}

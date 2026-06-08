@@ -548,6 +548,140 @@ pub fn default_deck_roguelike_substrate_config(seed: u32) -> CardRogueliteConfig
     }
 }
 
+pub fn default_engine_builder_deckbuilder_substrate_config(seed: u32) -> CardRogueliteConfig {
+    let mut modifiers = BTreeMap::new();
+    modifiers.insert(
+        "tuned".to_string(),
+        CardRogueliteModifier {
+            order: 10,
+            add_score: 2,
+            multiply_score: 1,
+        },
+    );
+    modifiers.insert(
+        "overdrive".to_string(),
+        CardRogueliteModifier {
+            order: 20,
+            add_score: 0,
+            multiply_score: 2,
+        },
+    );
+
+    let mut cards = BTreeMap::new();
+    cards.insert(
+        "spark-plug".to_string(),
+        CardRogueliteCard {
+            cost: 1,
+            tags: vec![
+                "engine-builder".to_string(),
+                "starter".to_string(),
+                "score".to_string(),
+            ],
+            actions: vec![CardRogueliteEffect::Score { amount: 4 }],
+            modifier_refs: vec!["tuned".to_string()],
+        },
+    );
+    cards.insert(
+        "coolant-loop".to_string(),
+        CardRogueliteCard {
+            cost: 1,
+            tags: vec![
+                "engine-builder".to_string(),
+                "starter".to_string(),
+                "stabilizer".to_string(),
+            ],
+            actions: vec![CardRogueliteEffect::Block { amount: 6 }],
+            modifier_refs: Vec::new(),
+        },
+    );
+    cards.insert(
+        "gear-train".to_string(),
+        CardRogueliteCard {
+            cost: 2,
+            tags: vec![
+                "engine-builder".to_string(),
+                "starter".to_string(),
+                "scaler".to_string(),
+            ],
+            actions: vec![CardRogueliteEffect::Score { amount: 7 }],
+            modifier_refs: vec!["overdrive".to_string()],
+        },
+    );
+    cards.insert(
+        "pressure-valve".to_string(),
+        CardRogueliteCard {
+            cost: 2,
+            tags: vec![
+                "engine-builder".to_string(),
+                "shop".to_string(),
+                "control".to_string(),
+            ],
+            actions: vec![CardRogueliteEffect::Damage { amount: 5 }],
+            modifier_refs: vec!["tuned".to_string()],
+        },
+    );
+    cards.insert(
+        "blueprint-cache".to_string(),
+        CardRogueliteCard {
+            cost: 3,
+            tags: vec![
+                "engine-builder".to_string(),
+                "unlock".to_string(),
+                "planning".to_string(),
+            ],
+            actions: vec![CardRogueliteEffect::Score { amount: 9 }],
+            modifier_refs: Vec::new(),
+        },
+    );
+
+    CardRogueliteConfig {
+        schema_version: CARD_ROGUELITE_SUBSTRATE_CONFIG_SCHEMA_VERSION.to_string(),
+        config_id: "engine-builder-deckbuilder".to_string(),
+        variant: "engine-builder-deckbuilder".to_string(),
+        seed,
+        cards,
+        starting_deck: vec![
+            "spark-plug".to_string(),
+            "spark-plug".to_string(),
+            "spark-plug".to_string(),
+            "coolant-loop".to_string(),
+            "coolant-loop".to_string(),
+            "gear-train".to_string(),
+            "gear-train".to_string(),
+            "pressure-valve".to_string(),
+        ],
+        modifiers,
+        run: CardRogueliteRunConfig {
+            starting_hp: 24,
+            starting_quota: 48,
+            ante_steps: vec![
+                CardRogueliteAnteStep {
+                    ante: 1,
+                    quota: 48,
+                    reward_gold: 12,
+                },
+                CardRogueliteAnteStep {
+                    ante: 2,
+                    quota: 72,
+                    reward_gold: 18,
+                },
+            ],
+        },
+        shop: CardRogueliteShopConfig {
+            base_gold: 35,
+            offer_count: 4,
+            price_floor: 2,
+        },
+        meta: CardRogueliteMetaConfig {
+            unlocks: vec![CardRogueliteUnlock {
+                id: "blueprint-cache".to_string(),
+                required_ante: 2,
+                card_ref: "blueprint-cache".to_string(),
+            }],
+        },
+    }
+}
+
 fn resolve_card_score(
     card: &CardRogueliteCard,
     modifiers: &BTreeMap<String, CardRogueliteModifier>,
