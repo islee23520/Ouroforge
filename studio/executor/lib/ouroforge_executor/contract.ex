@@ -82,4 +82,18 @@ defmodule OuroforgeExecutor.Contract do
 
   def allowed_cli?(argv) when is_list(argv), do: argv in @allowed_cli_surface
   def forbidden_cli?(argv) when is_list(argv), do: argv in @forbidden_cli_surface
+
+  def allowed_cli_family?(argv) when is_list(argv) do
+    Enum.any?(@allowed_cli_surface, &prefix?(&1, argv))
+  end
+
+  def forbidden_cli_family?(argv) when is_list(argv) do
+    Enum.any?(@forbidden_cli_surface, &prefix?(&1, argv))
+  end
+
+  def cli_family(argv) when is_list(argv) do
+    Enum.find(@allowed_cli_surface ++ @forbidden_cli_surface, &prefix?(&1, argv)) || argv
+  end
+
+  defp prefix?(prefix, argv), do: Enum.take(argv, length(prefix)) == prefix
 end
