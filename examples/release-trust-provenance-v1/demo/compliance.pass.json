@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "release-compliance-gate-v1",
+  "releaseCandidateRef": "examples/release-trust-provenance-v1/demo/refs/release-candidate.json",
+  "policyChecks": [
+    { "id": "content-policy", "status": "pass", "evidenceRef": "examples/release-trust-provenance-v1/demo/evidence/policy.json" }
+  ],
+  "ageRatingSignals": {
+    "declaredRating": "everyone-10-plus-local-signal",
+    "evidenceRef": "examples/release-trust-provenance-v1/demo/evidence/age-rating.json",
+    "unreviewedSignals": []
+  },
+  "assetChecks": [
+    {
+      "id": "licensed-sprite-atlas",
+      "assetRef": "examples/release-trust-provenance-v1/demo/refs/assets.json",
+      "license": "CC0-1.0",
+      "provenanceRef": "examples/release-trust-provenance-v1/demo/refs/assets-provenance.json",
+      "qaGateRef": "examples/release-trust-provenance-v1/demo/refs/assets-qa.json"
+    }
+  ],
+  "humanGoNoGo": "pending",
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composes with existing reviewer/evaluator gates; Rust/local read-only; browser and Studio read-only; human go/no-go retained; no release authority"
+}

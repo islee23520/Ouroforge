@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "provenance-bundle-release-trust-demo-complete",
+  "changeId": "change-release-trust-demo",
+  "status": "complete",
+  "chainLinks": [
+    { "kind": "intent-design-brief", "ref": "examples/provenance-bundle-v1/refs/intent-design-brief.json", "artifactId": "design-brief-release-trust-demo" },
+    { "kind": "generated-edited-artifact", "ref": "examples/provenance-bundle-v1/refs/generated-artifact.json", "artifactId": "generated-artifact-release-trust-demo" },
+    { "kind": "validation-result", "ref": "examples/provenance-bundle-v1/refs/validation-result.json", "artifactId": "validation-result-release-trust-demo" },
+    { "kind": "runtime-observation", "ref": "examples/provenance-bundle-v1/refs/runtime-observation.json", "artifactId": "runtime-observation-release-trust-demo" },
+    { "kind": "evaluator-verdict", "ref": "examples/provenance-bundle-v1/refs/evaluator-verdict.json", "artifactId": "evaluator-verdict-release-trust-demo" },
+    { "kind": "regression-comparison", "ref": "examples/provenance-bundle-v1/refs/regression-comparison.json", "artifactId": "regression-comparison-release-trust-demo" },
+    { "kind": "journal-review-decision", "ref": "examples/provenance-bundle-v1/refs/journal-review-decision.json", "artifactId": "journal-review-decision-release-trust-demo" },
+    { "kind": "promotion-rollback-record", "ref": "examples/provenance-bundle-v1/refs/promotion-rollback-record.json", "artifactId": "promotion-rollback-record-release-trust-demo" }
+  ],
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "incompleteReasons": [],
+  "compatibilityNotes": ["compose by reference only; no duplicate provenance engine"],
+  "boundary": "Read-only audit and replay surface only; no production quality guarantee and no Godot replacement claim.",
+  "guardrails": ["#1 remains open", "#23 remains open", "generated bundles stay untracked unless fixture-scoped"]
+}

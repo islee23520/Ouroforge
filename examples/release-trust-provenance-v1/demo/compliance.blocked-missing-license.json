@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "release-compliance-gate-v1",
+  "releaseCandidateRef": "examples/release-trust-provenance-v1/demo/refs/release-candidate.json",
+  "policyChecks": [
+    { "id": "content-policy", "status": "pass", "evidenceRef": "examples/release-trust-provenance-v1/demo/evidence/policy.json" }
+  ],
+  "ageRatingSignals": {
+    "declaredRating": "pending-review",
+    "evidenceRef": "examples/release-trust-provenance-v1/demo/evidence/age-rating.json",
+    "unreviewedSignals": []
+  },
+  "assetChecks": [
+    {
+      "id": "unlicensed-generated-music",
+      "assetRef": "examples/release-trust-provenance-v1/demo/refs/unlicensed-generated-music.json",
+      "license": null,
+      "provenanceRef": "examples/release-trust-provenance-v1/demo/refs/generated-music-provenance.json",
+      "qaGateRef": "examples/release-trust-provenance-v1/demo/refs/generated-music-qa.json"
+    }
+  ],
+  "humanGoNoGo": "pending",
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composes with existing reviewer/evaluator gates; Rust/local read-only; browser and Studio read-only; human go/no-go retained; no release authority"
+}
