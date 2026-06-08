@@ -104,6 +104,7 @@ pub mod plugin_threat_model;
 pub mod production_handoff;
 pub mod production_qa_matrix;
 pub mod production_qa_verdict;
+pub mod production_review_gates;
 pub mod production_roles;
 pub mod provenance_bundle;
 pub mod provenance_replay;

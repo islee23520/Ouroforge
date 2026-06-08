@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "production-review-gates-v1",
+  "milestone": "era-h-milestone-42",
+  "gates": [
+    {
+      "gateId": "gate-001",
+      "proposalRef": "evidence/proposals/gate-001.json",
+      "artifactClass": "design-brief",
+      "implementerRole": "designer",
+      "reviewerRole": "designer",
+      "criticRole": "critic",
+      "riskTier": "low",
+      "reviewerDecision": "approve",
+      "criticDecision": "approve",
+      "reviewerEvidenceRef": "evidence/review/gate-001-reviewer.json",
+      "criticEvidenceRef": "evidence/review/gate-001-critic.json",
+      "outcome": "promote-allowed"
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["gateId", "outcome"]
+  },
+  "boundary": "Promotion is gated by an independent review and critic under the trust gradient; gates fail closed and stay read-only; cleared proposals route through the review/apply path with no auto-apply, no auto-merge, no reviewer bypass, and no self-approval; a human keeps the release go/no-go."
+}
