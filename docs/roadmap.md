@@ -1667,6 +1667,56 @@ backward-compatible; generated runs/evidence remain ignored unless explicitly
 fixture-scoped; Layer-3 distributed orchestration / Elixir remains NO-GO under ADR
 #92 and deferred under #1508. #1 and #23 remain open governance anchors.
 
+### Deck-Roguelike Game Class v1 governance refresh
+
+Deck-Roguelike Game Class v1 is recorded as **complete for Era F Milestone 31**
+under #1, on merged evidence, as a conservative, additive, local-only milestone.
+It adds a deterministic, probe-exposed deck-roguelike game class (cards/relics/
+runs, an energy budget per turn, and a scripted enemy) to the existing
+game-runtime. It is a **demand-driven, capability-axis rung** on the Game
+Complexity Ladder (`docs/game-complexity-ladder-v1.md`): it adds the **seeded
+stochastic state** axis rather than new spatial breadth, and sits above the
+structural rungs (collect-and-exit through multi-scene objective game). Every
+capability **reuses an existing surface** — the runtime, the
+`window.__OUROFORGE__` probe, the replay-state digest, and the seeded stochastic
+determinism layer; it adds **no new engine, runtime, or writer**, and authorizes
+**no renderer, physics, audio, or 3D breadth**.
+
+The merged evidence chain is the scope/contract gate #1599
+(`docs/deck-roguelike-game-class-v1.md`, PR #1624) — defines the deck-roguelike
+game-class and seeded determinism contracts and the reuse statement; Seeded
+Stochastic Determinism v1 #1600 (`crates/ouroforge-core/src/seeded_rng.rs` and
+the runtime `mulberry32` stream, PR #1630) — makes all randomness derive from an
+explicit seed, captured by snapshot/restore and folded into the replay-state
+digest; Deck-Roguelike Game Class and Runtime v1 #1601
+(`examples/game-runtime/deck-roguelike.js` with the runtime load/advance/digest/
+probe wiring, PR #1752) — the deterministic, probe-exposed game class whose
+shuffles reuse the seeded stream, so an identical seed and action sequence
+reproduce a digest-stable run and malformed decks fail closed; the Deck-Roguelike
+Game Class Demo v1 #1602 (`docs/deck-roguelike-game-class-v1-demo.md` and
+`examples/deck-roguelike-game-class-v1/demo/`, PR #1757) — a deterministic,
+fixture-scoped demo with passing four-gate and Milestone 20 loop-coverage
+evidence and a recorded Milestone 24 ladder rung; and Scenario Coverage v31 #1603
+(`docs/scenario-coverage-v31.md`, PR #1760) — an enumerated, state/shape-only
+regression suite over seeded determinism (same/different seed), snapshot-across-
+draw, and run reproducibility, plus a backward-compatibility golden proving the
+prior non-stochastic classes keep byte-identical replay-state digests. #1 and
+#23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. **All randomness is seeded and
+replay-stable**: no unseeded randomness, wall-clock seeding, or ambient entropy;
+a seeded run is reproducible from its declared inputs. The class is a **bounded
+genre rung**, not a shipped game: no production-readiness, quality, fun,
+shippable, or current Godot replacement/parity claim is introduced, and the
+human release go/no-go is preserved. Generation/role-agent/producer output stays
+**proposal-only** through the existing review/apply/trust-gradient path — never a
+direct trusted write, auto-apply, auto-merge, self-approval, or reviewer bypass.
+Trusted logic is Rust/local; browser/Studio surfaces remain read-only. Existing
+contracts remain backward-compatible (the deck-roguelike digest key is additive),
+and generated runs/artifacts remain ignored unless explicitly fixture-scoped.
+Shipping/hosted/cloud/live-ops stays **DEFER until a #1508 Layer-3 GO** (Layer-3
+distributed orchestration / Elixir remains NO-GO under ADR #92).
+
 The recommended next milestone is not expanded by this completion; any later Era
 F rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
