@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "production-roles-v1",
+  "milestone": "era-h-milestone-42",
+  "roles": [
+    {
+      "role": "designer",
+      "purpose": "designer proposes design briefs and requirements for review",
+      "ownsArtifactClasses": ["design-brief", "requirement-extraction"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/agent-role-model-v1.md",
+      "forbiddenActions": [
+        "no self-approval of its own proposals",
+        "no auto-apply or trusted write",
+        "no hidden agent or unreviewed handoff"
+      ]
+    },
+    {
+      "role": "level-designer",
+      "purpose": "level-designer proposes scene and level drafts for review",
+      "ownsArtifactClasses": ["scene-draft"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/agent-role-model-v1.md",
+      "forbiddenActions": [
+        "no self-approval of its own proposals",
+        "no auto-apply or trusted write",
+        "no hidden agent or unreviewed handoff"
+      ]
+    },
+    {
+      "role": "asset-import-planner",
+      "purpose": "asset-import-planner proposes asset imports with license and provenance for review",
+      "ownsArtifactClasses": ["asset-proposal"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/agent-role-model-v1.md",
+      "forbiddenActions": [
+        "no self-approval of its own proposals",
+        "no auto-apply or trusted write",
+        "no hidden agent or unlicensed asset promotion"
+      ]
+    }
+  ],
+  "ownership": [
+    {
+      "artifactClass": "design-brief",
+      "ownerRole": "designer",
+      "evidenceRef": "docs/file-artifact-ownership-conflict-policy-v1.md"
+    },
+    {
+      "artifactClass": "requirement-extraction",
+      "ownerRole": "designer",
+      "evidenceRef": "docs/file-artifact-ownership-conflict-policy-v1.md"
+    },
+    {
+      "artifactClass": "scene-draft",
+      "ownerRole": "level-designer",
+      "evidenceRef": "docs/file-artifact-ownership-conflict-policy-v1.md"
+    },
+    {
+      "artifactClass": "asset-proposal",
+      "ownerRole": "asset-import-planner",
+      "evidenceRef": "docs/file-artifact-ownership-conflict-policy-v1.md"
+    }
+  ],
+  "attempts": [
+    {
+      "attemptId": "attempt-001",
+      "artifactClass": "design-brief",
+      "actorRole": "designer",
+      "writeKind": "proposal",
+      "proposalRef": "evidence/proposals/design-brief-001.json",
+      "declaredOutcome": "authorized"
+    },
+    {
+      "attemptId": "attempt-002",
+      "artifactClass": "design-brief",
+      "actorRole": "level-designer",
+      "writeKind": "proposal",
+      "proposalRef": "evidence/proposals/design-brief-002.json",
+      "declaredOutcome": "rejected"
+    },
+    {
+      "attemptId": "attempt-003",
+      "artifactClass": "scene-draft",
+      "actorRole": "level-designer",
+      "writeKind": "trusted-write",
+      "proposalRef": "evidence/proposals/scene-draft-003.json",
+      "declaredOutcome": "rejected"
+    },
+    {
+      "attemptId": "attempt-004",
+      "artifactClass": "audio-cue",
+      "actorRole": "asset-import-planner",
+      "writeKind": "proposal",
+      "proposalRef": "evidence/proposals/audio-cue-004.json",
+      "declaredOutcome": "rejected"
+    }
+  ],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["attemptId", "artifactClass", "actorRole", "ownerRole", "outcome"]
+  },
+  "boundary": "Role agents are proposal-only; each artifact class has a single owning role; unauthorized writes fail closed; promotion flows through the review/apply path under the trust gradient; dashboards stay read-only with no auto-apply, no auto-merge, and no self-approval."
+}

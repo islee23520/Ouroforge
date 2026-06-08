@@ -103,6 +103,7 @@ pub mod plugin_registry;
 pub mod plugin_threat_model;
 pub mod production_qa_matrix;
 pub mod production_qa_verdict;
+pub mod production_roles;
 pub mod provenance_bundle;
 pub mod provenance_replay;
 pub mod puzzle_difficulty_metric;

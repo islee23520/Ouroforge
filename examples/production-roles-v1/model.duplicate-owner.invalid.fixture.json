@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "production-roles-v1",
+  "milestone": "era-h-milestone-42",
+  "roles": [
+    {
+      "role": "designer",
+      "purpose": "designer proposes design briefs for review",
+      "ownsArtifactClasses": ["design-brief"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/agent-role-model-v1.md",
+      "forbiddenActions": [
+        "no self-approval",
+        "no auto-apply",
+        "no hidden agent"
+      ]
+    },
+    {
+      "role": "level-designer",
+      "purpose": "level-designer also claims the design brief, a conflict",
+      "ownsArtifactClasses": ["design-brief"],
+      "proposalOnly": true,
+      "evidenceRef": "docs/agent-role-model-v1.md",
+      "forbiddenActions": [
+        "no self-approval",
+        "no auto-apply",
+        "no hidden agent"
+      ]
+    }
+  ],
+  "ownership": [
+    {
+      "artifactClass": "design-brief",
+      "ownerRole": "designer",
+      "evidenceRef": "docs/file-artifact-ownership-conflict-policy-v1.md"
+    }
+  ],
+  "attempts": [],
+  "dashboardCompat": {
+    "readOnly": true,
+    "surface": "evidence-dashboard",
+    "columns": ["artifactClass", "ownerRole"]
+  },
+  "boundary": "Role agents are proposal-only; each artifact class has a single owning role; unauthorized writes fail closed; promotion flows through the review/apply path under the trust gradient; dashboards stay read-only."
+}
