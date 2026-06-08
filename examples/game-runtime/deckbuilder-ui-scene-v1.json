@@ -97,6 +97,83 @@
         "label": "Commit",
         "purpose": "proposal handoff to trusted review/apply path"
       }
-    ]
+    ],
+    "shop": {
+      "id": "act1-shop",
+      "title": "Act I Shop",
+      "currency": "gold",
+      "balance": 45,
+      "refreshSeed": "shop-seed-12345",
+      "offers": [
+        {
+          "id": "offer-strike-plus",
+          "label": "Strike+",
+          "kind": "card",
+          "price": 35,
+          "available": true
+        },
+        {
+          "id": "offer-vigor-charm",
+          "label": "Vigor Charm",
+          "kind": "relic",
+          "price": 75,
+          "available": false,
+          "unavailableReason": "insufficient gold"
+        }
+      ]
+    },
+    "runMap": {
+      "id": "act1-run-map",
+      "title": "Act I Route",
+      "currentNodeId": "start",
+      "knownUpcomingNodeIds": [
+        "shop",
+        "elite"
+      ],
+      "nodes": [
+        {
+          "id": "start",
+          "label": "Start",
+          "kind": "start",
+          "status": "completed"
+        },
+        {
+          "id": "shop",
+          "label": "Shop",
+          "kind": "shop",
+          "status": "available"
+        },
+        {
+          "id": "elite",
+          "label": "Elite",
+          "kind": "combat",
+          "status": "blocked",
+          "blockedReason": "requires a completed encounter"
+        },
+        {
+          "id": "boss",
+          "label": "Boss",
+          "kind": "boss",
+          "status": "unknown",
+          "known": false
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "shop"
+        },
+        {
+          "from": "start",
+          "to": "elite",
+          "blocked": true,
+          "reason": "elite path locked in fixture"
+        },
+        {
+          "from": "shop",
+          "to": "boss"
+        }
+      ]
+    }
   }
 }

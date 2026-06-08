@@ -128,6 +128,13 @@ surface. For that compatibility contract: generated runs/artifacts remain untrac
 Godot-replacement/parity, quality, fun, public-launch, or market-demand claim is
 authorized.
 
+
+## Shop and Run-Map UI implementation compatibility (#1827)
+
+Issue: #1827 is the follow-up implementation issue for read-only/draft-only shop and run-map UI. It extends the #1826 runtime UI module and `window.__OUROFORGE__` probe model with fixture-scoped shop offers, unavailable choices, run-map nodes, edges, current position, and draft path planning. Shop offer selection and run-map path planning are local UI proposals only: they set `trustedWrite: false`, remain draft-only, and route any trusted acceptance through the existing Rust/local review/apply/trust-gradient path.
+
+The implementation reuses the existing JavaScript runtime UI surface and adds no new UI framework, renderer, command bridge, browser trusted-write path, or parallel engine. Negative cases remain visible and fail closed: invalid node ids, stale offers, undeclared/unavailable prices, impossible paths, blocked edges, and unknown run-map state must be rendered or reported as bounded UI state rather than silently promoted. Generated runs/artifacts remain untracked unless explicitly fixture-scoped; browser/Studio surfaces remain read-only; issues #1 and #23 remain open; no production-ready, Godot-replacement/parity, quality, fun, public-launch, or market-demand claim is authorized.
+
 ## Generated state policy
 
 UI screenshots, probe exports, dashboard/cockpit exports, run-map captures,

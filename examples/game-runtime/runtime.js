@@ -2407,6 +2407,26 @@
       });
       return deckbuilderUiModule.worldStateView(world.deckbuilderUi);
     },
+    deckbuilderUiSelectShopOffer(offerId) {
+      if (!world.deckbuilderUi || !deckbuilderUiModule) return null;
+      world.deckbuilderUi = deckbuilderUiModule.selectShopOffer(world.deckbuilderUi, offerId);
+      record('runtime.deckbuilder_ui.select_shop_offer', {
+        offerId,
+        accepted: world.deckbuilderUi.interaction.lastAction.accepted,
+        draftOnly: true,
+      });
+      return deckbuilderUiModule.worldStateView(world.deckbuilderUi);
+    },
+    deckbuilderUiPlanRunMapNode(nodeId) {
+      if (!world.deckbuilderUi || !deckbuilderUiModule) return null;
+      world.deckbuilderUi = deckbuilderUiModule.planRunMapNode(world.deckbuilderUi, nodeId);
+      record('runtime.deckbuilder_ui.plan_run_map_node', {
+        nodeId,
+        accepted: world.deckbuilderUi.interaction.lastAction.accepted,
+        draftOnly: true,
+      });
+      return deckbuilderUiModule.worldStateView(world.deckbuilderUi);
+    },
     whenReady() {
       return sceneReady;
     },
