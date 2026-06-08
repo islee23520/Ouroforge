@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v51.curation-cockpit.v1",
+  "issue": "1855",
+  "suiteId": "scenario-coverage-v51-curation-cockpit",
+  "boundary": "Rust/local state and shape regression coverage for proposal-only candidate generation and read-only curation provenance; browser/Studio read-only; generated runs/artifacts remain untracked unless fixture-scoped; no auto-apply; no auto-merge; no self-approval; no automated fun/quality/release/production/Godot claim; #1 and #23 remain open.",
+  "rows": [
+    {
+      "id": "V51.generation.n_variant",
+      "kind": "candidate-generation",
+      "fixture": "examples/curation-cockpit-v1/candidate-generation-brief-v1.json",
+      "expected": "four-proposed-pending-unverified-candidates"
+    },
+    {
+      "id": "V51.curation.selection",
+      "kind": "selection-provenance",
+      "fixture": "examples/curation-cockpit-v1/curation-selection-v1.json",
+      "expected": "selected-candidate-replays-by-id-and-digest"
+    },
+    {
+      "id": "V51.curation.read_model",
+      "kind": "read-model",
+      "fixture": "examples/curation-cockpit-v1/candidate-generation-brief-v1.json",
+      "expected": "read-only-actions-only"
+    },
+    {
+      "id": "V51.curation.readonly_block",
+      "kind": "negative-boundary",
+      "fixture": "examples/curation-cockpit-v1/curation-selection-readonly-violation.json",
+      "expected": "trusted-write-and-apply-authority-rejected"
+    },
+    {
+      "id": "V51.demo.smoke",
+      "kind": "demo",
+      "fixture": "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json",
+      "expected": "three-candidate-demo-with-recorded-selection"
+    },
+    {
+      "id": "V51.m30.backcompat",
+      "kind": "milestone-30-backcompat",
+      "fixture": "examples/generative-front-door/generative-intake-brief-v1.json",
+      "expected": "single-grid-puzzle-proposal-remains-valid"
+    }
+  ]
+}
