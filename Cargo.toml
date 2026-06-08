@@ -7,3 +7,24 @@ members = [
   "crates/ouroforge-cli",
 ]
 resolver = "2"
+
+# Build-performance profiles.
+#
+# The dominant build cost in this workspace is link time: ~100 integration-test
+# binaries each statically link the large `ouroforge-core` rlib, and the default
+# `debug = 2` makes every one carry full DWARF. We keep line tables for our own
+# crates (so panic/test backtraces still point at source lines) and drop debug
+# info entirely for third-party dependencies, which we never step into. This
+# cuts codegen and link time across `cargo build`/`cargo test` with no change to
+# behavior. Release builds are unaffected.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.test]
+debug = "line-tables-only"
+
+[profile.test.package."*"]
+debug = false
