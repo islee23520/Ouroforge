@@ -135,6 +135,13 @@ Issue: #1827 is the follow-up implementation issue for read-only/draft-only shop
 
 The implementation reuses the existing JavaScript runtime UI surface and adds no new UI framework, renderer, command bridge, browser trusted-write path, or parallel engine. Negative cases remain visible and fail closed: invalid node ids, stale offers, undeclared/unavailable prices, impossible paths, blocked edges, and unknown run-map state must be rendered or reported as bounded UI state rather than silently promoted. Generated runs/artifacts remain untracked unless explicitly fixture-scoped; browser/Studio surfaces remain read-only; issues #1 and #23 remain open; no production-ready, Godot-replacement/parity, quality, fun, public-launch, or market-demand claim is authorized.
 
+
+## Number-Cascade and Score Display implementation compatibility (#1828)
+
+Issue: #1828 is the follow-up implementation issue for score/number-cascade display and tooltips. It extends the existing deckbuilder runtime UI and `window.__OUROFORGE__` probe model with a read-only score display sourced from Rust/local scoring resolution and score-cascade feedback evidence. The UI preserves cascade event order, formats displayed numbers deterministically (including large values), and derives bounded tooltips from declared card/modifier/cumulative score events.
+
+The score display is presentation only: it does not recompute authoritative score, does not become browser score authority, does not write trusted state, and does not add a new engine, renderer, command bridge, UI framework, or automated fun/quality verdict. Mismatched final/authoritative scores, out-of-order cascade events, stale score evidence, missing cause metadata, and tooltip drift must fail closed or remain visible as bounded read-only diagnostics. Generated runs/artifacts remain untracked unless explicitly fixture-scoped; browser/Studio surfaces remain read-only; issues #1 and #23 remain open; no production-ready, Godot-replacement/parity, quality, fun, public-launch, or market-demand claim is authorized.
+
 ## Generated state policy
 
 UI screenshots, probe exports, dashboard/cockpit exports, run-map captures,

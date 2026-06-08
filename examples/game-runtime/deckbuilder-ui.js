@@ -59,6 +59,7 @@
     });
     const shop = normalizeShop(rawSpec.shop);
     const runMap = normalizeRunMap(rawSpec.runMap);
+    const scoreDisplay = normalizeScoreDisplay(rawSpec.scoreDisplay);
     return {
       schemaVersion: SPEC_SCHEMA,
       id: text(rawSpec.id, 'deckbuilder-ui'),
@@ -66,8 +67,16 @@
       pipelineSlots,
       shop,
       runMap,
+      scoreDisplay,
       boundary: 'Browser/runtime UI is read-only and draft-only; trusted writes route through the existing review/apply/trust-gradient path.',
     };
+  }
+
+  function formatDisplayNumber(value) {
+    const finiteValue = Number.isFinite(value) ? Math.trunc(value) : 0;
+    const sign = finiteValue < 0 ? '-' : '';
+    const digits = String(Math.abs(finiteValue));
+    return `${sign}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
   }
 
   function normalizeShop(rawShop = {}) {
@@ -140,6 +149,85 @@
         .map((nodeId, index) => normalizeUiId(nodeId, `known-${index + 1}`, 'known upcoming node'))
         .filter((nodeId) => seen.has(nodeId)),
     };
+  }
+
+  function normalizeScoreDisplay(rawScoreDisplay = {}) {
+    if (rawScoreDisplay === undefined || rawScoreDisplay === null) rawScoreDisplay = {};
+    if (!isPlainObject(rawScoreDisplay)) fail('scoreDisplay must be an object');
+    const events = (Array.isArray(rawScoreDisplay.events) ? rawScoreDisplay.events : []).map((rawEvent, index) => {
+      if (!isPlainObject(rawEvent)) fail(`score display event ${index} must be an object`);
+      const stepIndex = Number.isInteger(rawEvent.stepIndex) ? rawEvent.stepIndex : index;
+      if (stepIndex !== index) fail('score display events must be declared in cascade step order');
+      const phase = text(rawEvent.phase, 'unknown');
+      const before = Number.isFinite(rawEvent.before) ? rawEvent.before : 0;
+      const addScore = Number.isFinite(rawEvent.addScore) ? rawEvent.addScore : 0;
+      const multiplyScore = Number.isFinite(rawEvent.multiplyScore) ? rawEvent.multiplyScore : 1;
+      const after = Number.isFinite(rawEvent.after) ? rawEvent.after : 0;
+      const cumulativeTotal = Number.isFinite(rawEvent.cumulativeTotal) ? rawEvent.cumulativeTotal : after;
+      const modifierId = typeof rawEvent.modifierId === 'string' && rawEvent.modifierId ? rawEvent.modifierId : null;
+      const cardId = typeof rawEvent.cardId === 'string' && rawEvent.cardId ? rawEvent.cardId : null;
+      return {
+        eventId: normalizeUiId(rawEvent.eventId, `score-event-${index + 1}`, 'score display event'),
+        stepIndex,
+        phase,
+        cardId,
+        modifierId,
+        operation: text(rawEvent.operation, phase),
+        before,
+        addScore,
+        multiplyScore,
+        after,
+        cumulativeTotal,
+        displayValue: formatDisplayNumber(after),
+        cumulativeDisplayValue: formatDisplayNumber(cumulativeTotal),
+        tooltip: text(rawEvent.tooltip, tooltipForScoreEvent({ phase, cardId, modifierId, before, addScore, multiplyScore, after, cumulativeTotal })),
+        readOnlyEvidence: rawEvent.readOnlyEvidence !== false,
+      };
+    });
+    const declaredFinal = Number.isFinite(rawScoreDisplay.finalScore)
+      ? rawScoreDisplay.finalScore
+      : (events.length ? events[events.length - 1].after : 0);
+    const authoritativeScore = Number.isFinite(rawScoreDisplay.authoritativeScore)
+      ? rawScoreDisplay.authoritativeScore
+      : declaredFinal;
+    if (declaredFinal !== authoritativeScore) fail('scoreDisplay finalScore must match authoritativeScore');
+    return {
+      id: normalizeUiId(rawScoreDisplay.id, 'score-display-v1', 'score display'),
+      title: text(rawScoreDisplay.title, 'Score Cascade'),
+      source: text(rawScoreDisplay.source, 'rust-score-cascade-feedback'),
+      sourceSchemaVersion: text(rawScoreDisplay.sourceSchemaVersion, 'ouroforge.score-cascade-feedback.v1'),
+      finalScore: declaredFinal,
+      authoritativeScore,
+      formattedFinalScore: formatDisplayNumber(declaredFinal),
+      events,
+      readOnlyInspection: {
+        trustedEmitter: 'browser-runtime-deckbuilder-ui-probe',
+        browserStudioMode: 'read-only score cascade display inspection',
+        disallowedActions: ['trusted writes', 'score recomputation authority', 'command bridge', 'live mutation', 'automated fun verdict'],
+      },
+      boundary: 'Score display presents Rust/local scoring resolution and cascade feedback only; it is not browser score authority, not a trusted write, and not a fun/quality verdict.',
+    };
+  }
+
+  function tooltipForScoreEvent(event) {
+    if (event.phase === 'base') {
+      return `${event.cardId || 'card'} base score ${formatSigned(event.addScore)} => ${formatDisplayNumber(event.after)}`;
+    }
+    if (event.phase === 'modifier') {
+      return `${event.modifierId || 'modifier'}: (${formatDisplayNumber(event.before)} + ${formatDisplayNumber(event.addScore)}) × ${formatDisplayNumber(event.multiplyScore)} = ${formatDisplayNumber(event.after)}`;
+    }
+    if (event.phase === 'card-total') {
+      return `${event.cardId || 'card'} contributes ${formatDisplayNumber(event.addScore)}; cumulative total ${formatDisplayNumber(event.cumulativeTotal)}`;
+    }
+    if (event.phase === 'cascade-complete') {
+      return `Authoritative Rust/local score ${formatDisplayNumber(event.after)} matched by cascade feedback`;
+    }
+    return `${event.phase}: ${formatDisplayNumber(event.after)}`;
+  }
+
+  function formatSigned(value) {
+    const normalized = Number.isFinite(value) ? Math.trunc(value) : 0;
+    return normalized >= 0 ? `+${formatDisplayNumber(normalized)}` : formatDisplayNumber(normalized);
   }
 
   function cardEffectText(card) {
@@ -223,6 +311,30 @@
         })),
         edges: clone(spec.runMap.edges),
         knownUpcomingNodeIds: spec.runMap.knownUpcomingNodeIds.slice(),
+      },
+      scoreDisplay: {
+        id: spec.scoreDisplay.id,
+        title: spec.scoreDisplay.title,
+        source: spec.scoreDisplay.source,
+        sourceSchemaVersion: spec.scoreDisplay.sourceSchemaVersion,
+        finalScore: spec.scoreDisplay.finalScore,
+        formattedFinalScore: spec.scoreDisplay.formattedFinalScore,
+        authoritativeScore: spec.scoreDisplay.authoritativeScore,
+        cascade: spec.scoreDisplay.events.map((event) => ({
+          kind: 'score-cascade-event',
+          eventId: event.eventId,
+          stepIndex: event.stepIndex,
+          phase: event.phase,
+          cardId: event.cardId,
+          modifierId: event.modifierId,
+          operation: event.operation,
+          displayValue: event.displayValue,
+          cumulativeDisplayValue: event.cumulativeDisplayValue,
+          tooltip: event.tooltip,
+          readOnlyEvidence: event.readOnlyEvidence,
+        })),
+        readOnlyInspection: clone(spec.scoreDisplay.readOnlyInspection),
+        boundary: spec.scoreDisplay.boundary,
       },
       interaction: clone(interaction),
     };
@@ -402,6 +514,7 @@
       pipelineSlots: clone(state.pipelineSlots),
       shop: clone(state.spec.shop),
       runMap: clone(state.spec.runMap),
+      scoreDisplay: clone(state.spec.scoreDisplay),
       renderModel: clone(state.renderModel),
       interaction: clone(state.interaction),
       readOnlyInspection: {
@@ -418,6 +531,7 @@
     SPEC_SCHEMA,
     STATE_SCHEMA,
     normalizeSpec,
+    formatDisplayNumber,
     createState,
     syncWithDeck,
     selectCard,

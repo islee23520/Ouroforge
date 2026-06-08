@@ -105,6 +105,33 @@ const scene = readScene('deckbuilder-ui-scene-v1.json');
   assert.equal(norm(api.getWorldState().deckRoguelike).status, 'playing', 'draft navigation does not advance trusted run state');
 }
 
+// --- Score cascade display preserves order, formatting, and tooltips ----------
+{
+  const deckbuilderUi = require('./deckbuilder-ui.js');
+  assert.equal(deckbuilderUi.formatDisplayNumber(1234567), '1,234,567');
+  assert.equal(deckbuilderUi.formatDisplayNumber(-9876543), '-9,876,543');
+
+  const api = createRuntime();
+  api.loadScene(scene);
+  const ui = norm(api.getWorldState().deckbuilderUi);
+  assert.equal(ui.renderModel.scoreDisplay.id, 'score-display-v1');
+  assert.equal(ui.renderModel.scoreDisplay.sourceSchemaVersion, 'ouroforge.score-cascade-feedback.v1');
+  assert.equal(ui.renderModel.scoreDisplay.formattedFinalScore, '24');
+  assert.deepEqual(
+    ui.renderModel.scoreDisplay.cascade.map((event) => event.phase),
+    ['base', 'modifier', 'modifier', 'card-total', 'cascade-complete'],
+  );
+  assert.deepEqual(
+    ui.renderModel.scoreDisplay.cascade.map((event) => event.stepIndex),
+    [0, 1, 2, 3, 4],
+  );
+  assert.equal(ui.renderModel.scoreDisplay.cascade[1].tooltip, 'plus-two: (5 + 2) × 1 = 7');
+  assert.match(ui.renderModel.scoreDisplay.cascade[4].tooltip, /Authoritative Rust\/local score 24/);
+  assert.ok(ui.renderModel.scoreDisplay.cascade.every((event) => event.readOnlyEvidence === true));
+  assert.ok(ui.renderModel.scoreDisplay.boundary.includes('not browser score authority'));
+  assert.ok(ui.renderModel.scoreDisplay.readOnlyInspection.disallowedActions.includes('score recomputation authority'));
+}
+
 // --- Deck actions resync UI hand state through the existing runtime path ------
 {
   const api = createRuntime();
