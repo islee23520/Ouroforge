@@ -2397,6 +2397,69 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   introduced. **#1 and #23 remain open governance anchors** and are not modified,
   closed, or narrowed by this milestone.
 
+- **Era I Milestone 48 — Multiplicative Scoring-Engine and Modifier Composition v1** (#1798–#1804):
+  records a bounded scoring-engine chain over the existing card-roguelite
+  substrate, including the scope contract, readable modifier/effect model,
+  deterministic multiplicative resolution, composition/degen surfacing, a
+  fixture-scoped scoring-engine demo, Scenario Coverage v43, and this governance
+  refresh (PRs #1925/#1929/#1953/#1963/#1971/#1988). The milestone verifies
+  mechanical scoring state only: modifiers remain individually readable,
+  resolution is seed-stable and traceable, degenerate composition is surfaced as
+  descriptive evidence, and the demo remains fixture-scoped. It is not a new
+  parallel engine, not an automated fun/quality/release verdict, and not a
+  production-ready or Godot replacement/parity claim. Trusted validation stays
+  Rust/local; browser, dashboard, cockpit, and Studio surfaces remain read-only;
+  generation remains proposal-only through the existing review/apply/trust-gradient
+  path; generated runs/artifacts stay untracked unless explicitly fixture-scoped.
+  **#1 and #23 remain open governance anchors** and are not closed, narrowed, or
+  modified by this milestone.
+
+### Multiplicative Scoring-Engine and Modifier Composition v1 governance refresh (Era I Milestone 48)
+
+Multiplicative Scoring-Engine and Modifier Composition v1 is recorded as
+**complete for Era I Milestone 48** under #1, on merged evidence, as a
+conservative, additive, Rust/local mechanical scoring milestone. It extends the
+existing card-roguelite substrate with readable modifiers, deterministic
+multiplicative resolution, composition/degen surfacing, a fixture-scoped demo,
+and Scenario Coverage v43. It does not claim that a game is fun, balanced for
+release, shippable, production-ready, or a Godot replacement.
+
+The merged evidence chain is the scope/design gate #1798 (PR #1925) — records
+the scoring-engine boundaries, substrate reuse, proposal-only generation path,
+and human Era J fun/release gates; Modifier and Effect Model v1 #1799 (PR #1929)
+— adds readable modifier/effect fixtures and validation without hidden score
+authority; Deterministic Multiplicative Resolution Engine v1 #1800 (PR #1953) —
+locks seed-stable ordering, overflow blocking, and traceable resolution state;
+Combinatorial Composition Model v1 #1801 (PR #1963) — surfaces degenerate
+composition descriptively without asserting fun or release quality;
+Scoring-Engine Demo v1 #1802 (PR #1971) — proves a local fixture-scoped demo over
+the scoring engine and substrate; and Scenario Coverage v43 #1803 (PR #1988) —
+locks state/shape-only regression coverage for the modifier model, resolution
+order, composition demo replay, substrate backcompat, generated-state wording,
+and governance. #1 and #23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. A scoring-engine variant is
+additive Rust/local state over the Card-Roguelite Substrate, not a new parallel
+engine or browser/Studio writer. Trusted validation, persistence, substrate
+scoring/balance, export/provenance logic, evidence writing, run/project binding,
+review/apply/trust-gradient path, and CLI behavior remain Rust/local.
+JavaScript/browser/Studio surfaces remain deterministic or read-only inspection
+surfaces for trusted state and do not gain trusted writes, command bridges,
+autonomous apply, auto-merge, self-approval, reviewer bypass, or hidden mutation
+authority. Generation remains proposal-only through the existing
+review/apply/trust-gradient path. The fun/feel verdict, Steam account/signing/
+release, content survey, market demand, hosted/cloud/mobile Layer-3 capability,
+and release go/no-go stay human or deferred as previously scoped. Existing
+runtime, probe, evaluator, evolve/campaign, compare, provenance-bundle, asset,
+dashboard, cockpit, and CLI contracts remain backward-compatible; generated
+runs/assets/builds remain ignored unless explicitly fixture-scoped. Scenario
+Coverage numbering continues through v43.
+
+The recommended next milestone is not expanded by this completion; any later Era
+I/J work requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same human fun/release, read-only UI,
+and Layer-3 boundaries.
+
 **Era I Milestone 50 — Engine-Builder Balance Verification v1 (descriptive, not a fun claim).** Era I records a bounded mechanical balance verification chain for an engine-builder/card-roguelite variant over the existing substrate, not a new engine and not an automated fun verdict:
 
 - **Era I Milestone 50 — Engine-Builder Balance Verification v1** (#1811–#1817): records the scope contract, combo/degenerate detector, dominant-build analyzer, fairness/daily-seed verifier, deterministic engine-builder balance demo, Scenario Coverage v45, and this governance refresh (PRs #1900/#1904/#1907/#1912/#1913). The milestone verifies descriptive mechanical surfaces: degenerate combo signatures, dominant-build concentration, and daily-seed fairness attribution. It does not assert that the game is good, fun, shippable, production-ready, or a Godot replacement/parity target. Balance verdicts are descriptive and evidence-linked; the human fun/release gate remains Era J. Trusted validation stays Rust/local; browser, dashboard, cockpit, and Studio surfaces remain read-only; generation remains proposal-only through the existing review/apply/trust-gradient path. Generated runs/artifacts remain untracked unless explicitly fixture-scoped. **#1 and #23 remain open governance anchors** and are not closed, narrowed, or modified by this milestone.
