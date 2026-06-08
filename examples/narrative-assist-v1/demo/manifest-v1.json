@@ -1,0 +1,25 @@
+{
+  "allowedActions": [
+    "inspect-candidates",
+    "record-human-selection",
+    "route-through-review-apply"
+  ],
+  "candidateSet": "examples/narrative-assist-v1/demo/candidate-set-v1.json",
+  "conservativeWording": "Demo shows deterministic candidate and provenance records only; it does not assert fun, tone quality, production readiness, or market fit.",
+  "demoId": "narrative-assist-demo-v1",
+  "fixedNowUnixMs": 1786400000000,
+  "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only",
+  "integrationProvenance": "examples/narrative-assist-v1/demo/integration-provenance-v1.json",
+  "liveBrowserRequired": false,
+  "networkRequired": false,
+  "proposalOnly": true,
+  "reviewApplyRequired": true,
+  "schemaVersion": "ouroforge.narrative-assist-demo.v1",
+  "selectedCandidateId": "theme-arc-harbor-repair-v1",
+  "selection": "examples/narrative-assist-v1/demo/selection-v1.json",
+  "selectionRecordedAtUnixMs": 1786500001000,
+  "sourceBrief": "examples/narrative-assist-v1/narrative-candidate-brief-v1.json",
+  "targetTitleId": "clockwork-harbor-demo",
+  "title": "Narrative Assist Demo v1",
+  "trustedWriteAuthority": false
+}

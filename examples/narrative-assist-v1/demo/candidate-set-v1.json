@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "ouroforge.narrative-candidate.v1",
+  "candidateSetId": "narrative-candidate-set-v1",
+  "generator": "narrative-candidate-generation-v1",
+  "storyId": "demo-story",
+  "phaseShift": "Move from repair-room tutorial into first harbor encounter while preserving human review of voice.",
+  "candidateCount": 3,
+  "sourceRefs": [
+    "docs/narrative-assist-v1.md",
+    "examples/long-form-systems-v1/demo/narrative.definition.json"
+  ],
+  "candidates": [
+    {
+      "candidateId": "theme-arc-harbor-repair-v1",
+      "class": "theme-arc-beat",
+      "humanIntent": "Draft a beat where the player notices the harbor repair loop before a choice.",
+      "compatibilityNotes": "Maps to the existing demo-story narrative surface as proposal data only.",
+      "sourceBriefRef": "theme-arc-harbor-repair-brief-v1",
+      "payloadHash": "1b7a11396b2644bc6b30d42bf6c51eb32cefdc4d03ccf6408b891ae9b5e57198",
+      "proposal": {
+        "proposal": {
+          "id": "generative-theme-arc-harbor-repair-puzzle-v1",
+          "reason": "Generated grid-puzzle proposal from brief: Harbor repair beat candidate",
+          "evidence_id": "generative-intake/theme-arc-harbor-repair-brief-v1",
+          "target": "grid-puzzle",
+          "path": "grid-puzzle/theme-arc-harbor-repair-puzzle-v1.json",
+          "from": "(no prior artifact)",
+          "to": "{\"height\":5,\"id\":\"theme-arc-harbor-repair-puzzle-v1\",\"intendedSolution\":[\"right\",\"right\"],\"legend\":{\"#\":[\"floor\",\"wall\"],\"*\":[\"floor\",\"crate\"],\".\":[\"floor\"],\"@\":[\"floor\",\"target\"],\"P\":[\"floor\",\"player\"]},\"lose\":{\"type\":\"none\"},\"objects\":{\"crate\":{\"role\":\"pushable\"},\"floor\":{\"role\":\"background\"},\"player\":{\"role\":\"player\"},\"target\":{\"role\":\"target\"},\"wall\":{\"role\":\"solid\"}},\"rows\":[\"######\",\"#P...#\",\"#.*@.#\",\"#....#\",\"######\"],\"schemaVersion\":\"ouroforge.grid-puzzle.v1\",\"width\":6,\"win\":{\"type\":\"all-targets-covered\"}}",
+          "confidence": "unverified",
+          "status": "proposed",
+          "verdict_status": "pending",
+          "created_at_unix_ms": 1786400000000
+        },
+        "provenance": {
+          "schemaVersion": "ouroforge.generative-intake.v1",
+          "briefId": "theme-arc-harbor-repair-brief-v1",
+          "briefDigest": "5c4b8baa9de9b1d629e4708317f0f1e3267b00c5e52786fc461106e05d23dd3a",
+          "generator": "generative-front-door-intake-v1",
+          "gameClass": "grid-puzzle",
+          "source": "brief",
+          "proposalOnly": true
+        }
+      },
+      "proposalOnly": true,
+      "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only"
+    },
+    {
+      "candidateId": "dialogue-variant-foreman-v1",
+      "class": "dialogue-variant",
+      "humanIntent": "Draft a foreman line variant that a reviewer can accept, reject, or rewrite.",
+      "compatibilityNotes": "References dialogue vocabulary without adding a new node engine or trusted state writer.",
+      "sourceBriefRef": "dialogue-variant-foreman-brief-v1",
+      "payloadHash": "ceaec6b059e3439c9a1519dcdab95157073a4fc761027b282a4acf06a033d572",
+      "proposal": {
+        "proposal": {
+          "id": "generative-dialogue-variant-foreman-puzzle-v1",
+          "reason": "Generated grid-puzzle proposal from brief: Foreman dialogue candidate",
+          "evidence_id": "generative-intake/dialogue-variant-foreman-brief-v1",
+          "target": "grid-puzzle",
+          "path": "grid-puzzle/dialogue-variant-foreman-puzzle-v1.json",
+          "from": "(no prior artifact)",
+          "to": "{\"height\":5,\"id\":\"dialogue-variant-foreman-puzzle-v1\",\"intendedSolution\":[\"right\",\"right\"],\"legend\":{\"#\":[\"floor\",\"wall\"],\"*\":[\"floor\",\"crate\"],\".\":[\"floor\"],\"@\":[\"floor\",\"target\"],\"P\":[\"floor\",\"player\"]},\"lose\":{\"type\":\"none\"},\"objects\":{\"crate\":{\"role\":\"pushable\"},\"floor\":{\"role\":\"background\"},\"player\":{\"role\":\"player\"},\"target\":{\"role\":\"target\"},\"wall\":{\"role\":\"solid\"}},\"rows\":[\"######\",\"#P...#\",\"#.*@.#\",\"#....#\",\"######\"],\"schemaVersion\":\"ouroforge.grid-puzzle.v1\",\"width\":6,\"win\":{\"type\":\"all-targets-covered\"}}",
+          "confidence": "unverified",
+          "status": "proposed",
+          "verdict_status": "pending",
+          "created_at_unix_ms": 1786400000000
+        },
+        "provenance": {
+          "schemaVersion": "ouroforge.generative-intake.v1",
+          "briefId": "dialogue-variant-foreman-brief-v1",
+          "briefDigest": "27e4683080cbffb3e95eee4d412e787ec4ca0d0c71a33c7d8fa8e634ad79df9d",
+          "generator": "generative-front-door-intake-v1",
+          "gameClass": "grid-puzzle",
+          "source": "brief",
+          "proposalOnly": true
+        }
+      },
+      "proposalOnly": true,
+      "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only"
+    },
+    {
+      "candidateId": "flavor-card-spark-coil-v1",
+      "class": "flavor-text",
+      "humanIntent": "Draft card flavor around a spark coil while keeping balance and final voice review separate.",
+      "compatibilityNotes": "Uses the deck-roguelike substrate as configuration/copy reference, not a new resolver.",
+      "sourceBriefRef": "flavor-card-spark-coil-brief-v1",
+      "payloadHash": "491aa8b069f3c378e49e8d1b6f2a46623c8ea71019c9878cda3ddb961eef1557",
+      "proposal": {
+        "proposal": {
+          "id": "generative-flavor-card-spark-coil-run-v1",
+          "reason": "Generated deck-roguelike proposal from brief: Spark Coil flavor candidate",
+          "evidence_id": "generative-intake/flavor-card-spark-coil-brief-v1",
+          "target": "deck-roguelike",
+          "path": "deck-roguelike/flavor-card-spark-coil-run-v1.json",
+          "from": "(no prior artifact)",
+          "to": "{\"cards\":{\"brace\":{\"block\":5,\"cost\":1,\"type\":\"skill\"},\"spark-coil\":{\"cost\":1,\"damage\":7,\"type\":\"attack\"}},\"deck\":[\"spark-coil\",\"spark-coil\",\"brace\"],\"enemy\":{\"intents\":[{\"damage\":5,\"type\":\"attack\"}],\"maxHp\":24},\"id\":\"flavor-card-spark-coil-run-v1\",\"player\":{\"energyPerTurn\":3,\"handSize\":5,\"maxHp\":30},\"relicVocabulary\":{},\"schemaVersion\":\"ouroforge.deck-roguelike.v1\",\"seed\":5902}",
+          "confidence": "unverified",
+          "status": "proposed",
+          "verdict_status": "pending",
+          "created_at_unix_ms": 1786400000000
+        },
+        "provenance": {
+          "schemaVersion": "ouroforge.generative-intake.v1",
+          "briefId": "flavor-card-spark-coil-brief-v1",
+          "briefDigest": "96087579acc4c596ee448d2277fff1e8c40c1c87799338eba61eaaa5f941195f",
+          "generator": "generative-front-door-intake-v1",
+          "gameClass": "deck-roguelike",
+          "source": "brief",
+          "proposalOnly": true
+        }
+      },
+      "proposalOnly": true,
+      "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only"
+    }
+  ],
+  "proposalOnly": true,
+  "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only"
+}
