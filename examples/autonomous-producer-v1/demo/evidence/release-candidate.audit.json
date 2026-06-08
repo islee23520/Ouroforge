@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "release-candidate.audit",
+  "kind": "stage-audit",
+  "stage": "release-candidate",
+  "status": "blocked-at-human-release-gate",
+  "summary": "Release-candidate promotion is blocked while the required human release gate remains pending.",
+  "refs": [
+    "examples/autonomous-producer-v1/demo/release-gate.policy.json",
+    "examples/autonomous-producer-v1/demo/evidence/release.pending.json"
+  ],
+  "boundary": "no auto-merge, self-approval, reviewer bypass, trusted write, or release action"
+}

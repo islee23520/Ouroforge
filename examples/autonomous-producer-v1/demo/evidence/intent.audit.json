@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "intent.audit",
+  "kind": "stage-audit",
+  "stage": "intent",
+  "status": "accepted-fixture-intent",
+  "summary": "Human design intent fixture is accepted as deterministic input for producer planning.",
+  "refs": [
+    "examples/producer-plan-v1/design-intent.valid.fixture.json"
+  ],
+  "boundary": "local fixture evidence only; no network, browser automation, trusted writes, auto-apply, or release action"
+}

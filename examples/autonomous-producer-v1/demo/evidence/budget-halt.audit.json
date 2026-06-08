@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "budget-halt.audit",
+  "kind": "budget-halt-audit",
+  "stage": "budget-halt",
+  "status": "halted-budget-exhausted",
+  "summary": "Budget-halt policy reaches its deterministic iteration and cost caps and stops safely.",
+  "refs": [
+    "examples/autonomous-producer-v1/demo/budget-halt.policy.json"
+  ],
+  "boundary": "halt is diagnostic fixture evidence only; no generated state is promoted"
+}

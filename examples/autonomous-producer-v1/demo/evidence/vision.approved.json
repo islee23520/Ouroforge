@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "vision.approved",
+  "kind": "human-gate-evidence",
+  "gateId": "gate-vision",
+  "gateKind": "vision",
+  "status": "approved",
+  "approverRole": "human creative director",
+  "summary": "Fixture records the vision gate as approved by a human role for deterministic policy evaluation.",
+  "boundary": "fixture approval record only; no self-approval or reviewer bypass"
+}

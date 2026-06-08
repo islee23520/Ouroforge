@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "legal.approved",
+  "kind": "human-gate-evidence",
+  "gateId": "gate-legal",
+  "gateKind": "legal",
+  "status": "approved",
+  "approverRole": "human legal reviewer",
+  "summary": "Fixture records the legal gate as approved by a human role for deterministic policy evaluation.",
+  "boundary": "fixture approval record only; no self-approval or reviewer bypass"
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "content.audit",
+  "kind": "stage-audit",
+  "stage": "content",
+  "status": "proposal-recorded",
+  "summary": "Requirements, mechanics, scaffold, scene, and behavior work remains fixture-scoped proposal evidence.",
+  "refs": [
+    "examples/autonomous-producer-v1/demo/demo.fixture.json"
+  ],
+  "boundary": "no generated content is promoted to trusted state by this fixture"
+}

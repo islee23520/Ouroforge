@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "assets.audit",
+  "kind": "stage-audit",
+  "stage": "assets",
+  "status": "provenance-gated",
+  "summary": "Asset work records deterministic fixture references without importing or generating runtime assets.",
+  "refs": [
+    "examples/autonomous-producer-v1/demo/demo.fixture.json"
+  ],
+  "boundary": "asset evidence is local and read-only; no runtime network or browser behavior"
+}

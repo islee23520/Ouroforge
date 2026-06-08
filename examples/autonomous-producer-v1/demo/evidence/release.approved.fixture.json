@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "release.approved.fixture",
+  "kind": "human-gate-evidence",
+  "gateId": "gate-release",
+  "gateKind": "release",
+  "status": "approved",
+  "approverRole": "human release owner",
+  "summary": "Budget-halt fixture records release approval as already present so the budget stop condition remains the blocker.",
+  "boundary": "fixture approval record only; no release action, auto-merge, or trusted write"
+}

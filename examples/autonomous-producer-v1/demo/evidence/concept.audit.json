@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "concept.audit",
+  "kind": "stage-audit",
+  "stage": "concept",
+  "status": "proposal-recorded",
+  "summary": "Concept and design-brief work is represented as proposal-only dispatch evidence.",
+  "refs": [
+    "examples/autonomous-producer-v1/demo/demo.fixture.json"
+  ],
+  "boundary": "proposal-only producer progress; human review remains required before apply or release"
+}

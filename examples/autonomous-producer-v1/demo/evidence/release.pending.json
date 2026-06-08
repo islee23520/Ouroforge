@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "release.pending",
+  "kind": "human-gate-evidence",
+  "gateId": "gate-release",
+  "gateKind": "release",
+  "status": "pending",
+  "approverRole": "human release owner",
+  "summary": "Fixture records the release gate as pending, blocking release-candidate promotion.",
+  "boundary": "mandatory human release approval remains required; no release action is performed"
+}

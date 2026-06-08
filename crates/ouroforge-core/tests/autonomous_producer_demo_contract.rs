@@ -7,7 +7,12 @@ use ouroforge_core::{
     producer_plan::{derive_producer_plan, ProducerDesignIntent},
 };
 use serde_json::Value;
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Component, Path, PathBuf},
+};
+
+const DEMO_EVIDENCE_PREFIX: &str = "examples/autonomous-producer-v1/demo/evidence/";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -25,6 +30,70 @@ fn demo_policy(name: &str) -> ProducerBudgetGatePolicy {
         .join("examples/autonomous-producer-v1/demo")
         .join(name);
     ProducerBudgetGatePolicy::from_json_str(&fs::read_to_string(path).expect(name)).expect(name)
+}
+
+fn collect_committed_evidence_refs(
+    value: &Value,
+    source: &'static str,
+    refs: &mut Vec<(&'static str, String)>,
+) {
+    match value {
+        Value::Object(map) => {
+            for (key, nested) in map {
+                match (key.as_str(), nested) {
+                    ("evidenceRef" | "lastEvidenceRef", Value::String(reference)) => {
+                        refs.push((source, reference.clone()));
+                    }
+                    ("evidenceRefs", Value::Array(references)) => {
+                        for reference in references {
+                            refs.push((
+                                source,
+                                reference
+                                    .as_str()
+                                    .expect("committed evidenceRefs entries are strings")
+                                    .to_string(),
+                            ));
+                        }
+                    }
+                    _ => collect_committed_evidence_refs(nested, source, refs),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for nested in items {
+                collect_committed_evidence_refs(nested, source, refs);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn assert_committed_evidence_ref_is_safe_local_and_present(source: &str, evidence: &str) {
+    assert!(
+        evidence.starts_with(DEMO_EVIDENCE_PREFIX),
+        "{source} evidence ref points outside demo evidence dir: {evidence}"
+    );
+
+    let path = Path::new(evidence);
+    assert!(
+        !path.is_absolute(),
+        "{source} evidence ref must be repo-relative: {evidence}"
+    );
+    assert!(
+        path.components()
+            .all(|component| matches!(component, Component::Normal(_))),
+        "{source} evidence ref contains unsafe path component: {evidence}"
+    );
+
+    let repo_path = repo_root().join(path);
+    assert!(
+        repo_path.is_file(),
+        "{source} evidence ref does not exist in repository: {evidence}"
+    );
+    serde_json::from_str::<Value>(
+        &fs::read_to_string(&repo_path).expect("committed evidence fixture is readable"),
+    )
+    .unwrap_or_else(|error| panic!("{source} evidence ref is not valid JSON: {evidence}: {error}"));
 }
 
 fn derived_orchestration() -> ouroforge_core::producer_orchestration::ProducerOrchestrationState {
@@ -58,8 +127,7 @@ fn deterministic_demo_replays_intent_to_release_candidate_audit_trail() {
     for (stage, entry) in stages.iter().zip(audit) {
         assert_eq!(entry["stage"], *stage);
         let evidence = entry["evidenceRef"].as_str().expect("evidence ref");
-        assert!(evidence.starts_with("examples/autonomous-producer-v1/demo/evidence/"));
-        assert!(!evidence.contains(".."));
+        assert_committed_evidence_ref_is_safe_local_and_present("demo.fixture.json", evidence);
         assert!(!entry["summary"].as_str().unwrap().trim().is_empty());
     }
 
@@ -79,6 +147,29 @@ fn deterministic_demo_replays_intent_to_release_candidate_audit_trail() {
         .validation_summary
         .iter()
         .any(|line| line.contains("deterministic order")));
+}
+
+#[test]
+fn committed_demo_and_policy_evidence_refs_are_safe_local_and_present() {
+    let fixture_names = [
+        "demo.fixture.json",
+        "release-gate.policy.json",
+        "budget-halt.policy.json",
+    ];
+
+    let mut refs = Vec::new();
+    for fixture_name in fixture_names {
+        let fixture = demo_value(fixture_name);
+        collect_committed_evidence_refs(&fixture, fixture_name, &mut refs);
+    }
+
+    refs.sort_unstable();
+    refs.dedup();
+    assert!(!refs.is_empty(), "committed demo evidence refs are covered");
+
+    for (source, evidence) in refs {
+        assert_committed_evidence_ref_is_safe_local_and_present(source, &evidence);
+    }
 }
 
 #[test]

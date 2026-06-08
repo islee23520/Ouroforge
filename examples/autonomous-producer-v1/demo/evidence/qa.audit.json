@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "autonomous-producer-demo-evidence-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "evidenceId": "qa.audit",
+  "kind": "stage-audit",
+  "stage": "qa",
+  "status": "local-validation-recorded",
+  "summary": "QA stage records deterministic local evidence before release-candidate consideration.",
+  "refs": [
+    "crates/ouroforge-core/tests/autonomous_producer_demo_contract.rs"
+  ],
+  "boundary": "validation is Rust/local only; no production-ready or quality guarantee is claimed"
+}
