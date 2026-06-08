@@ -379,3 +379,200 @@ distributed orchestration milestone.**
 This preserves the current local-first MVP, keeps Rust artifact contracts
 authoritative, avoids premature distributed architecture, and leaves a clear path
 to revisit BEAM only when concrete remote/supervision needs exist.
+
+---
+
+## Milestone 62 design gate: Studio Executor build timing and two-plane contract
+
+Issue: #1933 — Orchestration Executor Scope, ADR #92 Build-Timing Gate, and Two-Plane Contract v1
+
+Status: **M62 GATE DRAFT — HUMAN GO REQUIRED BEFORE M63.** This section is an
+ADR appendix to the 2026-06-08 partial-GO update. It does not build the
+executor, create an Elixir project, or change the Rust kernel. It records the
+contract and timing recommendation that M63+ must honor.
+
+### Gate question
+
+Given that the language direction is already fixed as **Elixir/OTP for the
+Studio executor control plane**, should Ouroforge begin building that executor
+now, or defer implementation until manual orchestration pain crosses measurable
+thresholds?
+
+### M62 recommendation: DEFER implementation timing until human GO is recorded
+
+Recommendation: **DEFER M63+ implementation for now.** The control-plane
+language remains Elixir/OTP, but the evidence available at this gate does not
+show the named trigger thresholds being met. A later human operator may record
+**GO** in this ADR/issue only after the trigger samples below show threshold
+crossing and the manual Rust CLI fallback remains intact.
+
+This is a timing recommendation, not a re-litigation of the language decision.
+The executor may not proceed from M62 to M63 solely because this section exists;
+M63+ requires an explicit human-recorded GO entry in this ADR or #1933.
+
+### Two-plane contract
+
+Ouroforge remains a strict two-plane system:
+
+| Plane | Owner | May own | Must not own |
+| --- | --- | --- | --- |
+| Data plane | Rust kernel and `ouroforge` CLI | seed/run/ledger/evidence/journal/verdict/mutation artifacts, evaluator gates, deterministic runtime/simulation, artifact schemas, validation, local file integrity, trusted-write acceptance | Elixir supervision state, scheduling policy, live fanout UI/process state |
+| Control plane | Elixir/OTP Studio executor | local single-machine task scheduling, dependency ordering, process supervision, restart/backoff, budget and stop-condition enforcement, retry policy, backpressure, concurrency limits, telemetry fanout derived from kernel artifacts | artifact truth, schema semantics, evaluator decisions, trusted-write certification, direct file mutation of artifacts/ledgers/evidence/verdicts, distributed/hosted/live-ops claims |
+
+Binding invariants for M63+:
+
+- **Rust kernel = data plane, unchanged.** Rust remains the sole authority for
+  canonical artifact semantics and validation.
+- **Elixir/OTP executor = control plane only.** It may decide when and how to
+  call approved CLI commands; it may not reinterpret their outputs as a stronger
+  truth than the kernel records.
+- **Kernel access is CLI-only.** The executor touches the kernel solely through
+  the frozen `ouroforge` CLI surface below; no direct Rust library calls, direct
+  artifact writes, direct ledger writes, schema rewrites, hidden command bridges,
+  database state, or browser trusted writes.
+- **Trusted writes remain review/apply/trust-gradient only.** The executor never
+  self-certifies, never self-approves, never bypasses reviewer/critic gates, and
+  never writes accepted/trusted state directly.
+- **Local single-machine only.** M62-M66 do not authorize distributed nodes,
+  remote workers, hosted/cloud services, databases, accounts, or live ops.
+
+### Frozen executor-facing `ouroforge` CLI surface
+
+The executor may call only this allowlist. Any additional command requires a new
+ADR update and issue before M63+ code may use it.
+
+#### Artifact production and validation
+
+- `ouroforge seed validate <seed_path>` — validate seed inputs before scheduling
+  a run.
+- `ouroforge project validate <project_root_or_manifest>` — validate project
+  manifests used by executor-driven runs.
+- `ouroforge asset validate <project_root_or_manifest>` — validate project asset
+  references when a plan requires asset integrity checks.
+- `ouroforge run <seed_path> [--workers N] [--transaction <path>] [--project <path>] [--scenario-pack <id>]` — create the canonical run and, when requested,
+  execute the existing Rust-owned private-MVP worker path. Output artifacts under
+  `runs/` remain Rust-owned.
+- `ouroforge browser smoke <run_dir> --url <url> [--cdp <url>] [--worker-id <id>] [--workers N]` — invoke Rust-owned browser smoke evidence capture.
+- `ouroforge scenario run <run_dir> --url <url> [--cdp <url>]` — invoke
+  Rust-owned scenario execution.
+- `ouroforge evaluate <run_dir>` — produce/read the Rust evaluator verdict.
+- `ouroforge evolve <run_dir>` — invoke the Rust-owned evolve proposal path.
+- `ouroforge journal update <run_dir>` — update the Rust-owned journal artifact.
+- `ouroforge compare <before_run_dir> <after_run_dir> [--output-dir <path>]` —
+  create a Rust-owned comparison artifact for before/after evidence.
+
+#### Review/apply/trust-gradient gates
+
+- `ouroforge mutation create <run_dir> --reason <text> --evidence <id> --target <target> --path <path> --from <json> --to <json>` — create proposal material
+  for review; not a trusted write.
+- `ouroforge mutation review <run_or_draft_path> [--proposal <id>] --decision <accepted|rejected|deferred> --reason <text> [--evidence <ref> ...] --reviewer <id> --reviewer-type <human|agent|system>` — record review decisions through the
+  Rust-owned review path. M63+ must configure executor identities so an executor
+  cannot review its own proposal as a human.
+- `ouroforge mutation apply-scene <run_dir> --operation <path> --transaction-output <path> [--project <path>] [--decision <id>]` — apply only through the
+  existing review-gated scene mutation transaction path.
+- `ouroforge edit draft-preview <draft_path> --project <path> [--transaction-output <path>]` — preview visual/edit drafts without trusted application.
+- `ouroforge edit draft-apply <draft_path> --project <path> --run-dir <path> --proposal <id> --decision <id> --transaction-output <path>` — apply visual/edit
+  drafts only through the existing review-gated transaction path.
+- `ouroforge behavior draft validate <draft_path> [--project-root <path>]` and
+  `ouroforge behavior draft preview <draft_path> [--project-root <path>]` —
+  validate/preview behavior drafts without trusted application.
+- `ouroforge behavior apply transaction validate <transaction_path>` — validate
+  review-gated behavior apply readiness; this command reports readiness but does
+  not apply trusted files.
+- `ouroforge patch-preview validate <preview_path> [--max-files N] [--max-changed-lines N]` and `ouroforge patch-preview show <preview_path> [...]` — inspect
+  bounded source patch previews as review material only; not trusted source
+  apply.
+- `ouroforge scenario promote-draft <run_dir> --project <path> --scenario <id> --output <path>` and `ouroforge scenario promote <draft_path> --project <path> --scenario-pack <id> [--dry-run]` — promote regression scenarios only through the
+  existing Rust-owned promotion commands and their dry-run/review expectations.
+
+#### Read-only inspection/export
+
+- `ouroforge ledger list <run_dir>` — read canonical ledger events.
+- `ouroforge evidence list <run_dir>` — read canonical evidence index entries.
+- `ouroforge journal show <run_dir>` — read journal content.
+- `ouroforge dashboard export [--runs-root <path>] [--output <path>]` — export a
+  read model derived from Rust-owned artifacts.
+- `ouroforge scene validate|show|reload-validate <scene_path>` — inspect scene
+  validity and reloadability.
+- `ouroforge runtime-debug frame-budget validate|show <budget_path>` — inspect
+  runtime frame budget artifacts.
+- `ouroforge plugin list|validate [dir]` — read-only plugin registry inspection.
+- `ouroforge asset audit-internal-sprites <reference_root> [--profile <id>] [--json]` — read/audit internal sprite references.
+- `ouroforge loop dry-run|status|resume|step|handoff <plan_path> ...` — may be
+  used only as read/model-orchestration evidence while it remains Rust-owned and
+  local; it does not authorize executor-owned artifact truth.
+
+#### Explicitly forbidden to the executor
+
+- Direct writes to `runs/**`, ledgers, evidence indexes, verdicts, journals,
+  mutation artifacts, scenario packs, source files, or dashboard exports except
+  as effects of the approved CLI commands above.
+- Direct use of Rust crates as libraries, private kernel functions, ad-hoc shell
+  commands that mutate artifacts, browser command bridges, databases, networked
+  coordinators, cloud queues, or remote workers.
+- Use of `ouroforge ledger append` or `ouroforge evidence add` for executor-authored
+  trusted state. Those commands exist in the CLI, but are outside the executor
+  allowlist because they would let the control plane write canonical truth
+  directly.
+- Any command that claims a proposal is accepted, applied, production-safe, or
+  release-ready without the Rust-owned review/apply/trust-gradient evidence.
+
+### Build-timing trigger metrics
+
+M63+ may start only after a human records GO based on sampled evidence that at
+least one trigger crosses its threshold and the other triggers are reviewed.
+DEFER remains the default when samples are missing, anecdotal, or below
+threshold.
+
+| Trigger | Metric | Sampling rule | GO threshold |
+| --- | --- | --- | --- |
+| Operator-authored task assignment frequency | Count of human-written lane/role assignment prompts needed to keep production orchestration moving | Count prompts across the most recent 10 merged production-lane PRs or a rolling 7-day window, whichever is larger | **>= 8** operator-authored assignments across the sample, or **>= 3/day** for 3 consecutive days |
+| Manual restart/budget/conflict incidents | Count of manual restarts, budget resets, stalled-agent recoveries, conflict-resolution interventions, or backpressure interventions | Count issue/PR comments, operator notes, or session logs tied to production orchestration attempts | **>= 5** incidents in the sample, or **>= 2** incidents blocking merge for more than 30 minutes each |
+| Hand-rolled supervision complexity | Lines/steps of non-product shell/tmux/scripts/checklists used only to supervise, retry, budget, or backpressure production agents | Count maintained scripts plus repeated prompt/checklist steps; exclude normal verification commands | **>= 150** maintained supervision LOC or **>= 12** repeated manual supervision steps across the sample |
+
+Evidence quality requirements:
+
+1. Each counted event must link to an issue, PR, session note, log, or commit.
+2. The sample must identify the production-lane scope and dates.
+3. The sample must separate ordinary implementation work from orchestration pain.
+4. The sample must record whether the manual Rust CLI fallback still ran without
+   the executor.
+
+### Current M62 sample and timing decision
+
+Current M62 sample: **insufficient recorded trigger evidence**. The roadmap and
+lane prompts demonstrate intended orchestration scope, but this ADR does not yet
+include a sampled set of 10 merged production-lane PRs, a 7-day incident count,
+or maintained supervision LOC crossing the thresholds above.
+
+Timing recommendation: **DEFER**. Do not build the executor until a human records
+GO with trigger evidence. This preserves the Elixir/OTP language direction while
+avoiding a premature control-plane implementation.
+
+### Local-first fallback contract
+
+The Rust CLI manual path remains first-class for M63+ and must remain tested:
+
+```bash
+cargo run -p ouroforge-cli -- seed validate <seed_path>
+cargo run -p ouroforge-cli -- project validate <project_root_or_manifest>
+cargo run -p ouroforge-cli -- run <seed_path> --workers <N> [--project <path>] [--scenario-pack <id>]
+cargo run -p ouroforge-cli -- evaluate <run_dir>
+cargo run -p ouroforge-cli -- journal update <run_dir>
+```
+
+A fresh checkout must be able to run the full loop manually through the Rust CLI
+without installing, starting, or configuring the Elixir/OTP executor. Executor
+artifacts, if later authorized, are convenience/control-plane state only and must
+not be required to inspect or validate canonical Rust artifacts.
+
+### M63+ entry checklist
+
+Before any M63 implementation PR begins, verify all of the following:
+
+- A human-recorded **GO** is present in this ADR or #1933.
+- The GO cites trigger evidence meeting at least one threshold above.
+- The frozen CLI allowlist remains accurate against `crates/ouroforge-cli`.
+- The manual Rust CLI fallback has a fresh passing verification.
+- #1 and #23 remain open; this gate does not close or replace them.
+- Layer-3 distributed/hosted/live-ops remains deferred.
