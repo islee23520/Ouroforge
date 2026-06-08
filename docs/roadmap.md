@@ -1567,6 +1567,58 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Design Regression Harness v1 governance refresh
+
+Design Regression Harness v1 (Era F Milestone 29 under #1) is recorded as
+**complete on merged evidence**: design regression as **CI for game design**. On a
+content or rule edit, the harness re-runs the Milestone 28 solver, over-solution
+detector, and difficulty suite across the affected grid-puzzle levels, diffs the
+recomputed status against the recorded baseline, and classifies each level
+`unchanged`, `improved`, or `newly-broken` — every regression carrying a
+**replayable trace** (the shortest over-solution counterexample, "watch the
+bypass", or the previously-intended solution that no longer wins, "watch it
+break"). It is an **orchestration** of existing surfaces, not a new comparison
+engine.
+
+The merged evidence chain is the scope/contract #1587
+(`docs/design-regression-harness-v1.md`, PR #1628); the harness Model and Diff v1
+#1588 (`crates/ouroforge-core/src/design_regression_harness.rs`, PR #1754) — the
+`design-regression-harness-v1` artifact that re-runs the existing #1580 solver,
+#1581 over-solution detector, and #1582 difficulty suite (no re-implementation),
+diffs against the recorded baseline, classifies the outcome with a replayable
+trace per regression, surfaces the verdict read-only in the dashboard, and fails
+closed (stale baseline, exhausted budget, or malformed input → `inconclusive`,
+never a false clean/improved/regression); the Demo v1 #1589
+(`docs/design-regression-harness-v1-demo.md`, PR #1761) — a deterministic,
+fixture-scoped demo where a shared-rule edit opens a new over-solution
+**elsewhere** and is flagged with a replayable trace while a clean edit passes,
+no network or live browser; and Scenario Coverage v29 #1590
+(`docs/scenario-coverage-v29.md`, PR #1762) — an enumerated newly-broken /
+improved / unchanged classification and trace-linkage regression matrix plus a
+single-run solver/detector backward-compatibility golden proving the Milestone 28
+surfaces remain valid outside the harness. All four are merged; Milestone 29 is
+therefore recorded as complete. No milestone is marked complete ahead of merged
+evidence.
+
+The boundaries stay explicit and reaffirmed. The harness logic is owned by
+**Rust/local** and **reuses** the existing solver, over-solution detector,
+difficulty suite, and the `compare` / evolve-campaign verdict shape — no new
+engine, runtime, writer, or parallel comparison engine. **Detection only**: there
+is no auto-fix, auto-apply, auto-merge, self-approval, or reviewer bypass, and a
+regression verdict blocks promotion rather than changing content; any trusted
+write stays on the existing review/apply/trust-gradient path. The harness asserts
+behavior and gate state and carries no difficulty, quality, fun,
+production-readiness, or Godot replacement/parity claim. Generation stays
+proposal-only; browser/Studio surfaces remain read-only; existing
+runtime/probe/evaluator four-gate aggregation contracts remain
+backward-compatible; generated runs/evidence remain ignored unless explicitly
+fixture-scoped; Layer-3 distributed orchestration / Elixir remains NO-GO under ADR
+#92 and deferred under #1508. #1 and #23 remain open governance anchors.
+
+The recommended next milestone is not expanded by this completion; any later Era
+F rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
