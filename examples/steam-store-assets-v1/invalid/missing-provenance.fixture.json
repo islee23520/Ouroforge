@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "ouroforge.steam-store-assets.v1",
+  "planId": "steam-store-assets-missing-provenance",
+  "title": "Missing provenance",
+  "reusePipeline": "milestone-36-asset-generation-proposal",
+  "proposalOnly": true,
+  "humanSubmissionRequired": true,
+  "boundary": "Rust/local Steam store asset proposals only; reuses Milestone 36 asset generation, human submits to Steam, no trusted write, no upload, no release authority, browser/Studio read-only.",
+  "assets": [
+    {
+      "slot": "capsule_small",
+      "assetId": "steam_capsule_small_bad",
+      "title": "Bad Small Capsule Proposal",
+      "description": "missing usable source",
+      "format": "png",
+      "width": 231,
+      "height": 87,
+      "license": { "license": "project-owned", "source": "", "allowedSource": true }
+    }
+  ]
+}

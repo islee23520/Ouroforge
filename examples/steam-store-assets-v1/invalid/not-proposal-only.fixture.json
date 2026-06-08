@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "ouroforge.steam-store-assets.v1",
+  "planId": "steam-store-assets-not-proposal",
+  "title": "Not proposal only",
+  "reusePipeline": "milestone-36-asset-generation-proposal",
+  "proposalOnly": false,
+  "humanSubmissionRequired": false,
+  "boundary": "Rust/local Steam store asset proposals only; reuses Milestone 36 asset generation, human submits to Steam, no trusted write, no upload, no release authority, browser/Studio read-only.",
+  "assets": [
+    {
+      "slot": "capsule_header",
+      "assetId": "steam_capsule_header_bad",
+      "title": "Bad Header Capsule Proposal",
+      "description": "tries to skip human submission",
+      "format": "png",
+      "width": 460,
+      "height": 215,
+      "license": { "license": "project-owned", "source": "fixture-scoped local art brief", "allowedSource": true }
+    }
+  ]
+}

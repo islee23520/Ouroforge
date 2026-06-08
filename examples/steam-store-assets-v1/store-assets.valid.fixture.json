@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "ouroforge.steam-store-assets.v1",
+  "planId": "steam-store-assets-demo",
+  "title": "Ouroforge Steam store asset proposals",
+  "reusePipeline": "milestone-36-asset-generation-proposal",
+  "proposalOnly": true,
+  "humanSubmissionRequired": true,
+  "boundary": "Rust/local Steam store asset proposals only; reuses Milestone 36 asset generation, human submits to Steam, no trusted write, no upload, no release authority, browser/Studio read-only.",
+  "assets": [
+    {
+      "slot": "capsule_main",
+      "assetId": "steam_capsule_main_demo",
+      "title": "Main Capsule Proposal",
+      "description": "main capsule art from fixture-scoped local brief",
+      "format": "png",
+      "width": 616,
+      "height": 353,
+      "license": { "license": "project-owned", "source": "fixture-scoped local art brief", "allowedSource": true }
+    },
+    {
+      "slot": "screenshot_1080p",
+      "assetId": "steam_screenshot_1080p_demo",
+      "title": "Screenshot Proposal",
+      "description": "screenshot frame from deterministic local capture brief",
+      "format": "png",
+      "width": 1920,
+      "height": 1080,
+      "license": { "license": "CC-BY-4.0", "attribution": "Ouroforge fixture artists", "source": "fixture-scoped local screenshot brief", "allowedSource": true }
+    },
+    {
+      "slot": "trailer_frame_1080p",
+      "assetId": "steam_trailer_frame_1080p_demo",
+      "title": "Trailer Frame Proposal",
+      "description": "trailer frame from fixture-scoped local gameplay brief",
+      "format": "png",
+      "width": 1920,
+      "height": 1080,
+      "license": { "license": "CC0-1.0", "source": "fixture-scoped local trailer frame brief", "allowedSource": true }
+    }
+  ]
+}
