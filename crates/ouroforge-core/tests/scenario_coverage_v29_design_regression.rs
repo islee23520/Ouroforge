@@ -61,7 +61,11 @@ fn v29_harness_classifications_are_enumerated() {
         let harness = load_harness(harness_path);
         let report = harness.run().expect("harness runs");
         if let Some(verdict) = case.get("overallVerdict") {
-            assert_eq!(report.overall_verdict, verdict.as_str().unwrap(), "{id}: verdict");
+            assert_eq!(
+                report.overall_verdict,
+                verdict.as_str().unwrap(),
+                "{id}: verdict"
+            );
         }
         if case.get("promotionBlocked") == Some(&Value::Bool(true)) {
             assert!(report.promotion_blocked(), "{id}: promotion blocked");
@@ -90,7 +94,9 @@ fn v29_harness_classifications_are_enumerated() {
                 .spec
                 .clone();
             assert!(
-                puzzle_solver::replay(&spec, trace).expect("replays").is_won(),
+                puzzle_solver::replay(&spec, trace)
+                    .expect("replays")
+                    .is_won(),
                 "{id}: trace wins"
             );
         } else {
