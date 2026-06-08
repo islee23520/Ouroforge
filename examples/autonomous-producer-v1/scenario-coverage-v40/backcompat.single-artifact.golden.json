@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "scenario-coverage-v40-backcompat",
+  "issue": 1687,
+  "references": [
+    {
+      "id": "backcompat-single-artifact-evolve",
+      "contract": "evolve-campaign-v1",
+      "ref": "examples/evolve-campaign-v1/scenario-coverage-v24/single-shot.fixture.json",
+      "expectValid": true,
+      "reason": "Autonomous producer coverage composes producer orchestration without regressing the existing single-artifact evolve campaign contract."
+    }
+  ]
+}

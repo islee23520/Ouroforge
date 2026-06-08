@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "scenario-coverage-v40-budget-regression",
+  "orchestrationRef": "collect-and-exit-whole-game",
+  "policies": [
+    {
+      "id": "budget-exhausted",
+      "ref": "examples/producer-budget-gates-v1/budget-halt.fixture.json",
+      "expectedStatus": "halted-budget-exhausted",
+      "expectedStopReason": "budget-exhausted",
+      "expectedConditionId": "stop-budget"
+    },
+    {
+      "id": "human-gate",
+      "ref": "examples/producer-budget-gates-v1/human-gate.fixture.json",
+      "expectedStatus": "blocked-human-gate",
+      "expectedStopReason": "human-approval-required",
+      "expectedConditionId": "stop-human",
+      "expectedPendingGates": ["gate-vision"]
+    },
+    {
+      "id": "no-progress",
+      "ref": "examples/producer-budget-gates-v1/no-progress.fixture.json",
+      "expectedStatus": "stopped-no-progress",
+      "expectedStopReason": "no-progress",
+      "expectedConditionId": "stop-no-progress"
+    },
+    {
+      "id": "demo-release-gate",
+      "ref": "examples/autonomous-producer-v1/demo/release-gate.policy.json",
+      "expectedStatus": "blocked-human-gate",
+      "expectedStopReason": "human-approval-required",
+      "expectedConditionId": "stop-human",
+      "expectedPendingGates": ["gate-release"]
+    }
+  ]
+}

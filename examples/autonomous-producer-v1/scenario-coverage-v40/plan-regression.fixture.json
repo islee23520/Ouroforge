@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "scenario-coverage-v40-plan-regression",
+  "intentRef": "examples/producer-plan-v1/design-intent.valid.fixture.json",
+  "invalidIntentRef": "examples/producer-plan-v1/invalid/design-intent.malformed.fixture.json",
+  "expectedPlanId": "collect-and-exit-producer-intent-production-plan",
+  "expectedTaskOrder": [
+    "design-brief",
+    "requirements",
+    "mechanics",
+    "scaffold",
+    "scene-level",
+    "behavior",
+    "assets",
+    "scenarios",
+    "qa",
+    "review"
+  ],
+  "expectedRoles": {
+    "designer": 2,
+    "gameplay-engineer": 3,
+    "level-designer": 1,
+    "asset-import-planner": 1,
+    "qa-agent": 2,
+    "reviewer": 1
+  },
+  "subsetRequestedFunctions": [
+    "requirements",
+    "mechanics"
+  ],
+  "expectedSubsetTerminalAgent": "review"
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "scenario-coverage-v40-orchestration-regression",
+  "orchestrationId": "collect-and-exit-whole-game",
+  "planRef": "examples/producer-plan-v1/design-intent.valid.fixture.json",
+  "completionEvidenceRefs": [
+    "examples/autonomous-producer-v1/demo/evidence/v40-dispatch-0.json",
+    "examples/autonomous-producer-v1/demo/evidence/v40-dispatch-1.json",
+    "examples/autonomous-producer-v1/demo/evidence/v40-dispatch-2.json"
+  ],
+  "expectedInitialStatus": "in-progress",
+  "expectedCurrentAfterThree": "scaffold",
+  "expectedCompletedAfterThree": 3,
+  "expectedTerminalStatus": "complete"
+}

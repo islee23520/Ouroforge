@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "scenario-coverage-v40",
+  "issue": 1687,
+  "suite": "Autonomous Producer Regression Suite",
+  "boundary": "Rust/local owns validation; browser/Studio read-only; state/shape assertions only; generated artifacts remain untracked unless fixture-scoped; proposal-only producer output; no network/live browser; no direct trusted writes; no auto-apply; no auto-merge; no self-approval; no reviewer bypass; no production-ready claim; no Godot replacement claim; no Godot parity claim; no quality/fun guarantee; #1 and #23 remain open.",
+  "scenarios": [
+    {
+      "id": "v40-plan-full-decomposition",
+      "system": "plan",
+      "kind": "valid",
+      "fixtureRef": "examples/producer-plan-v1/design-intent.valid.fixture.json",
+      "expect": "derived plan has deterministic task order and mandatory review gate"
+    },
+    {
+      "id": "v40-plan-subset-review-gate",
+      "system": "plan",
+      "kind": "valid",
+      "fixtureRef": "examples/producer-plan-v1/design-intent.valid.fixture.json",
+      "expect": "supported subset still terminates at review"
+    },
+    {
+      "id": "v40-plan-malformed-intent",
+      "system": "plan",
+      "kind": "invalid",
+      "fixtureRef": "examples/producer-plan-v1/invalid/design-intent.malformed.fixture.json",
+      "expect": "unsupported function fails closed"
+    },
+    {
+      "id": "v40-orchestration-first-dispatch",
+      "system": "orchestration",
+      "kind": "valid",
+      "fixtureRef": "examples/producer-orchestration-v1/plan-progression.fixture.json",
+      "expect": "first dispatch is proposal-only and advances to requirements"
+    },
+    {
+      "id": "v40-orchestration-resume-token",
+      "system": "orchestration",
+      "kind": "valid",
+      "fixtureRef": "examples/producer-orchestration-v1/resume-state.fixture.json",
+      "expect": "serialized long-horizon state resumes deterministically"
+    },
+    {
+      "id": "v40-orchestration-complete-path",
+      "system": "orchestration",
+      "kind": "valid",
+      "fixtureRef": "examples/autonomous-producer-v1/demo/demo.fixture.json",
+      "expect": "proposal-only dispatches can complete to release-candidate consideration"
+    },
+    {
+      "id": "v40-budget-exhausted",
+      "system": "budget",
+      "kind": "halt",
+      "fixtureRef": "examples/producer-budget-gates-v1/budget-halt.fixture.json",
+      "expect": "budget exhaustion halts with diagnosis"
+    },
+    {
+      "id": "v40-human-gate-block",
+      "system": "budget",
+      "kind": "halt",
+      "fixtureRef": "examples/producer-budget-gates-v1/human-gate.fixture.json",
+      "expect": "pending mandatory human gate blocks"
+    },
+    {
+      "id": "v40-no-progress-stop",
+      "system": "budget",
+      "kind": "halt",
+      "fixtureRef": "examples/producer-budget-gates-v1/no-progress.fixture.json",
+      "expect": "no-progress window halts with diagnosis"
+    },
+    {
+      "id": "v40-demo-release-gate",
+      "system": "budget",
+      "kind": "halt",
+      "fixtureRef": "examples/autonomous-producer-v1/demo/release-gate.policy.json",
+      "expect": "release candidate remains blocked at human release gate"
+    },
+    {
+      "id": "v40-backcompat-single-artifact-evolve",
+      "system": "backcompat",
+      "kind": "valid",
+      "fixtureRef": "examples/evolve-campaign-v1/scenario-coverage-v24/single-shot.fixture.json",
+      "expect": "single-artifact evolve campaign remains valid"
+    },
+    {
+      "id": "v40-doc-governance",
+      "system": "doc",
+      "kind": "governance",
+      "fixtureRef": "docs/scenario-coverage-v40.md",
+      "expect": "docs preserve read-only/generated-state/#1/#23 boundaries"
+    }
+  ]
+}
