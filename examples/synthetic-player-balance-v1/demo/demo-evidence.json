@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "ouroforge.synthetic-player-balance-demo-evidence.v1",
+  "note": "Deterministic demo evidence (#1609). Reproduced by the demo smoke test from a fresh clone with no network/live browser.",
+  "scene": "synthetic-player-balance-demo-v1",
+  "reportDigest": "report|scene=synthetic-player-balance-demo-v1|runs=5|won=5|lost=0|playing=0|cards=brick:0:0:0:0,hex:13:5:5:0,smite:16:5:5:0,strike:6:5:5:0|degen={hex@5/5#31:cautious-novice},{hex+smite@5/5#31:cautious-novice},{smite@5/5#31:cautious-novice}|dead={brick#31:cautious-novice}|curve=aggressive-expert:won:3:9,balanced-veteran:won:4:10,cautious-novice:won:4:10,defensive-expert:won:3:9,reckless-novice:won:3:9",
+  "degenerateCombo": {
+    "cards": [
+      "hex",
+      "smite"
+    ],
+    "winInclusion": {
+      "included": 5,
+      "totalWins": 5
+    },
+    "replay": {
+      "deckSeed": 31,
+      "persona": "cautious-novice",
+      "personaSeed": 1
+    }
+  },
+  "deadItems": [
+    "brick"
+  ],
+  "baselineWinRate": {
+    "wins": 5,
+    "total": 5
+  },
+  "rerun": {
+    "change": {
+      "card": "smite",
+      "damage": 6
+    },
+    "status": "changed",
+    "winRate": {
+      "before": {
+        "wins": 5,
+        "total": 5
+      },
+      "after": {
+        "wins": 3,
+        "total": 5
+      },
+      "deltaWins": -2
+    },
+    "diffDigest": "rerun-diff|status=changed|change=smite[damage=6]|wr=5/5->3/5(-2)|cards=brick:0->0,hex:13->22,smite:16->12,strike:6->11|degenResolved=hex+smite+smite|degenIntroduced=|deadResolved=|deadIntroduced="
+  }
+}

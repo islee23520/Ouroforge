@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1",
+  "id": "synthetic-player-balance-demo-v1",
+  "bounds": { "width": 96, "height": 80 },
+  "entities": [],
+  "seed": 31,
+  "metadata": {
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike encounter for the Synthetic Player Balance Demo v1 (#1609). Deterministic, no network/live browser. smite (18 dmg) and hex (15 dmg) form a degenerate combo that dominates play and is co-played in every winning run; brick (cost 4) is an unaffordable dead item; strike is a normal card. The warden (95 HP) is tuned so that proposing a smite nerf (18 -> 6) re-runs the identical seed distribution to a lower win-rate, demonstrating the read-only cockpit's re-run diff."
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "synthetic-player-balance-demo-v1",
+    "seed": 31,
+    "player": { "maxHp": 28, "energyPerTurn": 3, "handSize": 5 },
+    "cards": {
+      "strike": { "type": "attack", "cost": 1, "damage": 6 },
+      "smite": { "type": "attack", "cost": 1, "damage": 18 },
+      "hex": { "type": "attack", "cost": 1, "damage": 15 },
+      "brick": { "type": "attack", "cost": 4, "damage": 99 }
+    },
+    "deck": ["smite", "smite", "smite", "hex", "hex", "hex", "strike", "strike", "strike", "brick"],
+    "enemy": {
+      "id": "warden",
+      "maxHp": 95,
+      "intents": [
+        { "type": "attack", "value": 8 },
+        { "type": "attack", "value": 7 }
+      ]
+    }
+  }
+}

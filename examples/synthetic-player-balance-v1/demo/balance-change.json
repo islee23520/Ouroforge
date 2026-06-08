@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "ouroforge.balance-change.v1",
+  "metadata": {
+    "note": "Fixture-scoped proposed balance change for the Synthetic Player Balance Demo v1 (#1609). A PROPOSAL ONLY: nerf the degenerate staple smite from 18 to 6 damage. The read-only cockpit re-runs the identical seed distribution with this change applied to a copy of the deck spec and diffs the win-rate impact; it never auto-applies the nerf."
+  },
+  "change": { "card": "smite", "damage": 6 }
+}
