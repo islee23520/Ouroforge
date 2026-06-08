@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v53.narrative-assist.v1",
+  "issue": "1867",
+  "anchor": "#1 Era J Milestone 59 Narrative and Theme-Arc Authoring Assist v1",
+  "boundary": "Rust/local owns trusted validation and provenance; browser/Studio surfaces are read-only; generated runs/artifacts remain untracked unless fixture-scoped; state/shape checks only; generation is proposal-only; integration requires human selection and review/apply/trust-gradient; no automated fun score; no tone/quality claim; no production-readiness claim; no Godot replacement claim; no auto-apply; no auto-merge; no self-approval; #1 and #23 remain open.",
+  "rows": [
+    {
+      "id": "V53.candidate_generation.valid",
+      "surface": "#1864 narrative candidate generation",
+      "fixture": "examples/narrative-assist-v1/narrative-candidate-brief-v1.json",
+      "expectedState": "candidate-set-valid-proposal-only"
+    },
+    {
+      "id": "V53.candidate_generation.rejects_malformed",
+      "surface": "#1864 fail-closed candidate generation",
+      "fixture": "examples/narrative-assist-v1/narrative-candidate-malformed-v1.json",
+      "expectedState": "candidate-count-drift-rejected"
+    },
+    {
+      "id": "V53.candidate_generation.proposal_only_boundary",
+      "surface": "#1864 proposal-only drift guard",
+      "fixture": "examples/narrative-assist-v1/narrative-candidate-proposal-only-v1.json",
+      "expectedState": "trusted-write-drift-rejected"
+    },
+    {
+      "id": "V53.integration.human_selection",
+      "surface": "#1865 human-selected integration provenance",
+      "fixture": "examples/narrative-assist-v1/demo/integration-provenance-v1.json",
+      "expectedState": "ready-for-review-apply-without-trusted-write"
+    },
+    {
+      "id": "V53.integration.readonly_trusted_write_blocked",
+      "surface": "#1865 read-only selection drift guard",
+      "fixture": "examples/narrative-integration-v1/narrative-selection-readonly-violation.json",
+      "expectedState": "trusted-write-request-rejected"
+    },
+    {
+      "id": "V53.demo.smoke",
+      "surface": "#1866 deterministic narrative assist demo",
+      "fixture": "examples/narrative-assist-v1/demo/manifest-v1.json",
+      "expectedState": "deterministic-demo-fixtures-match-computed-records"
+    },
+    {
+      "id": "V53.m39_narrative.backcompat",
+      "surface": "Milestone 39 narrative system",
+      "fixture": "examples/narrative-assist-v1/scenario-coverage-v53/milestone39-narrative-backcompat.fixture.json",
+      "expectedState": "existing-narrative-definition-remains-valid"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v53.m39-narrative-backcompat.v1",
+  "sourceDefinition": "examples/narrative-system-v1/valid/narrative.definition.json",
+  "storyId": "demo-story",
+  "initialNode": "intro",
+  "acceptChoice": "accept",
+  "expectedAfterAccept": {
+    "currentNode": "accepted",
+    "visitedNodes": ["intro"],
+    "flags": {
+      "metKing": true,
+      "acceptedQuest": false,
+      "audienceLogged": true,
+      "questBlessed": false
+    },
+    "firedEvents": ["logAudience"],
+    "ended": false
+  },
+  "expectedReadModel": {
+    "storyId": "demo-story",
+    "currentNode": "accepted",
+    "ended": false,
+    "firedEventCount": 1,
+    "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+  },
+  "boundary": "Backward compatibility golden only: state/shape checks over the existing Milestone 39 narrative system; no generated trusted write, no browser authority, no fun/tone/quality claim."
+}
