@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "scenario-coverage-v41",
+  "issue": 1695,
+  "fixtureScoped": true,
+  "boundary": "Scenario Coverage v41 is Rust/local owned state/shape regression coverage for scaled trust, release provenance, and compliance; browser/Studio surfaces are read-only; no timing, no network/live browser, no trusted writes, no auto-merge, no self-approval, no quality/fun or production-ready claim, no Godot replacement/parity claim; #1 and #23 remain open.",
+  "scenarios": [
+    {
+      "id": "v41-release-auto-apply-eligible-rollback",
+      "system": "release-auto-apply",
+      "kind": "eligible-rollback",
+      "fixtureRef": "examples/release-auto-apply-v1/fixtures/eligible-auto-apply.json",
+      "expect": "auto-applied with rollback command and pending human release gate"
+    },
+    {
+      "id": "v41-release-auto-apply-high-risk-manual",
+      "system": "release-auto-apply",
+      "kind": "manual-fallback",
+      "fixtureRef": "examples/release-auto-apply-v1/fixtures/ineligible-high-risk-manual.json",
+      "expect": "manual fallback without rollback command"
+    },
+    {
+      "id": "v41-release-auto-apply-kill-switch",
+      "system": "release-auto-apply",
+      "kind": "kill-switch",
+      "fixtureRef": "examples/release-auto-apply-v1/fixtures/kill-switch-audit-log.json",
+      "expect": "kill switch halts release-scale autonomy"
+    },
+    {
+      "id": "v41-release-provenance-complete",
+      "system": "release-provenance",
+      "kind": "complete",
+      "fixtureRef": "examples/release-provenance-bundle-v1/bundle.complete.fixture.json",
+      "expect": "complete and replayable per-release bundle"
+    },
+    {
+      "id": "v41-release-provenance-missing-link",
+      "system": "release-provenance",
+      "kind": "incomplete",
+      "fixtureRef": "examples/release-provenance-bundle-v1/bundle.missing-link.fixture.json",
+      "expect": "explicit incomplete state without fabricated links"
+    },
+    {
+      "id": "v41-release-provenance-not-replayable",
+      "system": "release-provenance",
+      "kind": "not-replayable",
+      "fixtureRef": "examples/release-provenance-bundle-v1/bundle.not-replayable.fixture.json",
+      "expect": "incomplete replayability state"
+    },
+    {
+      "id": "v41-release-compliance-pass",
+      "system": "release-compliance",
+      "kind": "pass",
+      "fixtureRef": "examples/release-compliance-gate-v1/fixtures/compliant-release.json",
+      "expect": "compliance pass with human gate pending"
+    },
+    {
+      "id": "v41-release-compliance-license-block",
+      "system": "release-compliance",
+      "kind": "blocked",
+      "fixtureRef": "examples/release-compliance-gate-v1/fixtures/violation-release.json",
+      "expect": "blocked for policy, age-rating, missing license, and missing provenance"
+    },
+    {
+      "id": "v41-backcompat-m22-per-change-auto-apply",
+      "system": "backcompat-m22",
+      "kind": "golden",
+      "fixtureRef": "examples/trust-gradient-v1/fixtures/auto-apply-success.json",
+      "expect": "Milestone 22 per-change auto-apply remains valid"
+    },
+    {
+      "id": "v41-backcompat-m25-per-change-provenance",
+      "system": "backcompat-m25",
+      "kind": "golden",
+      "fixtureRef": "examples/provenance-bundle-v1/bundle.complete.fixture.json",
+      "expect": "Milestone 25 per-change provenance remains complete"
+    }
+  ]
+}

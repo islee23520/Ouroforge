@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "scenario-coverage-v41-backcompat-golden",
+  "fixtureScoped": true,
+  "milestone22": {
+    "fixtureRef": "examples/trust-gradient-v1/fixtures/auto-apply-success.json",
+    "expectedOutcome": "auto-applied",
+    "expectedRollbackCommand": "ouroforge rollback --transaction txn-scene-001 --reverse examples/trust-gradient-v1/fixtures/reverse/txn-scene-001.json",
+    "expectedBudgetRemaining": 2
+  },
+  "milestone25": {
+    "fixtureRef": "examples/provenance-bundle-v1/bundle.complete.fixture.json",
+    "fixtureRoot": "examples/provenance-bundle-v1",
+    "expectedStatus": "complete",
+    "expectedLinkCount": 8
+  },
+  "boundary": "Fixture-scoped backward compatibility golden only; no browser/Studio mutation, no trusted writes, no auto-merge, no release authority, no production-ready or quality/fun claim; #1 and #23 remain open."
+}
