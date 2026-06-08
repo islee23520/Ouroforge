@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "ouroforge.balance-combo-telemetry.v1",
+  "fixtureId": "malformed-missing-boundary",
+  "boundary": "browser may apply fixes",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped.",
+  "runs": []
+}

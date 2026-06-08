@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ouroforge.balance-combo-telemetry.v1",
+  "fixtureId": "balanced-engine-builds",
+  "boundary": "Rust/local owns descriptive balance telemetry; browser/Studio read-only; no auto-apply; no auto-merge; no fun guarantee; #1 and #23 remain open.",
+  "generatedStatePolicy": "Generated runs/artifacts remain untracked unless fixture-scoped; this tiny telemetry matrix is fixture-scoped regression data.",
+  "runs": [
+    { "runId": "seed-410-smith", "deckSeed": 410, "personaId": "smith", "outcome": "won", "turns": 5, "score": 118, "cardPlays": { "wrench": 2, "shield": 2, "overcharger": 1, "reactor-loop": 0 }, "actions": ["play wrench", "play shield", "play overcharger"] },
+    { "runId": "seed-411-racer", "deckSeed": 411, "personaId": "racer", "outcome": "won", "turns": 5, "score": 116, "cardPlays": { "wrench": 2, "shield": 1, "overcharger": 0, "reactor-loop": 1 }, "actions": ["play reactor-loop", "play wrench", "play shield"] },
+    { "runId": "seed-412-planner", "deckSeed": 412, "personaId": "planner", "outcome": "lost", "turns": 6, "score": 102, "cardPlays": { "wrench": 2, "shield": 2, "overcharger": 1, "reactor-loop": 1 }, "actions": ["play shield", "play wrench", "play overcharger", "play reactor-loop"] },
+    { "runId": "seed-413-auditor", "deckSeed": 413, "personaId": "auditor", "outcome": "won", "turns": 4, "score": 121, "cardPlays": { "wrench": 1, "shield": 1, "overcharger": 1, "reactor-loop": 1 }, "actions": ["play wrench", "play reactor-loop", "play overcharger"] }
+  ]
+}
