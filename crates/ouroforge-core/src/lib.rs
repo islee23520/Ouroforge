@@ -93,6 +93,7 @@ pub use evolve_campaign::*;
 pub mod economy_system;
 pub mod funfeel_gate;
 pub mod meta_progression;
+pub mod narrative_candidate;
 pub mod narrative_system;
 pub mod playtest_capture;
 pub mod plugin_asset_metadata;

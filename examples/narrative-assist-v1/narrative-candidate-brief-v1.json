@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "ouroforge.narrative-candidate.v1",
+  "candidateSetId": "narrative-candidate-set-v1",
+  "title": "Clockwork harbor narrative candidates",
+  "phaseShift": "Move from repair-room tutorial into first harbor encounter while preserving human review of voice.",
+  "narrativeArc": "A local mechanic discovers that the harbor machines respond to careful deck choices and explicit dialogue flags.",
+  "themeGoals": [
+    "Show repair, consequence, and cautious momentum through candidate material.",
+    "Keep wit as a draft label for human selection rather than a machine verdict."
+  ],
+  "constraints": [
+    "Use Milestone 39 narrative ids and Milestone 30 proposal intake only.",
+    "Do not apply or promote generated text without human selection."
+  ],
+  "candidateCount": 3,
+  "narrativeSurface": {
+    "schemaVersion": "narrative-system-v1",
+    "storyId": "demo-story",
+    "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+  },
+  "sourceRefs": [
+    "docs/narrative-assist-v1.md",
+    "examples/long-form-systems-v1/demo/narrative.definition.json"
+  ],
+  "candidates": [
+    {
+      "candidateId": "theme-arc-harbor-repair-v1",
+      "class": "theme-arc-beat",
+      "humanIntent": "Draft a beat where the player notices the harbor repair loop before a choice.",
+      "compatibilityNotes": "Maps to the existing demo-story narrative surface as proposal data only.",
+      "gameClass": "grid-puzzle",
+      "gridPuzzle": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "theme-arc-harbor-repair-brief-v1",
+        "title": "Harbor repair beat candidate",
+        "description": "A narrative beat candidate represented as a small inspection room proposal for the repair loop.",
+        "gameClass": "grid-puzzle",
+        "puzzleId": "theme-arc-harbor-repair-puzzle-v1",
+        "rows": ["######", "#P...#", "#.*@.#", "#....#", "######"],
+        "intendedSolution": ["right", "right"]
+      }
+    },
+    {
+      "candidateId": "dialogue-variant-foreman-v1",
+      "class": "dialogue-variant",
+      "humanIntent": "Draft a foreman line variant that a reviewer can accept, reject, or rewrite.",
+      "compatibilityNotes": "References dialogue vocabulary without adding a new node engine or trusted state writer.",
+      "gameClass": "grid-puzzle",
+      "gridPuzzle": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "dialogue-variant-foreman-brief-v1",
+        "title": "Foreman dialogue candidate",
+        "description": "A dialogue variant candidate preserved as proposal data for human curation.",
+        "gameClass": "grid-puzzle",
+        "puzzleId": "dialogue-variant-foreman-puzzle-v1",
+        "rows": ["######", "#P...#", "#.*@.#", "#....#", "######"],
+        "intendedSolution": ["right", "right"]
+      }
+    },
+    {
+      "candidateId": "flavor-card-spark-coil-v1",
+      "class": "flavor-text",
+      "humanIntent": "Draft card flavor around a spark coil while keeping balance and final voice review separate.",
+      "compatibilityNotes": "Uses the deck-roguelike substrate as configuration/copy reference, not a new resolver.",
+      "gameClass": "deck-roguelike",
+      "deckRoguelike": {
+        "schemaVersion": "ouroforge.generative-intake.v1",
+        "briefId": "flavor-card-spark-coil-brief-v1",
+        "title": "Spark Coil flavor candidate",
+        "description": "A deckbuilder flavor candidate over the existing card-roguelike substrate.",
+        "gameClass": "deck-roguelike",
+        "runId": "flavor-card-spark-coil-run-v1",
+        "seed": 5902,
+        "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+        "cards": {
+          "spark-coil": { "type": "attack", "cost": 1, "damage": 7 },
+          "brace": { "type": "skill", "cost": 1, "block": 5 }
+        },
+        "deck": ["spark-coil", "spark-coil", "brace"],
+        "relicVocabulary": {},
+        "enemy": { "maxHp": 24, "intents": [{ "type": "attack", "damage": 5 }] }
+      }
+    }
+  ]
+}

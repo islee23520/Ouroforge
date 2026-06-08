@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.narrative-candidate.v1",
+  "candidateSetId": "narrative-candidate-malformed-v1",
+  "title": "Malformed narrative candidates",
+  "phaseShift": "This brief should fail closed because candidateCount does not match candidates.",
+  "narrativeArc": "A malformed prompt cannot be repaired into trusted output.",
+  "themeGoals": ["Reject malformed narrative candidate input."],
+  "constraints": ["No repair through browser or generated trusted writes."],
+  "candidateCount": 2,
+  "narrativeSurface": {
+    "schemaVersion": "narrative-system-v1",
+    "storyId": "demo-story",
+    "boundary": "rust-trusted-state; browser/studio read-only; generation proposal-only via review/apply/trust-gradient"
+  },
+  "sourceRefs": ["docs/narrative-assist-v1.md"],
+  "candidates": []
+}

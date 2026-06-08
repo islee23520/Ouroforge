@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "ouroforge.narrative-candidate.v1",
+  "candidateSetId": "narrative-candidate-proposal-only-drift-v1",
+  "generator": "narrative-candidate-generation-v1",
+  "storyId": "demo-story",
+  "phaseShift": "A serialized candidate set that intentionally drifts away from proposal-only.",
+  "candidateCount": 0,
+  "sourceRefs": ["docs/narrative-assist-v1.md"],
+  "candidates": [],
+  "proposalOnly": false,
+  "humanToneBoundary": "tone/soul/fun/quality are human judgments; generation emits proposals only"
+}
