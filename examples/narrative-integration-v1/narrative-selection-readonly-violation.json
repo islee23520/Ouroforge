@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.narrative-integration.v1",
+  "selectionId": "narrative-selection-unsafe-v1",
+  "candidateSetId": "narrative-candidate-set-v1",
+  "targetTitleId": "clockwork-harbor-demo",
+  "selectedCandidateId": "theme-arc-harbor-repair-v1",
+  "selectedProposalId": "generative-theme-arc-harbor-repair-puzzle-v1",
+  "selectedPayloadHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "decision": "selected",
+  "humanActor": "human-curator-local",
+  "rationale": "Unsafe fixture tries to turn a read-only selection into authority.",
+  "recordedAtUnixMs": 1786500001000,
+  "surfaceBoundary": "read-only-narrative-integration-provenance",
+  "trustedWriteRequested": true,
+  "applyAuthority": true,
+  "reviewApplyRequired": false
+}

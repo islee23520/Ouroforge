@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "ouroforge.narrative-integration.v1",
+  "selectionId": "narrative-selection-harbor-repair-v1",
+  "candidateSetId": "narrative-candidate-set-v1",
+  "targetTitleId": "clockwork-harbor-demo",
+  "selectedCandidateId": "theme-arc-harbor-repair-v1",
+  "selectedProposalId": "generative-theme-arc-harbor-repair-puzzle-v1",
+  "selectedPayloadHash": "__COMPUTED_IN_TEST__",
+  "decision": "selected",
+  "humanActor": "human-curator-local",
+  "rationale": "Human selected this beat as an integration candidate; final source changes still require review/apply.",
+  "recordedAtUnixMs": 1786500001000,
+  "surfaceBoundary": "read-only-narrative-integration-provenance",
+  "trustedWriteRequested": false,
+  "applyAuthority": false,
+  "reviewApplyRequired": true
+}
