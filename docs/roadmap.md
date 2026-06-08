@@ -1077,7 +1077,7 @@ fail-closed behaviors.
 The **remaining gaps** are demand-driven and tracked as their own rungs, not
 backfilled here: the trusted bounded solver and over-solution detection are
 Milestone 28 (#1579-#1585, recorded below, with the Design-Integrity Gate #1583
-still open); natural-language generation into this game class is Milestone 30; and
+since merged); natural-language generation into this game class is Milestone 30; and
 any engine breadth beyond the grid-puzzle rung's gate requires a separate scope
 issue citing the specific gate it satisfies. The grid-puzzle class is the
 beachhead, not a general engine claim.
@@ -1184,11 +1184,11 @@ difficulty / design-integrity-gate regression matrix plus a four-gate
 The realized design-integrity gate verdict — *intent satisfied AND no unintended
 over-solution* — composes via the existing evaluator `declared-gate-and`
 aggregation and is demonstrated end to end (#1584) and regression-covered
-(#1585). The **remaining gap** is the Design-Integrity Gate v1 #1583, which
-formalizes that gate as a declared gate inside the evaluator; it is **still open**
-and Milestone 28 is therefore recorded as *substantially complete, gate
-integration pending* rather than fully complete. No milestone is marked complete
-ahead of merged evidence.
+(#1585). The Design-Integrity Gate v1 #1583
+(`crates/ouroforge-evaluator/src/design_integrity_gate.rs`, PR #1751) — which
+formalizes that gate as a declared gate inside the evaluator — has **since
+merged**, so Milestone 28 is now recorded as **complete on merged evidence**. No
+milestone is marked complete ahead of merged evidence.
 
 The boundaries stay explicit and reaffirmed. The solver, detector, difficulty
 metric, and gate semantics are owned by **Rust/local** and operate **over the
@@ -1203,10 +1203,10 @@ backward-compatible; generated runs/evidence remain ignored unless explicitly
 fixture-scoped; Layer-3 distributed orchestration / Elixir remains NO-GO under
 ADR #92 and deferred under #1508. #1 and #23 remain open governance anchors.
 
-The recommended next step within Milestone 28 is to land the Design-Integrity
-Gate v1 #1583; no later Era F rung is expanded by this refresh, and each requires
-its own scope issue with explicit non-goals, regression coverage, generated-state
-audits, and the same Layer-3 / hosted-paid boundaries.
+With the Design-Integrity Gate v1 #1583 merged, Milestone 28 is closed; no later
+Era F rung is expanded by this refresh, and each requires its own scope issue with
+explicit non-goals, regression coverage, generated-state audits, and the same
+Layer-3 / hosted-paid boundaries.
 
 ### Foundation Hardening v1 governance refresh
 
@@ -1781,6 +1781,124 @@ ADR #92).
 The recommended next milestone is not expanded by this completion; any later Era
 F rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
+### Era F (Milestones 27–34) governance refresh
+
+Era F (**Accessible Authoring and Genre Verticalization**, Milestones 27–34
+under #1) is recorded as **complete on merged evidence** as a conservative,
+additive, local-first sequence. This is the Era F closing governance refresh
+(#1 Milestone 35). It records what each milestone actually realized, assesses the
+sequence against #1's extended north-star, and reaffirms every Era F boundary. It
+marks **no** milestone complete ahead of merged evidence, adds no executable
+behavior, and does not close or narrow #1 or #23. The guiding principle is
+unchanged: **generation is the front door** (access and adoption) and the
+**deterministic verification/balancing loop is the engine room** that makes
+generated output non-slop — layers, not alternatives. Every milestone below is
+recorded in its own per-milestone governance refresh above; this section
+consolidates them and does not supersede them.
+
+The merged per-milestone evidence chain is:
+
+- **Milestone 27 — Grid-Puzzle Game Class v1** (#1573–#1577): the beachhead
+  machine-checkable genre — a deterministic, probe-observable grid-puzzle class
+  whose solvability and intended-solution replay are decided by the loop, with a
+  validate-then-load PuzzleScript-compatible DSL ingest (PRs #1621/#1631/#1753/
+  #1748/#1763; Scenario Coverage v27).
+- **Milestone 28 — Puzzle Solver and Over-Solution Detection v1** (#1579–#1585):
+  the moat capability — a bounded deterministic solver and an exhaustive
+  over-solution detector that surface any unintended shortcut as a replayable
+  counterexample, a descriptive difficulty-metric artifact, and the
+  Design-Integrity Gate v1 #1583
+  (`crates/ouroforge-evaluator/src/design_integrity_gate.rs`, PR #1751) ANDed into
+  the evaluator `declared-gate-and` aggregation (PRs #1622/#1677/#1708/#1715/
+  #1722/#1724/#1751; Scenario Coverage v28).
+- **Milestone 29 — Design Regression Harness v1** (#1587–#1590): CI for game
+  design — an orchestration that re-runs the M28 solver/detector/difficulty suite
+  on each edit, diffs against the recorded baseline, classifies `unchanged` /
+  `improved` / `newly-broken` with a replayable trace, and fails closed to
+  `inconclusive` (PRs #1628/#1754/#1761/#1762; Scenario Coverage v29).
+- **Milestone 30 — Generative Front Door v1** (#1592–#1597): the accessibility
+  front door — a plain brief becomes a grid-puzzle *proposal* over the existing
+  `MutationProposal` model, promotable only when it passes the engine room
+  (solver + over-solution + design-integrity gate ANDed into the four-gate
+  aggregation), routed unchanged into the existing review/apply/trust-gradient
+  path and never a trusted write (PRs #1620/#1699/#1755/#1758/#1771/#1764;
+  Scenario Coverage v30).
+- **Milestone 31 — Deck-Roguelike Game Class v1** (#1599–#1603): the next genre
+  rung — a seeded stochastic determinism layer (`seeded_rng.rs` and the runtime
+  `mulberry32` stream) and a deterministic, probe-exposed deck-roguelike class
+  whose shuffles are seed-reproducible and folded into the replay-state digest
+  (PRs #1624/#1630/#1752/#1757/#1760; Scenario Coverage v31).
+- **Milestone 32 — Synthetic Player Balance v1** (#1605–#1610): pre-launch
+  balance telemetry — human-like persona agents (not win-maximizers) play seeded
+  runs, descriptive telemetry flags degenerate combos and dead items with
+  replayable seeds, and a read-only cockpit re-runs a proposed nerf on the
+  identical seed distribution via `compare` to diff its win-rate (PRs #1625/#1759/
+  #1770/#1777/#1778/#1780/#1765/#1769; Scenario Coverage v32).
+- **Milestone 33 — Evidence-Native Marketplace v1** (#1612–#1616): evidence
+  compounding into verifiable assets — a local verifiable-asset registry where
+  each asset binds its acceptance suite, a deterministic replay proof, and an M25
+  provenance lineage (the Asset Replay-Proof and Provenance Binding v1 #1614),
+  re-verified locally on consume, with the paid/hosted transaction layer recorded
+  as a Layer-3-gated policy line, not a code path (PRs #1623/#1629/#1756/#1632/
+  #1633; Scenario Coverage v33).
+- **Milestone 34 — OSS Trust Charter and Paid-Cloud Boundary Design Gate v1**
+  (#1618): a design-gate ADR (`docs/oss-trust-charter.md`, PR #1626) adopting the
+  MIT/Apache no-relicense / no-runtime-fee / no-install-fee / no-revenue-share
+  charter and recording a per-surface paid-cloud GO/DEFER — DEFER by default on
+  every surface, each tied to a #1508 Layer-3 hosted/cloud GO, and **never** a
+  creative primitive. No cloud, hosted, or paid capability is implemented.
+
+**North-star assessment (descriptive, not a maturity claim).** Against #1's
+extended north-star `loop coverage × game complexity × trust × accessibility`:
+
+- **Loop coverage × game complexity:** the loop now produces and machine-verifies
+  two new genre verticals beyond the Era A–E structural ladder — grid puzzle
+  (spatial, M27) and deck roguelike (seeded stochastic, M31) — each with a
+  loop-produced, fixture-scoped demo carrying passing four-gate and Milestone 20
+  loop-coverage evidence recorded as a Milestone 24 ladder rung (#1576, #1602).
+  Coverage is measured per genre by those demos; it is **not** a claim of broad
+  engine coverage or production parity.
+- **Trust:** generation is verified rather than asserted — a generated proposal is
+  promotable only after passing the engine room (M28 solver + over-solution + the
+  design-integrity gate, ANDed into the existing four-gate `declared-gate-and`
+  aggregation), and design regression (M29) re-proves the whole game on each edit.
+  The trust posture is locked by the M34 charter (third-rails affirmed,
+  paid-cloud DEFER per surface). Generation **never performs a trusted write**;
+  every promotion flows through the existing review/apply/trust-gradient path.
+- **Accessibility:** a non-developer can describe a grid-puzzle in a plain brief
+  and receive a *verified-solvable proposal* (M30) without weakening the safety
+  model, and pre-launch balance is surfaced as interpretable, human-in-the-loop
+  evidence with replayable counterexamples (M32). "Verified" means only that a
+  proposal passed the engine room — **not** that a generated game is good, fun,
+  shippable, or production-ready.
+
+**Remaining gaps (recorded, not backfilled here).** Engine breadth (renderer, 3D,
+audio, physics depth) beyond each rung's gate stays demand-driven under the
+Milestone 24 ladder and requires a separate scope issue citing the gate it
+satisfies. The arcade rung and campaign-scale generation are later work (Era G+),
+not Era F. Any hosted, cloud, paid, or marketplace-transaction capability stays
+**DEFER until a #1508 Layer-3 GO**; distributed orchestration / Elixir remains
+NO-GO under ADR #92 (`docs/distributed-elixir-design.md`).
+
+**Boundaries reaffirmed across all Era F milestones.** Generation, role-agent,
+and producer output is **proposal-only** through the existing review/apply/
+trust-gradient path — never a direct trusted write, auto-apply, auto-merge,
+self-approval, or reviewer bypass. Non-slop is a **process guarantee** (the engine
+room), not a quality claim. Metrics are **descriptive**. Trusted logic is
+**Rust/local**; the runtime, `window.__OUROFORGE__` probe, and dashboard/cockpit
+surfaces are **read-only**; there is no browser command bridge, shell execution,
+dependency install, CI/workflow mutation, credentialed operation, or publish/
+deploy/sign/upload. Genre and engine growth stay **demand-driven**.
+Cloud/hosted/marketplace monetization stays **Layer-3-gated** (DEFER per #1508).
+Existing runtime/probe/evaluator four-gate aggregation, evolve/campaign,
+`compare`, provenance-bundle, dashboard, cockpit, and CLI contracts remain
+backward-compatible; generated runs/genre/evidence/registry artifacts remain
+ignored unless explicitly fixture-scoped. No production-readiness, quality, fun,
+shippability, or Godot replacement/parity claim is introduced. **#1 and #23
+remain open governance anchors** and are not modified, closed, or narrowed by this
+refresh; Scenario Coverage numbering continues from v26 (Era E) onward through the
+Era F suite (v27–v33).
 
 ## Product direction
 
