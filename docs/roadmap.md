@@ -1721,6 +1721,67 @@ The recommended next milestone is not expanded by this completion; any later Era
 F rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+Synthetic Player Balance v1 is recorded as **complete for Era F Milestone 32**
+under #1, on merged evidence, as a conservative, additive, local-only milestone.
+It adds **pre-launch synthetic balance telemetry** over the deck-roguelike game
+class (Milestone 31): human-like persona agents play seeded runs, descriptive
+telemetry aggregates them into a balance report, and a read-only cockpit flags
+degenerate combos and dead items with replayable seeds and re-runs a proposed
+nerf on the identical seed distribution to diff its win-rate impact. It is the
+verification **engine room** for the generative front door — layers, not
+alternatives. Every capability **reuses an existing surface** — the deck-roguelike
+probe and seeded determinism, the evidence model, the `compare` contract, and the
+read-only dashboard/cockpit surfacing; it adds **no new engine, runtime, writer,
+or solver**.
+
+The merged evidence chain is the scope/contract gate #1605
+(`docs/synthetic-player-balance-v1.md`, PR #1625) — defines the persona,
+telemetry, cockpit, and `compare`-based re-run contracts and the reuse statement;
+Synthetic Player Persona Agents v1 #1606 (`examples/game-runtime/synthetic-player.js`
+with the trusted Rust mirror `crates/ouroforge-core/tests/synthetic_player_agents_contract.rs`,
+PR #1759, with the turn-budget boundary fix PR #1770) — human-like (skill/style)
+personas that drive the existing probe deterministically over an integer-only
+seeded decision stream, with a bounded run budget, not win-maximizers; Balance
+Telemetry Aggregation v1 #1607 (`examples/game-runtime/balance-telemetry.js` and
+`crates/ouroforge-core/tests/balance_telemetry_contract.rs`, PR #1777) — a
+deterministic, descriptive balance report that flags a degenerate combo and a
+dead item with replayable seeds; Balance Cockpit Read-Only Surface and Re-Run
+Diff v1 #1608 (`examples/game-runtime/balance-cockpit.js` and
+`crates/ouroforge-core/tests/balance_cockpit_rerun_contract.rs`, PR #1778) — a
+read-only, HTML-escaped surfacing with per-flag counterexamples and a proposed
+nerf re-run that diffs the win-rate, reusing the `compare` digest-equality signal
+and never mutating the trusted spec; the Synthetic Player Balance Demo v1 #1609
+(`docs/synthetic-player-balance-v1-demo.md` and
+`examples/synthetic-player-balance-v1/demo/`, PR #1780) — a deterministic,
+fixture-scoped demo (no network/live browser) that flags the `smite`+`hex`
+degenerate combo with a replayable seed and re-runs a `smite` nerf to diff the
+win-rate (5/5 → 3/5); and Scenario Coverage v32 #1610
+(`crates/ouroforge-core/tests/scenario_coverage_v32_synthetic_player_balance.rs`,
+PR #1765, repaired by PR #1769) — an enumerated, state/shape-only regression suite
+over persona determinism, telemetry flags, and the cockpit re-run diff. #1 and
+#23 remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. The **metrics are descriptive**, not
+a balance or quality guarantee; the **cockpit is read-only and human-in-the-loop**
+with **no auto-applied nerf or buff**. Personas are **human-like, not
+win-maximizing or superhuman**; runs are **seeded and replay-stable** with **no
+live or network telemetry**. The milestone is a **bounded analysis slice**, not a
+shipped game: no production-readiness, quality, fun, shippable, or current Godot
+replacement/parity claim is introduced, and the human release go/no-go is
+preserved. Generation/role-agent/producer output stays **proposal-only** through
+the existing review/apply/trust-gradient path — never a direct trusted write,
+auto-apply, auto-merge, self-approval, or reviewer bypass. Trusted logic is
+Rust/local; browser/Studio surfaces remain read-only. Existing contracts remain
+backward-compatible (the persona run record's per-card tally and the report/diff
+artifacts are additive), and generated runs/artifacts remain ignored unless
+explicitly fixture-scoped. Shipping/hosted/cloud/live-ops stays **DEFER until a
+#1508 Layer-3 GO** (Layer-3 distributed orchestration / Elixir remains NO-GO under
+ADR #92).
+
+The recommended next milestone is not expanded by this completion; any later Era
+F rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
