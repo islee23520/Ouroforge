@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "release-compliance-gate-v1",
+  "releaseCandidateRef": "examples/release-compliance-gate-v1/fixtures/release-candidate.json",
+  "policyChecks": [
+    { "id": "content-policy", "status": "pass", "evidenceRef": "examples/release-compliance-gate-v1/fixtures/policy.json" }
+  ],
+  "ageRatingSignals": {
+    "declaredRating": "everyone-10-plus-local-signal",
+    "evidenceRef": "examples/release-compliance-gate-v1/fixtures/age-rating.json",
+    "unreviewedSignals": []
+  },
+  "assetChecks": [
+    {
+      "id": "sprite-atlas",
+      "assetRef": "examples/release-compliance-gate-v1/fixtures/assets/sprite-atlas.json",
+      "license": "CC0-1.0",
+      "provenanceRef": "examples/release-compliance-gate-v1/fixtures/assets/sprite-atlas-provenance.json",
+      "qaGateRef": "examples/release-compliance-gate-v1/fixtures/assets/sprite-atlas-qa.json"
+    }
+  ],
+  "humanGoNoGo": "pending",
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composes with existing reviewer/evaluator gates; Rust/local read-only; browser and Studio read-only; human go/no-go retained; no release authority"
+}

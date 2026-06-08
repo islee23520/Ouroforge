@@ -125,6 +125,7 @@ pub mod puzzle_difficulty_metric;
 pub mod puzzle_oversolution;
 pub mod puzzle_solver;
 pub mod release_auto_apply;
+pub mod release_compliance_gate;
 pub mod release_provenance_bundle;
 pub mod seeded_rng;
 pub use ouroforge_source_apply::source_apply_audit_ledger;

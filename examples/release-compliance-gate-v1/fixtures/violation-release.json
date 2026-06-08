@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "release-compliance-gate-v1",
+  "releaseCandidateRef": "examples/release-compliance-gate-v1/fixtures/release-candidate.json",
+  "policyChecks": [
+    {
+      "id": "content-policy",
+      "status": "violation",
+      "evidenceRef": "examples/release-compliance-gate-v1/fixtures/policy.json",
+      "blockedReason": "release candidate includes unresolved policy issue"
+    }
+  ],
+  "ageRatingSignals": {
+    "declaredRating": "pending-review",
+    "evidenceRef": "examples/release-compliance-gate-v1/fixtures/age-rating.json",
+    "unreviewedSignals": ["violence-intensity"]
+  },
+  "assetChecks": [
+    {
+      "id": "generated-music",
+      "assetRef": "examples/release-compliance-gate-v1/fixtures/assets/generated-music.json",
+      "license": null,
+      "provenanceRef": null,
+      "qaGateRef": "examples/release-compliance-gate-v1/fixtures/assets/generated-music-qa.json"
+    }
+  ],
+  "humanGoNoGo": "pending",
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composes with existing reviewer/evaluator gates; Rust/local read-only; browser and Studio read-only; human go/no-go retained; no release authority"
+}
