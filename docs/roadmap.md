@@ -1563,6 +1563,57 @@ The recommended next milestone is not expanded by this completion; any later Era
 G rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+
+### Card-Roguelite Substrate v1 governance refresh (Era I Milestone 47)
+
+Card-Roguelite Substrate v1 is recorded as **complete for Era I Milestone 47**
+under #1, on merged evidence, as a conservative, additive, Rust/local milestone.
+It generalizes the existing deck-roguelike class into a validated
+card-roguelite substrate, preserves the pre-substrate deck-roguelike golden,
+adds an engine-builder deckbuilder variant strictly as a substrate config,
+proves a deterministic fixture-scoped demo, and locks the surface with Scenario
+Coverage v42. The milestone is a mechanical/balance substrate and regression
+coverage milestone only; it does not claim that a game is fun, shippable,
+production-ready, or a Godot replacement.
+
+The merged evidence chain is the scope/design gate #1791 (PR #1892) — records
+the substrate-as-config rule, Rust/local trust boundary, proposal-only generation
+path, and human Era J fun/release gates; Card-Roguelite Substrate Core Model v1
+#1792 (PR #1897) — adds the validated cards/modifiers/run/shop/meta substrate,
+deterministic seeded resolution, digest/probe state, and read-only inspection
+shape; Deck-Roguelike-as-Substrate-Config parity #1793 (PR #1898) — migrates the
+existing deck-roguelike fixture to the substrate while preserving golden-byte
+parity and fail-closed malformed behavior; Engine-Builder Deckbuilder Config v1
+#1794 (PR #1903) — adds the first deckbuilder variant as a distinct config over
+the same substrate, not a parallel engine; Card-Roguelite Substrate Demo v1 #1795
+(PR #1909) — runs the deck-roguelike parity config and engine-builder config
+deterministically from fixture-scoped docs/manifest evidence; and Scenario
+Coverage v42 #1796 (PR #1915) — enumerates state/shape-only regressions for
+determinism, config parity, engine-builder config, demo shape, pre-substrate
+backward compatibility, generated-state wording, and governance. #1 and #23
+remain open governance anchors.
+
+The boundaries stay explicit and reaffirmed. A deckbuilder variant is a
+configuration over the Card-Roguelite Substrate, not a new engine or browser/
+Studio writer. Trusted validation, persistence, substrate scoring/balance,
+export/provenance logic, evidence writing, run/project binding, review/apply/
+trust-gradient path, and CLI behavior remain Rust/local. JavaScript/browser/
+Studio surfaces remain deterministic or read-only inspection surfaces for trusted
+state and do not gain trusted writes, command bridges, autonomous apply,
+auto-merge, self-approval, reviewer bypass, or hidden mutation authority.
+Generation remains proposal-only through the existing review/apply/trust-gradient
+path. The fun/feel verdict, Steam account/signing/release, content survey,
+market demand, hosted/cloud/mobile Layer-3 capability, and release go/no-go stay
+human or deferred as previously scoped. Existing runtime, probe, evaluator,
+evolve/campaign, compare, provenance-bundle, asset, dashboard, cockpit, and CLI
+contracts remain backward-compatible; generated runs/assets/builds remain ignored
+unless explicitly fixture-scoped. Scenario Coverage numbering continues through
+v42.
+
+The recommended next milestone is not expanded by this completion; any later Era
+I/J work requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Autonomous Producer and Whole-Game Orchestration v1 governance refresh (Era H Milestone 43)
 
 Autonomous Producer and Whole-Game Orchestration v1 is recorded as **complete for
@@ -2261,6 +2312,20 @@ as **evidence-gated, proposal-only collaboration**, not an autonomous studio:
   replacement/parity, or autonomous-shipping claim is introduced. **#1 and #23
   remain open governance anchors** and are not modified, closed, or narrowed by
   this milestone.
+
+
+- **Era I Milestone 47 — Card-Roguelite Substrate v1** (#1791–#1797):
+  generalizes the existing deck-roguelike class into a validated Rust/local
+  card-roguelite substrate, preserves deck-roguelike golden parity, adds the
+  engine-builder deckbuilder as a config over the same substrate, proves a
+  fixture-scoped deterministic demo, and locks Scenario Coverage v42 (PRs
+  #1892/#1897/#1898/#1903/#1909/#1915). The substrate is mechanical/balance
+  evidence only: browser/Studio surfaces remain read-only, generation remains
+  proposal-only, generated state remains untracked unless fixture-scoped, the
+  fun/feel and release verdicts stay human, and no production-ready, quality/fun,
+  shippability, Godot replacement/parity, or autonomous-shipping claim is
+  introduced. **#1 and #23 remain open governance anchors** and are not modified,
+  closed, or narrowed by this milestone.
 
 **Era I Milestone 50 — Engine-Builder Balance Verification v1 (descriptive, not a fun claim).** Era I records a bounded mechanical balance verification chain for an engine-builder/card-roguelite variant over the existing substrate, not a new engine and not an automated fun verdict:
 
