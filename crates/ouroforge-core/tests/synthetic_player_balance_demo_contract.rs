@@ -768,7 +768,7 @@ fn aggregate(
             }
         }
     }
-    degenerate_combos.sort_by(|x, y| x.cards.join("+").cmp(&y.cards.join("+")));
+    degenerate_combos.sort_by_key(|combo| combo.cards.join("+"));
 
     // Difficulty curve, sorted by persona for a stable order.
     let mut curve: Vec<&RunRecord> = runs.iter().collect();
