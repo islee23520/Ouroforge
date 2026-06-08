@@ -138,6 +138,7 @@ pub mod qa_performance_budget;
 pub mod qa_playtest_demo;
 pub mod qa_regression_coverage;
 pub mod qa_run_matrix;
+pub mod responsiveness;
 pub mod runtime_frame_budget;
 pub mod score_cascade_feedback;
 pub mod visual_regression_scale;
@@ -161,6 +162,12 @@ pub use ouroforge_evidence::{
 pub use ouroforge_ledger::{append_ledger_event, read_ledger_events, write_ledger_created};
 pub use ouroforge_source_apply::source_apply_emergency_hold;
 pub use ouroforge_source_apply::source_apply_evidence_bundle;
+pub use responsiveness::{
+    verify_responsiveness, ResponsivenessEvent, ResponsivenessEventKind, ResponsivenessEvidence,
+    ResponsivenessMeasurement, ResponsivenessReadOnlyInspection, ResponsivenessReport,
+    ResponsivenessStatus, DEFAULT_RESPONSIVENESS_BUDGET_MS, RESPONSIVENESS_EVENT_SCHEMA_VERSION,
+    RESPONSIVENESS_REPORT_SCHEMA_VERSION,
+};
 pub use runtime_frame_budget::{read_runtime_frame_budget, RuntimeFrameBudgetStatus};
 pub use score_cascade_feedback::{
     score_cascade_feedback_trace, ScoreCascadeFeedbackEvent, ScoreCascadeFeedbackTrace,

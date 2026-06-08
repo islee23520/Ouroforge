@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "ouroforge.responsiveness-fixture.v1",
+  "issue": 1821,
+  "generatedStatePolicy": "fixture-scoped only; generated responsiveness reports remain untracked outside fixtures",
+  "boundary": "mechanical fixed-step responsiveness evidence only; not a fun/quality verdict, not a new runtime, and not browser trusted authority",
+  "cases": [
+    {
+      "schemaVersion": "ouroforge.responsiveness-event.v1",
+      "scenarioId": "responsiveness-within-budget",
+      "fixedDeltaMs": 16,
+      "budgetMs": 100,
+      "generatedStatePolicy": "fixture-scoped only; generated responsiveness reports remain untracked outside fixtures",
+      "boundary": "browser/probe observations are read-only evidence inputs; Rust/local owns verification",
+      "events": [
+        { "eventId": "input-1", "kind": "input", "tick": 10, "inputId": "play-card" },
+        { "eventId": "feedback-1", "kind": "feedback", "tick": 15, "inputId": "play-card", "feedbackId": "juice-score-cascade" }
+      ],
+      "expectedStatus": "pass",
+      "expectedMaxLatencyMs": 80
+    },
+    {
+      "schemaVersion": "ouroforge.responsiveness-event.v1",
+      "scenarioId": "responsiveness-over-budget",
+      "fixedDeltaMs": 16,
+      "budgetMs": 100,
+      "generatedStatePolicy": "fixture-scoped only; generated responsiveness reports remain untracked outside fixtures",
+      "boundary": "browser/probe observations are read-only evidence inputs; Rust/local owns verification",
+      "events": [
+        { "eventId": "input-2", "kind": "input", "tick": 20, "inputId": "end-turn" },
+        { "eventId": "feedback-2", "kind": "feedback", "tick": 27, "inputId": "end-turn", "feedbackId": "juice-payoff-late" }
+      ],
+      "expectedStatus": "fail",
+      "expectedMaxLatencyMs": 112
+    }
+  ]
+}
