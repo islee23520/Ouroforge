@@ -1,0 +1,256 @@
+{
+  "schemaVersion": "1",
+  "id": "deckbuilder-ui-demo-scene-v1",
+  "bounds": {
+    "width": 96,
+    "height": 80
+  },
+  "entities": [],
+  "seed": 12345,
+  "metadata": {
+    "gameClass": "deck-roguelike",
+    "note": "Fixture-scoped deck-roguelike scene for the Deck-Roguelike Game Class v1 runtime contract (#1601). Deterministic, seed-reproducible single-encounter run.",
+    "issue": "1829",
+    "ui": "deckbuilder-ui-demo-v1"
+  },
+  "deckRoguelike": {
+    "schemaVersion": "ouroforge.deck-roguelike.v1",
+    "id": "deck-roguelike-trial-v1",
+    "seed": 12345,
+    "player": {
+      "maxHp": 30,
+      "energyPerTurn": 3,
+      "handSize": 5
+    },
+    "cards": {
+      "strike": {
+        "type": "attack",
+        "cost": 1,
+        "damage": 6
+      },
+      "bash": {
+        "type": "attack",
+        "cost": 2,
+        "damage": 10
+      },
+      "defend": {
+        "type": "skill",
+        "cost": 1,
+        "block": 5
+      }
+    },
+    "deck": [
+      "strike",
+      "strike",
+      "strike",
+      "strike",
+      "strike",
+      "bash",
+      "bash",
+      "defend",
+      "defend",
+      "defend"
+    ],
+    "relics": [
+      "vigor-charm"
+    ],
+    "relicVocabulary": {
+      "vigor-charm": {
+        "trigger": "run-start",
+        "effect": {
+          "block": 3
+        }
+      }
+    },
+    "enemy": {
+      "id": "slime",
+      "maxHp": 20,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 8
+        },
+        {
+          "type": "attack",
+          "value": 5
+        }
+      ]
+    }
+  },
+  "deckbuilderUi": {
+    "schemaVersion": "ouroforge.deckbuilder-ui.v1",
+    "id": "deckbuilder-ui-v1",
+    "title": "Card / Hand / Pipeline UI",
+    "pipelineSlots": [
+      {
+        "id": "intent",
+        "label": "Intent",
+        "purpose": "draft the next card intent"
+      },
+      {
+        "id": "modifier",
+        "label": "Modifier",
+        "purpose": "draft optional support or block"
+      },
+      {
+        "id": "commit",
+        "label": "Commit",
+        "purpose": "proposal handoff to trusted review/apply path"
+      }
+    ],
+    "shop": {
+      "id": "act1-shop",
+      "title": "Act I Shop",
+      "currency": "gold",
+      "balance": 45,
+      "refreshSeed": "shop-seed-12345",
+      "offers": [
+        {
+          "id": "offer-strike-plus",
+          "label": "Strike+",
+          "kind": "card",
+          "price": 35,
+          "available": true
+        },
+        {
+          "id": "offer-vigor-charm",
+          "label": "Vigor Charm",
+          "kind": "relic",
+          "price": 75,
+          "available": false,
+          "unavailableReason": "insufficient gold"
+        }
+      ]
+    },
+    "runMap": {
+      "id": "act1-run-map",
+      "title": "Act I Route",
+      "currentNodeId": "start",
+      "knownUpcomingNodeIds": [
+        "shop",
+        "elite"
+      ],
+      "nodes": [
+        {
+          "id": "start",
+          "label": "Start",
+          "kind": "start",
+          "status": "completed"
+        },
+        {
+          "id": "shop",
+          "label": "Shop",
+          "kind": "shop",
+          "status": "available"
+        },
+        {
+          "id": "elite",
+          "label": "Elite",
+          "kind": "combat",
+          "status": "blocked",
+          "blockedReason": "requires a completed encounter"
+        },
+        {
+          "id": "boss",
+          "label": "Boss",
+          "kind": "boss",
+          "status": "unknown",
+          "known": false
+        }
+      ],
+      "edges": [
+        {
+          "from": "start",
+          "to": "shop"
+        },
+        {
+          "from": "start",
+          "to": "elite",
+          "blocked": true,
+          "reason": "elite path locked in fixture"
+        },
+        {
+          "from": "shop",
+          "to": "boss"
+        }
+      ]
+    },
+    "scoreDisplay": {
+      "id": "score-display-v1",
+      "title": "Score Cascade",
+      "source": "rust-score-cascade-feedback",
+      "sourceSchemaVersion": "ouroforge.score-cascade-feedback.v1",
+      "finalScore": 24,
+      "authoritativeScore": 24,
+      "events": [
+        {
+          "eventId": "cascade-0001",
+          "stepIndex": 0,
+          "cardId": "spark",
+          "phase": "base",
+          "operation": "base-score",
+          "before": 0,
+          "addScore": 5,
+          "multiplyScore": 1,
+          "after": 5,
+          "cumulativeTotal": 0,
+          "readOnlyEvidence": true
+        },
+        {
+          "eventId": "cascade-0002",
+          "stepIndex": 1,
+          "cardId": "spark",
+          "phase": "modifier",
+          "modifierId": "plus-two",
+          "operation": "add-then-multiply",
+          "before": 5,
+          "addScore": 2,
+          "multiplyScore": 1,
+          "after": 7,
+          "cumulativeTotal": 0,
+          "readOnlyEvidence": true
+        },
+        {
+          "eventId": "cascade-0003",
+          "stepIndex": 2,
+          "cardId": "spark",
+          "phase": "modifier",
+          "modifierId": "double",
+          "operation": "add-then-multiply",
+          "before": 7,
+          "addScore": 0,
+          "multiplyScore": 2,
+          "after": 14,
+          "cumulativeTotal": 0,
+          "readOnlyEvidence": true
+        },
+        {
+          "eventId": "cascade-0004",
+          "stepIndex": 3,
+          "cardId": "spark",
+          "phase": "card-total",
+          "operation": "cumulative-total",
+          "before": 0,
+          "addScore": 14,
+          "multiplyScore": 1,
+          "after": 14,
+          "cumulativeTotal": 14,
+          "readOnlyEvidence": true
+        },
+        {
+          "eventId": "cascade-0005",
+          "stepIndex": 4,
+          "phase": "cascade-complete",
+          "operation": "authoritative-score-match",
+          "before": 24,
+          "addScore": 0,
+          "multiplyScore": 1,
+          "after": 24,
+          "cumulativeTotal": 24,
+          "tooltip": "Authoritative Rust/local score 24 matched by cascade feedback",
+          "readOnlyEvidence": true
+        }
+      ]
+    }
+  }
+}

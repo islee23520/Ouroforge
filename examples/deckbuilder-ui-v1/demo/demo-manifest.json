@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "ouroforge.deckbuilder-ui-demo.v1",
+  "issue": 1829,
+  "title": "Deckbuilder UI Demo v1",
+  "sceneRef": "examples/deckbuilder-ui-v1/demo/deckbuilder-ui-demo-scene-v1.json",
+  "runtimeSurface": "examples/game-runtime/runtime.js",
+  "probeGlobal": "window.__OUROFORGE__",
+  "expected": {
+    "schemaVersion": "ouroforge.deckbuilder-ui-state.v1",
+    "handCardIds": ["strike", "strike", "bash", "defend", "defend"],
+    "pipelineSlotIds": ["intent", "modifier", "commit"],
+    "shopOfferIds": ["offer-strike-plus", "offer-vigor-charm"],
+    "runMapNodeIds": ["start", "shop", "elite", "boss"],
+    "scoreDisplayId": "score-display-v1",
+    "scorePhases": ["base", "modifier", "modifier", "card-total", "cascade-complete"],
+    "formattedFinalScore": "24",
+    "draftOnlyActions": ["deckbuilderUiSelectCard", "deckbuilderUiQueueSelected", "deckbuilderUiSelectShopOffer", "deckbuilderUiPlanRunMapNode"]
+  },
+  "determinism": {
+    "network": "disabled",
+    "liveBrowser": "not required",
+    "seed": 12345,
+    "generatedStatePolicy": "fixture-scoped only; generated runs/artifacts remain untracked unless explicitly fixture-scoped"
+  },
+  "governance": {
+    "browserStudioMode": "read-only/draft-only deckbuilder UI inspection",
+    "trustedWriteBoundary": "trusted writes route through the existing Rust/local review/apply/trust-gradient path",
+    "claims": "mechanical UI/probe demo only; no production-ready, fun, quality, shippable, or Godot replacement/parity claim",
+    "anchors": "#1 and #23 remain open"
+  }
+}
