@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "campaign-scale-sampler-v1",
+  "title": "Campaign-scale sampler: puzzles and a deck run",
+  "description": "A small campaign brief that produces a set of proposals across both supported genres: several grid-puzzle levels and several deck-roguelike encounters drawn from a shared card and relic pool.",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-sokoban-01",
+      "title": "Campaign sokoban 01",
+      "description": "A tiny block-pushing puzzle: the player pushes one crate onto a single target in a small walled room.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "campaign-sokoban-01",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-sokoban-02",
+      "title": "Campaign sokoban 02",
+      "description": "A second tiny puzzle with the crate on the opposite side, exercising the same one-crate-one-target shape.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "campaign-sokoban-02",
+      "rows": [
+        "######",
+        "#.P*.#",
+        "#...@#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["right", "down"]
+    }
+  ],
+  "deckRoguelikes": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-deck-01",
+      "title": "Campaign deck encounter 01",
+      "description": "A single seeded deck-roguelike encounter against a slime, using a small attack/skill pool and a run-start block relic.",
+      "gameClass": "deck-roguelike",
+      "runId": "campaign-deck-01",
+      "seed": 12345,
+      "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+      "cards": {
+        "strike": { "type": "attack", "cost": 1, "damage": 6 },
+        "bash": { "type": "attack", "cost": 2, "damage": 10 },
+        "defend": { "type": "skill", "cost": 1, "block": 5 }
+      },
+      "deck": ["strike", "strike", "strike", "strike", "strike", "bash", "bash", "defend", "defend", "defend"],
+      "relics": ["vigor-charm"],
+      "relicVocabulary": {
+        "vigor-charm": { "trigger": "run-start", "effect": { "block": 3 } }
+      },
+      "enemy": {
+        "id": "slime",
+        "maxHp": 20,
+        "intents": [
+          { "type": "attack", "value": 8 },
+          { "type": "attack", "value": 5 }
+        ]
+      }
+    },
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-deck-02",
+      "title": "Campaign deck encounter 02",
+      "description": "A second seeded encounter against a tougher enemy, reusing the shared card pool without any relic.",
+      "gameClass": "deck-roguelike",
+      "runId": "campaign-deck-02",
+      "seed": 67890,
+      "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+      "cards": {
+        "strike": { "type": "attack", "cost": 1, "damage": 6 },
+        "bash": { "type": "attack", "cost": 2, "damage": 10 },
+        "defend": { "type": "skill", "cost": 1, "block": 5 }
+      },
+      "deck": ["strike", "strike", "strike", "strike", "bash", "bash", "bash", "defend", "defend", "defend"],
+      "enemy": {
+        "id": "brute",
+        "maxHp": 28,
+        "intents": [
+          { "type": "attack", "value": 10 },
+          { "type": "attack", "value": 7 }
+        ]
+      }
+    }
+  ]
+}

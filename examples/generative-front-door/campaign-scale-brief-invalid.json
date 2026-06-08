@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "ouroforge.campaign-scale.v1",
+  "campaignId": "campaign-scale-malformed-v1",
+  "title": "Campaign-scale malformed sampler",
+  "description": "A campaign brief whose deck-roguelike item references a card that is not declared in its card vocabulary; the whole campaign must fail closed (no per-game escape hatch).",
+  "gridPuzzles": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-sokoban-ok",
+      "title": "Campaign sokoban ok",
+      "description": "A well-formed grid-puzzle item; the campaign still fails because a sibling deck item is malformed.",
+      "gameClass": "grid-puzzle",
+      "puzzleId": "campaign-sokoban-ok",
+      "rows": [
+        "######",
+        "#@...#",
+        "#.*P.#",
+        "#....#",
+        "######"
+      ],
+      "intendedSolution": ["left", "down", "left", "up"]
+    }
+  ],
+  "deckRoguelikes": [
+    {
+      "schemaVersion": "ouroforge.generative-intake.v1",
+      "briefId": "brief-campaign-deck-bad",
+      "title": "Campaign deck encounter (malformed)",
+      "description": "A deck-roguelike item whose deck references an undeclared card id.",
+      "gameClass": "deck-roguelike",
+      "runId": "campaign-deck-bad",
+      "seed": 12345,
+      "player": { "maxHp": 30, "energyPerTurn": 3, "handSize": 5 },
+      "cards": {
+        "strike": { "type": "attack", "cost": 1, "damage": 6 }
+      },
+      "deck": ["strike", "nonexistent"],
+      "enemy": {
+        "id": "slime",
+        "maxHp": 20,
+        "intents": [
+          { "type": "attack", "value": 8 }
+        ]
+      }
+    }
+  ]
+}

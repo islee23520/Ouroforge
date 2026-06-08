@@ -15,6 +15,16 @@
 //! grid-puzzle artifact shape mirrors the Grid-Puzzle Game Class v1 (#1574)
 //! fixture; this module does not re-implement the runtime/solver, it only
 //! validates that the assembled artifact is well-formed before proposing it.
+//!
+//! Campaign-Scale Generation v1 (#1649) extends this same front door to a second
+//! genre — the deck-roguelike class ([`DeckRoguelikeBrief`] /
+//! [`intake_deck_roguelike_brief`]) whose artifact shape mirrors the
+//! Deck-Roguelike Game Class v1 (#1601) fixture. Both genres reuse the same
+//! proposal-only model and provenance here; the campaign-scale set wrapper that
+//! produces many such proposals lives in
+//! [`crate::content_scale_generation`]. Adding the second genre does not relax
+//! any boundary: deck-roguelike proposals are likewise unverified, pending, and
+//! never promoted by this module.
 
 use crate::export_hash::sha256_hex;
 use crate::MutationProposal;
@@ -32,6 +42,12 @@ pub const GRID_PUZZLE_GAME_CLASS: &str = "grid-puzzle";
 /// The grid-puzzle artifact schema version, matching the Grid-Puzzle Game Class
 /// v1 fixture (#1574).
 pub const GRID_PUZZLE_SCHEMA_VERSION: &str = "ouroforge.grid-puzzle.v1";
+/// The deck-roguelike game class supported by the campaign-scale extension
+/// (#1649).
+pub const DECK_ROGUELIKE_GAME_CLASS: &str = "deck-roguelike";
+/// The deck-roguelike artifact schema version, matching the Deck-Roguelike Game
+/// Class v1 fixture (#1601).
+pub const DECK_ROGUELIKE_SCHEMA_VERSION: &str = "ouroforge.deck-roguelike.v1";
 
 /// The intake source recorded in provenance (the proposal originated from a
 /// brief routed through the generative front door).
@@ -196,9 +212,10 @@ impl GenerationProvenance {
                 "generation provenance generator must be \"{GENERATIVE_INTAKE_GENERATOR}\""
             ));
         }
-        if self.game_class != GRID_PUZZLE_GAME_CLASS {
+        if self.game_class != GRID_PUZZLE_GAME_CLASS && self.game_class != DECK_ROGUELIKE_GAME_CLASS
+        {
             return Err(anyhow!(
-                "generation provenance gameClass must be \"{GRID_PUZZLE_GAME_CLASS}\""
+                "generation provenance gameClass must be \"{GRID_PUZZLE_GAME_CLASS}\" or \"{DECK_ROGUELIKE_GAME_CLASS}\""
             ));
         }
         if self.source != GENERATIVE_INTAKE_SOURCE {
@@ -398,6 +415,312 @@ pub fn intake_brief(brief: &GenerativeBrief, now_unix_ms: u128) -> Result<Genera
         brief_digest,
         generator: GENERATIVE_INTAKE_GENERATOR.to_string(),
         game_class: GRID_PUZZLE_GAME_CLASS.to_string(),
+        source: GENERATIVE_INTAKE_SOURCE.to_string(),
+        proposal_only: true,
+    };
+
+    let generative = GenerativeProposal {
+        proposal,
+        provenance,
+    };
+    generative.validate()?;
+    Ok(generative)
+}
+
+// --- Deck-roguelike genre (Campaign-Scale Generation v1, #1649) ---------------
+
+/// A structured authoring brief for the deck-roguelike genre: the front-door
+/// intake for a single deck-roguelike encounter. The `description` is the
+/// natural-language statement of intent (preserved verbatim for provenance); the
+/// remaining fields are the author's deck/relic/enemy sketch. The brief mirrors
+/// the Deck-Roguelike Game Class v1 (#1601) artifact so the author sketches the
+/// run directly; structural acceptance is enforced on the assembled artifact.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DeckRoguelikeBrief {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "briefId")]
+    pub brief_id: String,
+    pub title: String,
+    /// Natural-language description of the desired encounter. Preserved verbatim
+    /// as the provenance source; never executed.
+    pub description: String,
+    #[serde(rename = "gameClass")]
+    pub game_class: String,
+    /// The id recorded on the assembled deck-roguelike artifact.
+    #[serde(rename = "runId")]
+    pub run_id: String,
+    /// Seed for the runtime's seeded stochastic layer (#1600). Recorded on the
+    /// artifact; this module never executes the run.
+    pub seed: u64,
+    /// Player configuration: `{ maxHp, energyPerTurn, handSize }`.
+    pub player: Value,
+    /// Card vocabulary keyed by card id.
+    pub cards: Value,
+    /// The draw pile as a list of declared card ids.
+    pub deck: Vec<String>,
+    /// Optional list of relics the run starts with (each must be declared in
+    /// `relicVocabulary`).
+    #[serde(default)]
+    pub relics: Vec<String>,
+    /// Optional relic vocabulary keyed by relic id.
+    #[serde(rename = "relicVocabulary", default)]
+    pub relic_vocabulary: Value,
+    /// Enemy configuration: `{ maxHp, intents: [...] }`.
+    pub enemy: Value,
+}
+
+impl DeckRoguelikeBrief {
+    /// Parse a brief from JSON, failing closed on malformed JSON.
+    pub fn from_json_str(text: &str) -> Result<Self> {
+        let brief: DeckRoguelikeBrief = serde_json::from_str(text)
+            .map_err(|err| anyhow!("deck-roguelike brief is not valid JSON: {err}"))?;
+        Ok(brief)
+    }
+
+    /// Validate the brief's envelope, failing closed on any problem. Deep
+    /// structural acceptance is enforced on the assembled artifact (see
+    /// [`intake_deck_roguelike_brief`]).
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GENERATIVE_INTAKE_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "deck-roguelike brief schemaVersion must be \"{GENERATIVE_INTAKE_SCHEMA_VERSION}\""
+            ));
+        }
+        crate::require_text("deck-roguelike brief briefId", &self.brief_id)?;
+        crate::require_text("deck-roguelike brief title", &self.title)?;
+        crate::require_text("deck-roguelike brief description", &self.description)?;
+        crate::require_text("deck-roguelike brief runId", &self.run_id)?;
+        if self.game_class != DECK_ROGUELIKE_GAME_CLASS {
+            return Err(anyhow!(
+                "deck-roguelike brief gameClass \"{}\" is unsupported; expected \"{DECK_ROGUELIKE_GAME_CLASS}\"",
+                self.game_class
+            ));
+        }
+        if self.deck.is_empty() {
+            return Err(anyhow!(
+                "deck-roguelike brief deck must be a non-empty array of card ids"
+            ));
+        }
+        Ok(())
+    }
+
+    /// Deterministic digest over the canonical serialization of the brief.
+    pub fn digest(&self) -> Result<String> {
+        let canonical = serde_json::to_vec(self)
+            .map_err(|err| anyhow!("failed to serialize deck-roguelike brief: {err}"))?;
+        Ok(sha256_hex(&canonical))
+    }
+}
+
+/// Assemble the canonical deck-roguelike artifact from the author's brief
+/// sketch. Mirrors the Deck-Roguelike Game Class v1 (#1601) `deckRoguelike`
+/// block; this module does not execute or balance the run.
+fn assemble_deck_roguelike_artifact(brief: &DeckRoguelikeBrief) -> Value {
+    let mut artifact = Map::new();
+    artifact.insert(
+        "schemaVersion".to_string(),
+        json!(DECK_ROGUELIKE_SCHEMA_VERSION),
+    );
+    artifact.insert("id".to_string(), json!(brief.run_id));
+    artifact.insert("seed".to_string(), json!(brief.seed));
+    artifact.insert("player".to_string(), brief.player.clone());
+    artifact.insert("cards".to_string(), brief.cards.clone());
+    artifact.insert("deck".to_string(), json!(brief.deck));
+    if !brief.relics.is_empty() {
+        artifact.insert("relics".to_string(), json!(brief.relics));
+    }
+    if !brief.relic_vocabulary.is_null() {
+        artifact.insert(
+            "relicVocabulary".to_string(),
+            brief.relic_vocabulary.clone(),
+        );
+    }
+    artifact.insert("enemy".to_string(), brief.enemy.clone());
+    Value::Object(artifact)
+}
+
+/// Trusted structural validator for an assembled deck-roguelike artifact. A
+/// fail-closed well-formedness check over the artifact shape; it is not the
+/// engine room and it does not re-implement the runtime. It mirrors the
+/// structural acceptance rules of the Deck-Roguelike Game Class v1 contract
+/// (#1601): a card vocabulary with valid types, a deck that references only
+/// declared cards, relics that reference only the declared vocabulary, and an
+/// enemy with at least one intent.
+fn validate_deck_roguelike_artifact(artifact: &Value) -> Result<()> {
+    if artifact["schemaVersion"] != DECK_ROGUELIKE_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "deck-roguelike artifact schemaVersion must be \"{DECK_ROGUELIKE_SCHEMA_VERSION}\""
+        ));
+    }
+    let player = artifact["player"]
+        .as_object()
+        .ok_or_else(|| anyhow!("deck-roguelike artifact player must be an object"))?;
+    for field in ["maxHp", "energyPerTurn", "handSize"] {
+        if player
+            .get(field)
+            .and_then(Value::as_u64)
+            .filter(|v| *v > 0)
+            .is_none()
+        {
+            return Err(anyhow!(
+                "deck-roguelike artifact player.{field} must be a positive integer"
+            ));
+        }
+    }
+
+    let cards = artifact["cards"]
+        .as_object()
+        .filter(|c| !c.is_empty())
+        .ok_or_else(|| anyhow!("deck-roguelike artifact cards must be a non-empty object"))?;
+    for (id, def) in cards {
+        let kind = def["type"]
+            .as_str()
+            .filter(|t| *t == "attack" || *t == "skill")
+            .ok_or_else(|| anyhow!("deck-roguelike artifact card \"{id}\" has unknown type"))?;
+        if def.get("cost").and_then(Value::as_u64).is_none() {
+            return Err(anyhow!(
+                "deck-roguelike artifact card \"{id}\" cost must be a non-negative integer"
+            ));
+        }
+        if kind == "attack" && def.get("damage").and_then(Value::as_u64).is_none() {
+            return Err(anyhow!(
+                "deck-roguelike artifact attack card \"{id}\" must declare damage"
+            ));
+        }
+        if kind == "skill" && def.get("block").and_then(Value::as_u64).is_none() {
+            return Err(anyhow!(
+                "deck-roguelike artifact skill card \"{id}\" must declare block"
+            ));
+        }
+    }
+
+    let deck = artifact["deck"]
+        .as_array()
+        .filter(|d| !d.is_empty())
+        .ok_or_else(|| {
+            anyhow!("deck-roguelike artifact deck must be a non-empty array of card ids")
+        })?;
+    for card_id in deck {
+        let card_id = card_id
+            .as_str()
+            .ok_or_else(|| anyhow!("deck-roguelike artifact deck card id must be a string"))?;
+        if !cards.contains_key(card_id) {
+            return Err(anyhow!(
+                "deck-roguelike artifact deck references undeclared card \"{card_id}\""
+            ));
+        }
+    }
+
+    let empty_vocab = Map::new();
+    let relic_vocab = match artifact.get("relicVocabulary") {
+        Some(Value::Object(map)) => map,
+        Some(Value::Null) | None => &empty_vocab,
+        Some(_) => {
+            return Err(anyhow!(
+                "deck-roguelike artifact relicVocabulary must be an object"
+            ))
+        }
+    };
+    for (id, def) in relic_vocab {
+        def["trigger"]
+            .as_str()
+            .filter(|t| *t == "run-start" || *t == "turn-start")
+            .ok_or_else(|| {
+                anyhow!("deck-roguelike artifact relic \"{id}\" must declare a valid trigger")
+            })?;
+    }
+    if let Some(relics) = artifact.get("relics") {
+        let relics = relics
+            .as_array()
+            .ok_or_else(|| anyhow!("deck-roguelike artifact relics must be an array"))?;
+        for relic_id in relics {
+            let relic_id = relic_id
+                .as_str()
+                .ok_or_else(|| anyhow!("deck-roguelike artifact relic id must be a string"))?;
+            if !relic_vocab.contains_key(relic_id) {
+                return Err(anyhow!(
+                    "deck-roguelike artifact relics references undeclared relic \"{relic_id}\""
+                ));
+            }
+        }
+    }
+
+    let enemy = artifact["enemy"]
+        .as_object()
+        .ok_or_else(|| anyhow!("deck-roguelike artifact enemy must be an object"))?;
+    if enemy
+        .get("maxHp")
+        .and_then(Value::as_u64)
+        .filter(|v| *v > 0)
+        .is_none()
+    {
+        return Err(anyhow!(
+            "deck-roguelike artifact enemy.maxHp must be a positive integer"
+        ));
+    }
+    let intents = enemy
+        .get("intents")
+        .and_then(Value::as_array)
+        .filter(|i| !i.is_empty())
+        .ok_or_else(|| {
+            anyhow!("deck-roguelike artifact enemy.intents must be a non-empty array")
+        })?;
+    for intent in intents {
+        if intent.get("type").and_then(Value::as_str).is_none() {
+            return Err(anyhow!(
+                "deck-roguelike artifact enemy intent must declare a string type"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Front-door intake for the deck-roguelike genre: turn a brief into a validated
+/// deck-roguelike proposal with generation provenance. Fails closed on a
+/// malformed brief or a malformed assembled artifact. Like [`intake_brief`],
+/// `now_unix_ms` is supplied by the caller, and this function never reads the
+/// clock, the filesystem, the network, or performs any trusted write. The result
+/// is a proposal only: unverified, pending, never promoted.
+pub fn intake_deck_roguelike_brief(
+    brief: &DeckRoguelikeBrief,
+    now_unix_ms: u128,
+) -> Result<GenerativeProposal> {
+    brief.validate()?;
+
+    let artifact = assemble_deck_roguelike_artifact(brief);
+    validate_deck_roguelike_artifact(&artifact)?;
+    let artifact_json = serde_json::to_string(&artifact)
+        .map_err(|err| anyhow!("failed to serialize deck-roguelike artifact: {err}"))?;
+
+    let brief_digest = brief.digest()?;
+    let evidence_id = format!("generative-intake/{}", brief.brief_id);
+
+    let proposal = MutationProposal {
+        id: format!("generative-{}", brief.run_id),
+        reason: format!(
+            "Generated deck-roguelike proposal from brief: {}",
+            brief.title
+        ),
+        evidence_id: evidence_id.clone(),
+        target: DECK_ROGUELIKE_GAME_CLASS.to_string(),
+        path: format!("deck-roguelike/{}.json", brief.run_id),
+        from: GENERATIVE_FROM_NONE.to_string(),
+        to: artifact_json,
+        confidence: "unverified".to_string(),
+        status: "proposed".to_string(),
+        verdict_status: "pending".to_string(),
+        created_at_unix_ms: now_unix_ms,
+        rationale: None,
+    };
+
+    let provenance = GenerationProvenance {
+        schema_version: GENERATIVE_INTAKE_SCHEMA_VERSION.to_string(),
+        brief_id: brief.brief_id.clone(),
+        brief_digest,
+        generator: GENERATIVE_INTAKE_GENERATOR.to_string(),
+        game_class: DECK_ROGUELIKE_GAME_CLASS.to_string(),
         source: GENERATIVE_INTAKE_SOURCE.to_string(),
         proposal_only: true,
     };
