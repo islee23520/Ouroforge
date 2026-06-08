@@ -2568,6 +2568,45 @@ The recommended next milestone is not expanded by this completion; later Era J w
   deferred and unchanged until Milestone 26 re-evaluation. #1 and #23 remain
   open.
 
+
+### Era K Production Orchestration Executor governance refresh
+
+Era K — Production Orchestration Executor (Studio Layer) — is recorded as
+**complete on merged evidence** for Milestones 62–66. The completed evidence
+chain is the M62 design gate and two-plane CLI contract (#1933 / PR #1957), the
+M63 executor skeleton/scheduler/CLI-drive/golden-parity demo/Scenario Coverage
+v55 chain (#1934–#1938 / PR #1958, #1959, #1960, #1962, #1967), the M64
+supervision/budget/retry/recovery/demo/Scenario Coverage v56 chain (#1939–#1944
+/ PR #1968, #1970, #1972, #1974, #1976, #1978), the M65
+concurrency/backpressure/read-only telemetry/load-demo/Scenario Coverage v57
+chain (#1945–#1949 / PR #1979, #1980, #1981, #1982, #1983), and the M66
+Scenario Coverage v58 autonomy regression (#1950 / PR #1984) plus this #1951
+governance refresh.
+
+The autonomy assessment is recorded in
+[`docs/executor-autonomy-assessment-v1.md`](executor-autonomy-assessment-v1.md).
+It measures a bounded local concept-to-release-candidate envelope: 9 of 12
+operational control-plane step families are executor-driven after approved
+inputs, while humans remain responsible for intent, taste, legal/release
+go/no-go, mandatory gates, and review of blocked or ambiguous states. This is a
+descriptive local-control-plane measurement, not a production-readiness,
+quality/fun/legal, hosted-ops, or release claim.
+
+The two-plane invariant is reaffirmed. Elixir/OTP owns only the Studio executor
+control plane — scheduling, supervision, budget checks, retry/backoff,
+backpressure, and read-only telemetry. The Rust kernel remains the data plane and
+continues to own artifact semantics, schemas, ledgers, evidence, verdicts,
+review/apply/trust-gradient acceptance, and release truth. The executor reaches
+the kernel only through the frozen `ouroforge` CLI surface, never writes
+artifacts/ledgers/evidence directly, never owns artifact truth, never
+self-certifies, and never releases. The manual Rust-CLI loop remains a tested,
+first-class local fallback.
+
+Distributed/multi-machine orchestration, hosted/cloud execution,
+servers/databases, and live-ops remain Layer-3 DEFER under ADR #92 / Milestone
+45 / #1508. Era K completion does not change those boundaries. #1 and #23 remain
+open governance anchors.
+
 ## Active anchors
 
 - #1 remains the broad vision and implementation-roadmap anchor until a separate
