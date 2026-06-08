@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.content-curation-gate.v1",
+  "campaignId": "curation-low-novelty-v1",
+  "levelsTotal": 4,
+  "levelsSolvable": 4,
+  "balanced": true,
+  "lowNovelty": true,
+  "curvePassed": true,
+  "curveFindingCount": 0,
+  "evidence": { "solver": ["evidence/solver.json"], "balance": ["evidence/balance.json"], "novelty": ["evidence/novelty.json"], "curve": ["evidence/curve.json"] }
+}

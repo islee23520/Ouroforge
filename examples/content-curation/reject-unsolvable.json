@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.content-curation-gate.v1",
+  "campaignId": "curation-unsolvable-v1",
+  "levelsTotal": 4,
+  "levelsSolvable": 3,
+  "balanced": true,
+  "lowNovelty": false,
+  "curvePassed": true,
+  "curveFindingCount": 0,
+  "evidence": { "solver": ["evidence/solver.json"], "balance": ["evidence/balance.json"], "novelty": ["evidence/novelty.json"], "curve": ["evidence/curve.json"] }
+}

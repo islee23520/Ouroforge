@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.content-curation-gate.WRONG",
+  "campaignId": "curation-malformed-v1",
+  "levelsTotal": 4,
+  "levelsSolvable": 4,
+  "balanced": true,
+  "lowNovelty": false,
+  "curvePassed": true,
+  "curveFindingCount": 0,
+  "evidence": { "solver": ["evidence/solver.json"], "balance": ["evidence/balance.json"], "novelty": ["evidence/novelty.json"], "curve": ["evidence/curve.json"] }
+}

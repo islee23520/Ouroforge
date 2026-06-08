@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "ouroforge.content-curation-gate.v1",
+  "campaignId": "curation-curve-spike-v1",
+  "levelsTotal": 4,
+  "levelsSolvable": 4,
+  "balanced": true,
+  "lowNovelty": false,
+  "curvePassed": false,
+  "curveFindingCount": 2,
+  "evidence": { "solver": ["evidence/solver.json"], "balance": ["evidence/balance.json"], "novelty": ["evidence/novelty.json"], "curve": ["evidence/curve.json"] }
+}
