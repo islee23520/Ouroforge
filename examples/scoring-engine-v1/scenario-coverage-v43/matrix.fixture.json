@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "scenario-coverage-v43",
+  "issue": 1803,
+  "fixtureScoped": true,
+  "boundary": "Rust/local owns scoring-engine regression coverage. Browser/Studio surfaces are read-only inspection only. Coverage uses state/shape assertions only; no timing, no network, no live browser, trusted writes, auto-apply, auto-merge, self-approval, automated fun score, quality verdict, production-ready claim, or Godot replacement/parity claim. Generated runs/artifacts remain untracked unless fixture-scoped. #1 and #23 remain open governance anchors.",
+  "scenarios": [
+    {
+      "id": "v43-modifier-readable-effect-model",
+      "system": "modifier-model",
+      "kind": "readable-effect-shape",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/scoring-engine-v1/modifier-effects.valid.json",
+      "expect": "readable one-line additive and multiplicative modifier effects validate and preserve score 16"
+    },
+    {
+      "id": "v43-modifier-malformed-effect-fail-closed",
+      "system": "modifier-model",
+      "kind": "negative-shape",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/scoring-engine-v1/modifier-effects.malformed.json",
+      "expect": "opaque or multi-line effect text fails closed before state resolution"
+    },
+    {
+      "id": "v43-resolution-deterministic-parity",
+      "system": "resolution",
+      "kind": "same-config-determinism",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/scoring-engine-v1/resolution.parity.json",
+      "expect": "score resolution is digest-stable and matches substrate state score 16"
+    },
+    {
+      "id": "v43-resolution-explicit-order",
+      "system": "resolution",
+      "kind": "ordered-trace-shape",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/scoring-engine-v1/resolution.order.json",
+      "expect": "modifier order is stable by order then modifier id and produces score 30"
+    },
+    {
+      "id": "v43-composition-degenerate-combo",
+      "system": "composition",
+      "kind": "degenerate-combo-replay",
+      "fixtureRef": "examples/card-roguelite-substrate-v1/scoring-engine-v1/composition.degenerate.json",
+      "expect": "readable modifiers compose to final score 90 and a deterministic degenerate finding"
+    },
+    {
+      "id": "v43-composition-demo-replay",
+      "system": "demo",
+      "kind": "fixture-scoped-demo",
+      "fixtureRef": "examples/scoring-engine-v1/demo/demo.manifest.json",
+      "expect": "Scoring-Engine Demo v1 manifest documents local replay without network or live browser"
+    },
+    {
+      "id": "v43-backcompat-substrate-determinism-golden",
+      "system": "backcompat",
+      "kind": "substrate-golden",
+      "fixtureRef": "examples/scoring-engine-v1/scenario-coverage-v43/substrate-determinism.golden.json",
+      "expect": "classic substrate determinism digest remains golden-stable"
+    },
+    {
+      "id": "v43-generated-state-and-governance-audit",
+      "system": "governance",
+      "kind": "wording-audit",
+      "fixtureRef": "docs/scenario-coverage-v43.md",
+      "expect": "docs preserve generated-state boundaries, conservative wording, state/shape scope, and #1/#23 open anchors"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "scoring-engine-v43-substrate-backcompat-golden.v1",
+  "issue": 1803,
+  "fixtureScoped": true,
+  "configRef": "examples/card-roguelite-substrate-v1/fixtures/classic.valid.json",
+  "expectedConfigId": "deck-roguelike-classic",
+  "expectedVariant": "deck-roguelike-classic",
+  "expectedSeed": 12345,
+  "expectedScore": 61,
+  "expectedDeckPrefix": [
+    "strike",
+    "strike",
+    "bash",
+    "defend",
+    "defend"
+  ],
+  "expectedShopOfferCount": 3,
+  "expectedDigest": "a14b2e123a0a4657"
+}
