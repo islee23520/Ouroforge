@@ -1,0 +1,4 @@
+{
+  "case": "missing-human-gate",
+  "reason": "A producer budget policy without all mandatory human gates must fail closed before progress can continue."
+}
