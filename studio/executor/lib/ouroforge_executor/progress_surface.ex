@@ -188,7 +188,16 @@ defmodule OuroforgeExecutor.ProgressSurface do
       queued_ready_tasks:
         integer_or_zero(control_plane, [:queued_ready_tasks, "queuedReadyTasks"]),
       retry_attempts: integer_or_zero(control_plane, [:retry_attempts, "retryAttempts"]),
-      trusted_write_authority: false
+      trusted_write_authority: false,
+      budget_limited?:
+        Map.get(control_plane, :budget_limited?) == true or
+          Map.get(control_plane, "budgetLimited") == true or
+          Map.get(control_plane, "budget_limited?") == true,
+      stop_gate:
+        Map.get(control_plane, :stop_gate) || Map.get(control_plane, "stopGate") ||
+          Map.get(control_plane, "stop_gate"),
+      backpressure_depth:
+        integer_or_zero(control_plane, [:backpressure_depth, "backpressureDepth"])
     }
   end
 
