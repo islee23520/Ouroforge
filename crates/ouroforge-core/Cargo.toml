@@ -7,6 +7,7 @@ edition = "2021"
 ouroforge-evidence = { path = "../ouroforge-evidence" }
 ouroforge-evaluator = { path = "../ouroforge-evaluator" }
 ouroforge-ledger = { path = "../ouroforge-ledger" }
+ouroforge-core-types = { path = "../ouroforge-core-types" }
 ouroforge-gdd = { path = "../ouroforge-gdd" }
 ouroforge-source-apply = { path = "../ouroforge-source-apply" }
 anyhow = "1"

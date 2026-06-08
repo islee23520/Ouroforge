@@ -3,6 +3,7 @@ members = [
   "crates/ouroforge-ledger",
   "crates/ouroforge-evidence",
   "crates/ouroforge-evaluator",
+  "crates/ouroforge-core-types",
   "crates/ouroforge-gdd",
   "crates/ouroforge-source-apply",
   "crates/ouroforge-core",

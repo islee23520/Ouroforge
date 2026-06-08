@@ -289,11 +289,24 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "ouroforge-core-types",
  "ouroforge-evaluator",
  "ouroforge-evidence",
  "ouroforge-gdd",
  "ouroforge-ledger",
  "ouroforge-source-apply",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tungstenite",
+]
+
+[[package]]
+name = "ouroforge-core-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
  "serde",
  "serde_json",
  "serde_yaml",
