@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "producer-budget-gates-v1",
+  "policyId": "collect-and-exit-human-gate",
+  "orchestrationRef": "collect-and-exit-whole-game",
+  "budget": { "maxIterations": 5, "maxCostUnits": 100, "noProgressWindow": 2 },
+  "usage": { "iterationCount": 1, "costUnits": 30, "noProgressSteps": 0, "lastEvidenceRef": "evidence/producer-budget-gates-v1/iteration-1.json" },
+  "stopConditions": [
+    { "conditionId": "stop-budget", "reason": "budget-exhausted", "description": "halt when iteration or cost budget reaches the declared game-scale cap" },
+    { "conditionId": "stop-human", "reason": "human-approval-required", "description": "halt when any mandatory human approval gate remains pending" },
+    { "conditionId": "stop-no-progress", "reason": "no-progress", "description": "halt when the trailing no-progress window shows no useful movement" }
+  ],
+  "humanApprovalGates": [
+    { "gateId": "gate-vision", "gateKind": "vision", "status": "pending", "evidenceRef": "evidence/producer-budget-gates-v1/vision.pending.json", "approverRole": "human creative director" },
+    { "gateId": "gate-legal", "gateKind": "legal", "status": "approved", "evidenceRef": "evidence/producer-budget-gates-v1/legal.approved.json", "approverRole": "human legal reviewer" },
+    { "gateId": "gate-release", "gateKind": "release", "status": "approved", "evidenceRef": "evidence/producer-budget-gates-v1/release.approved.json", "approverRole": "human release owner" }
+  ],
+  "evidenceRefs": ["evidence/producer-budget-gates-v1/iteration-1.json", "evidence/producer-budget-gates-v1/vision.pending.json"],
+  "generatedStatePolicy": "Generated producer budget state, runs, assets, content, coverage, and local artifacts remain untracked unless explicitly fixture-scoped.",
+  "boundary": "Reuses evolve-campaign/fuzz budget and stop-condition shape; no new control engine; game-scale budgets are hard Rust/local evidence gates; human approval gates mandatory; proposal-only producer progress; browser/Studio read-only; no direct trusted writes; no auto-apply; no auto-merge; no self-approval; no reviewer bypass; no production-ready claim; no engine replacement claim."
+}
