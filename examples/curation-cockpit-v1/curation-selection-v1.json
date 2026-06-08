@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.curation-selection.v1",
+  "selectionId": "human-selection-spark-v1",
+  "candidateSetId": "curation-candidate-set-v1",
+  "selectedVariantId": "candidate-card-spark-v1",
+  "selectedProposalId": "generative-candidate-card-spark-run-v1",
+  "selectedPayloadDigest": "__COMPUTED_IN_TEST__",
+  "decision": "selected",
+  "humanActor": "human-curator-local",
+  "rationale": "Best fit for the engine-part deckbuilder theme; still only provenance until review/apply.",
+  "recordedAtUnixMs": 1786000001000,
+  "surfaceBoundary": "read-only-provenance",
+  "trustedWriteRequested": false,
+  "applyAuthority": false
+}

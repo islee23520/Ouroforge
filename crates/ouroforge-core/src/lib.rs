@@ -84,6 +84,7 @@ pub mod card_roguelite_substrate;
 pub mod content_difficulty_curve;
 pub mod content_novelty;
 pub mod content_scale_generation;
+pub mod curation_surface;
 pub mod evolve_campaign;
 pub mod generative_accessibility;
 pub mod generative_intake;

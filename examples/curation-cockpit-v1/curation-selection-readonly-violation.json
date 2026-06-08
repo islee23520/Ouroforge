@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "ouroforge.curation-selection.v1",
+  "selectionId": "human-selection-unsafe-v1",
+  "candidateSetId": "curation-candidate-set-v1",
+  "selectedVariantId": "candidate-card-spark-v1",
+  "selectedProposalId": "generative-candidate-card-spark-run-v1",
+  "selectedPayloadDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "decision": "selected",
+  "humanActor": "human-curator-local",
+  "rationale": "Unsafe fixture requests trusted write authority and must fail closed.",
+  "recordedAtUnixMs": 1786000001000,
+  "surfaceBoundary": "read-only-provenance",
+  "trustedWriteRequested": true,
+  "applyAuthority": true
+}
