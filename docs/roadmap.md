@@ -2724,6 +2724,28 @@ Boundaries reaffirmed: a patch re-verifies through the full gate set before re-p
 
 The recommended next milestone is not expanded by this completion; later Era I/J work requires separate scope issues with explicit non-goals, regression coverage, generated-state audits, and the same human fun/feel, release, Steam Ring-3, read-only/draft-only UI, proposal-only generation, and Layer-3 boundaries.
 
+### Era I closing governance refresh (Milestones 47-55 / Milestone 56)
+
+Era I is recorded as **complete for Milestones 47-55** under #1, on merged evidence, as a bounded genre-verticalization and local desktop-artifact milestone. Across the completed chain, Ouroforge produced an engine-builder deckbuilder variant as configuration over the card-roguelite substrate, not a parallel engine. The realized capability is descriptive and evidence-native: deterministic substrate state, readable scoring modifiers, bounded run/shop progression, mechanical balance verification, deterministic juice/feedback evidence, in-game deckbuilder UI/probe state, proposal-only localization, local Steam desktop export/package descriptor evidence, and the post-launch patch/save-migration loop.
+
+Merged evidence by milestone:
+
+- **M47 Card-Roguelite Substrate v1** (#1791-#1797): substrate-as-config, deck-roguelike golden parity, engine-builder config, deterministic demo, and Scenario Coverage v42.
+- **M48 Scoring Engine v1** (#1798-#1804): readable modifiers, deterministic multiplicative resolution, degenerate-composition surfacing, demo, and Scenario Coverage v43.
+- **M49 Run/Shop v1** (#1805-#1810): bounded ante/quota runs, deterministic shop economy levers, run-shop demo, Scenario Coverage v44, and governance refresh (#2110).
+- **M50 Balance Verification v1** (#1811-#1817): combo/dominance/fairness evidence, deterministic balance demo, and Scenario Coverage v45.
+- **M51 Game-Feel/Juice Toolkit v1** (#1818-#1824): deterministic feedback intents, score-cascade feedback, responsiveness evidence, demo, and Scenario Coverage v46.
+- **M52 Deckbuilder UI Kit v1** (#1825-#1831): card/hand/pipeline UI, shop/run-map UI, score display, demo, and Scenario Coverage v47.
+- **M53 Localization Pipeline v1** (#1832-#1836): stable string ids, proposal-only generated locale validation, localization demo, and Scenario Coverage v48.
+- **M54 Steam Desktop Export and Steamworks v1** (#1837-#1843): local Electron wrapper/build descriptor, mockable Steamworks wiring/fallback/leaderboard, proposal-only store assets, deterministic demo, Scenario Coverage v49, and governance refresh.
+- **M55 Post-Launch Patch, Re-Verify, and Save-Migration Loop v1** (#1844-#1849): patch re-verify/re-package gate, save migration/version compatibility, deterministic patch demo, Scenario Coverage v50, and governance refresh.
+
+Shippability assessment (descriptive, not release authority): Era I reached a **verified Steam-shippable desktop artifact shape** for the loop-produced deckbuilder line. The evidence demonstrates that the deckbuilder variant can be represented as substrate configuration, validated mechanically, surfaced in deterministic UI/probe state, localized through proposal-only catalogs, wrapped into a local desktop package descriptor, wired to mockable Steamworks/local evidence surfaces, and guarded by patch re-verify plus save migration coverage. This is not a public release, store submission, code-signing result, content-survey completion, market-demand signal, production-ready claim, fun/quality verdict, or Godot replacement/parity claim. Human/Ring-3 Steam steps and the human Era J fun/feel/release verdict remain outside Era I.
+
+Boundaries reaffirmed: the deckbuilder remains substrate-as-config; deterministic/seed-stable Rust/local validation owns trusted state, persistence, scoring/balance/export/provenance, save migration, evidence writing, run/project binding, review/apply/trust-gradient, and CLI behavior. JavaScript/browser/Studio/dashboard/cockpit/Electron/Steamworks surfaces remain deterministic read-only or proposal/draft-only surfaces for trusted state. Steam desktop export remains local and not Layer-3; hosted/cloud/mobile, real-player telemetry, live balancing, market demand, Steam account/signing/release, and public release authority remain human/Ring-3 or DEFER. Generated runs/artifacts/builds/migrated saves remain untracked unless fixture-scoped. **#1 and #23 remain open governance anchors** and are not closed, narrowed, or modified by Era I completion.
+
+The recommended next work is Era J human creative/release judgment and later scoped milestones only; no new capability is introduced by this governance refresh.
+
 **Era J Milestone 57 — Candidate Generation and Curation Cockpit v1 (creation as curation; proposal-only).** Era J records a bounded creation-as-curation chain for deckbuilder candidate proposals over the existing card-roguelite/deck-roguelike substrate, not a new engine, not browser/Studio trusted-write authority, and not an automated fun or release verdict:
 
 - **Era J Milestone 59 — Narrative and Theme-Arc Authoring Assist v1 (proposal-only; tone/soul human).** Era J records a bounded narrative/theme authoring assist chain over the existing Milestone 39 narrative system, Milestone 30 generative front door, and review/apply/trust-gradient path, not a new narrative engine, not browser/Studio trusted-write authority, and not an automated tone/soul/fun/quality verdict:

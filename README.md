@@ -223,11 +223,19 @@ Era F/G added genre/function evidence and specialized production gates. The #1 a
 per-era completion history and evidence chains live in
 [`docs/roadmap.md`](docs/roadmap.md) and the matching `docs/*.md` contracts.
 
-**Next.** Era I/J work continues only through bounded, issue-scoped genre and
-human-judgment milestones. Shipping/native-store export, hosted/cloud,
-real-player telemetry, live balancing, update/patch pipelines, and distributed
-Layer-3 behavior remain **DEFER** absent a separate #1508 Layer-3 GO; Rust-first /
-local-first is preserved absent that GO.
+**Current frontier.** Era I (Milestones 47-55) is complete on merged evidence as
+a bounded genre-verticalization and local desktop-artifact track: the
+engine-builder deckbuilder is configuration over the card-roguelite substrate,
+with deterministic scoring/run/shop/balance/juice/UI/localization, local Steam
+desktop package-descriptor evidence, and post-launch patch/save-migration
+coverage. This is a verified local artifact shape, not release authority, a
+fun/quality verdict, production readiness, or a Godot replacement claim.
+
+**Next.** Era J work continues only through bounded, issue-scoped human
+creative/release-judgment milestones. Shipping/native-store release actions,
+hosted/cloud, real-player telemetry, live balancing, update/patch pipelines, and
+distributed Layer-3 behavior remain **DEFER** absent a separate #1508 Layer-3 GO;
+Rust-first / local-first is preserved absent that GO.
 
 ## Contributor guide
 
