@@ -1965,6 +1965,141 @@ remain open governance anchors** and are not modified, closed, or narrowed by th
 refresh; Scenario Coverage numbering continues from v26 (Era E) onward through the
 Era F suite (v27–v33).
 
+### Era G (Milestones 36–40) governance refresh
+
+Era G (**Specialized Production Functions**, Milestones 36–40 under #1) is
+recorded as **complete on merged evidence** as a conservative, additive,
+local-first sequence. This is the Era G closing governance refresh (#1 Milestone
+41). It records what each milestone actually realized, assesses the sequence
+against #1's extended north-star, and reaffirms every Era G boundary. It marks
+**no** milestone complete ahead of merged evidence, adds no executable behavior,
+and does not close or narrow #1 or #23. The guiding principle is unchanged from
+Era F and extended to each studio function: **each missing studio function
+becomes a specialized, verified capability, never an unverified generator** —
+generation (assets, audio, content, systems) stays proposal-only through the
+existing review/apply/trust-gradient path, and every generated artifact must pass
+a function-specific verification gate (asset-QA, audio-QA, content-curation,
+systems contract, production-QA) before promotion. Every milestone below is
+recorded in its own per-milestone governance refresh above; this section
+consolidates them and does not supersede them.
+
+The merged per-milestone evidence chain is:
+
+- **Milestone 36 — Asset Generation and Asset-QA v1** (#1634–#1639): the loop's
+  verified visual-asset function (sprites, tilesets, UI art) — a generated asset
+  is a proposal carrying mandatory license/provenance, routed through the existing
+  review/apply/trust-gradient path and promotable only after a function-specific
+  asset-QA gate (style consistency, format/resolution validity, visual-regression
+  vs baseline, license/provenance completeness) passes ANDed into the evaluator
+  `declared-gate-and` aggregation, with validate-then-load import reusing the
+  existing asset manifest/atlas surfaces (PRs #1703/#1709/#1714/#1720/#1727/#1730;
+  Scenario Coverage v34).
+- **Milestone 37 — Audio Generation and Audio-QA v1** (#1641–#1646): the same
+  verified-asset pattern extended to audio (SFX, music, adaptive audio) — a
+  generated audio asset is a proposal carrying mandatory license/provenance,
+  promotable only after an audio-QA gate (format/loudness validity,
+  license/provenance completeness, regression vs baseline) passes under
+  `declared-gate-and`, with deterministic adaptive-audio runtime hooks reusing the
+  existing runtime audio-intent surface (PRs #1705/#1713/#1719/#1729/#1734/#1737;
+  Scenario Coverage v35).
+- **Milestone 38 — Content-at-Scale Generation and Curation v1** (#1648–#1654):
+  generation scaled from single levels to campaign scale across the grid-puzzle
+  and deck-roguelike genres with **mandatory curation** — campaign-scale
+  proposal-only generation, descriptive dedup/novelty metrics, whole-game
+  difficulty-curve verification, and a content-curation gate ANDed into the
+  four-gate aggregation that admits a campaign only when it is
+  solvable/balanced/novel/curve-verified, reusing the M30 front door, the M28
+  solver/difficulty metric, and the M32 balance telemetry (PRs #1706/#1779/#1781/
+  #1784/#1785/#1786/#1787; Scenario Coverage v36).
+- **Milestone 39 — Long-Form Game Systems v1** (#1656–#1663): the trusted
+  Rust/local data systems a longer-form game needs — meta-progression/unlocks,
+  economy/currency, save/profile and run-history at scale (with a v0→v1
+  migration), UI/UX flow with onboarding and accessibility (deterministic,
+  probe-observable, read-only), and an optional narrative/dialogue/event system —
+  each a Milestone 24 ladder rung proven by a loop-produced, fixture-scoped demo
+  carrying passing four-gate and loop-coverage evidence, on the existing runtime
+  (PRs #1707/#1711/#1716/#1725/#1733/#1736/#1739/#1740; Scenario Coverage v37).
+- **Milestone 40 — Production-Scale QA Matrix v1** (#1665–#1671): QA scaled from
+  per-artifact checks to whole-game production QA — a regression matrix across
+  content variants, seeds, and supported targets; visual-regression at scale;
+  synthetic performance/soak testing; crash/accessibility checks; and a single
+  consolidated production-QA verdict composed via `declared-gate-and` that fails
+  closed when any declared check fails — every capability reusing an existing
+  runner (the QA/playtest swarm, the visual gate, the frame-budget surface, the
+  evaluator aggregation), with no new test engine, profiler, or evaluator (PRs
+  #1700/#1710/#1712/#1718/#1723/#1742/#1743; Scenario Coverage v38).
+
+**North-star assessment (descriptive, not a maturity claim).** Against #1's
+extended north-star `loop coverage × game complexity × trust × accessibility ×
+production coverage`:
+
+- **Production coverage × loop coverage:** the loop now produces and
+  machine-verifies five previously-uncovered specialized studio functions — visual
+  assets (M36), audio (M37), content at campaign scale (M38), long-form game
+  systems (M39), and whole-game production QA (M40) — each as a specialized
+  capability with its own verification gate, extending the Era A–F mechanics/
+  balance/verification coverage toward the functions a *larger, longer* game needs.
+  Coverage is measured per function by that function's gate and its fixture-scoped
+  demo; it is **not** a claim of full studio coverage, production parity, or broad
+  engine breadth.
+- **Game complexity:** the long-form systems (M39) are recorded as Milestone 24
+  ladder rungs satisfied only on loop-produced, four-gate + loop-coverage
+  evidence, and content-at-scale (M38) verifies whole-game difficulty curves at
+  campaign scale; engine and content growth stay demand-driven and rung-justified,
+  with no later rung, breadth, or parity claimed.
+- **Trust:** every generated artifact is verified rather than asserted — assets,
+  audio, and campaign content are promotable only after passing their
+  function-specific gate (asset-QA, audio-QA, content-curation) ANDed into the
+  existing four-gate `declared-gate-and` aggregation, and production-scale QA (M40)
+  composes bounded evidence signals into one descriptive verdict that fails closed.
+  Generation **never performs a trusted write**; every promotion flows through the
+  existing review/apply/trust-gradient path, and license/provenance is mandatory
+  before any asset/audio/content promotion.
+- **Accessibility:** long-form systems surface deterministic, probe-observable
+  UI/UX flow with declared accessibility options and onboarding (M39), and
+  production-scale QA includes accessibility checks (M40) — surfaced as
+  interpretable, structural evidence. "Verified" means only that an artifact
+  passed its gate — **not** that a generated asset, sound, campaign, or game is
+  good, on-brand, fun, shippable, or production-ready.
+
+**Remaining gaps (recorded, not backfilled here).** Coverage is per function and
+per demo, not whole-studio or production parity: only the five functions above are
+evidenced, each at fixture scope, and art/audio/UX/narrative taste and the human
+release go/no-go are deliberately retained outside every gate. Engine breadth
+(renderer, 3D, physics depth) beyond each rung's gate stays demand-driven under
+the Milestone 24 ladder and requires a separate scope issue citing the gate it
+satisfies. Autonomous orchestration of these functions into a whole-game pipeline
+is later work (Era H), not Era G. Any hosted, cloud, paid, real-player-telemetry,
+or live-ops capability stays **DEFER until a #1508 Layer-3 GO**; distributed
+orchestration / Elixir remains NO-GO under ADR #92
+(`docs/distributed-elixir-design.md`).
+
+**Boundaries reaffirmed across all Era G milestones.** Generation, role-agent,
+and producer output is **proposal-only** through the existing review/apply/
+trust-gradient path — never a direct trusted write, auto-apply, auto-merge,
+self-approval, or reviewer bypass. **License/provenance and the function-specific
+QA gate are mandatory before any asset/audio/content promotion; the gates fail
+closed** — no unlicensed, uncredited, or unverified-style generated artifact is
+ever promoted. Non-slop at scale is a **process guarantee** (each function's
+verification gate), not a quality, fun, or production claim; metrics are
+**descriptive**, and "looks good / sounds good / is fun" and art/audio/UX/
+narrative direction remain human decisions with the human release go/no-go
+preserved. Trusted logic is **Rust/local**; the runtime, `window.__OUROFORGE__`
+probe, and dashboard/cockpit/Studio surfaces are **read-only**; there is no
+browser command bridge, shell execution, dependency install, CI/workflow
+mutation, credentialed operation, or publish/deploy/sign/upload. Genre, engine,
+and function growth stay **demand-driven** (Milestone 24 ladder). Shipping,
+hosted/cloud, real-player telemetry, and live-ops stay **Layer-3-gated** (DEFER
+per Milestone 26 / #1508). Existing runtime/probe/evaluator four-gate
+aggregation, evolve/campaign, `compare`, provenance-bundle, asset-manifest,
+QA-swarm, dashboard, cockpit, and CLI contracts remain backward-compatible;
+generated runs/assets/audio/content/profiles/artifacts remain ignored unless
+explicitly fixture-scoped. No production-readiness, quality, fun, shippability, or
+Godot replacement/parity claim is introduced. **#1 and #23 remain open governance
+anchors** and are not modified, closed, or narrowed by this refresh; Scenario
+Coverage numbering continues from v33 (Era F) onward through the Era G suite
+(v34–v38).
+
 ## Product direction
 
 - Keep the evidence-native loop inspectable, file-based, and local-first.
