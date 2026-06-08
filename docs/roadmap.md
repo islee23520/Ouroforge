@@ -1097,6 +1097,58 @@ unless explicitly fixture-scoped; Layer-3 distributed orchestration / Elixir
 remains NO-GO under ADR #92 and deferred under #1508. #1 and #23 remain open
 governance anchors and are not modified, closed, or narrowed by this refresh.
 
+### Generative Front Door v1 governance refresh
+
+Generative Front Door v1 is recorded as **complete for Era F Milestone 30**
+as a conservative, additive, local-only milestone under #1. It adds the
+generation front door over the verification engine room: a non-developer can
+describe a grid-puzzle in a plain brief, and the deterministic verification loop
+decides whether the generated proposal has design integrity before it can be
+promoted. Generation is the front door and the deterministic verification loop
+is the engine room — layers, not alternatives. The completion evidence chain is
+the parent scope/design gate #1592 (`docs/generative-front-door-v1.md`, PR
+#1620); the Brief/NL Intake and Proposal Model v1 #1593
+(`crates/ouroforge-core/src/generative_intake.rs`, PR #1699) — a plain brief
+becomes a grid-puzzle *proposal* over the existing `MutationProposal` model with
+generation provenance, proposal-only and never a trusted write; the Engine-Room
+Promotion Guard v1 #1594 (`crates/ouroforge-core/src/generative_promotion_guard.rs`,
+PR #1755) — a proposal is promotable only when it passes the engine room (the
+deterministic solver #1580 and over-solution detector #1581 produce the facts,
+the Milestone 28 design-integrity gate #1583 turns them into a verdict, and that
+verdict is ANDed into the existing four-gate `declared-gate-and` aggregation),
+otherwise it is blocked with a replayable evidence-linked reason; the
+Non-Developer Accessibility Path v1 #1595
+(`crates/ouroforge-core/src/generative_accessibility.rs`, PR #1758) — a
+read-only view that surfaces the proposal, provenance, verdicts, and solver
+trace, routing a verified proposal unchanged into the existing
+review/apply/trust-gradient path and reporting an unverified brief without
+promoting it; the Generative Front Door Demo v1 #1596
+(`docs/generative-front-door-v1-demo.md`, PR #1771); and Scenario Coverage v30
+#1597 (`docs/scenario-coverage-v30.md`, PR #1764). #1 and #23 remain open
+governance anchors.
+
+The boundaries stay explicit and reaffirmed. Generation **never performs a
+trusted write**: it emits proposals only, and every promotion flows through the
+existing review/apply/trust-gradient path (`source_apply_*`, `trust_gradient_*`),
+never a direct trusted write, auto-apply, auto-merge, self-approval, or reviewer
+bypass. Promotion stays **gated by the engine room**: no proposal that has not
+passed the four gates plus solver and over-solution can be promoted, and the
+guard adds no parallel aggregator. Browser and Studio surfaces remain
+**read-only**. Rust/local owns the trusted validation, the solver/detector/gate
+logic, and the proposal/provenance writing; the additions are backward-compatible
+and preserve the existing runtime, probe, evaluator four-gate aggregation,
+intake, solver, dashboard, cockpit, and review/apply/trust-gradient contracts.
+"Verified" means only that a proposal passed the engine room — **not** that a
+generated game is good, fun, shippable, or production-ready, and **not** a Godot
+replacement or parity claim. Generated runs, genre, evidence, and registry
+artifacts remain ignored unless explicitly fixture-scoped. Any hosted, paid, or
+distributed capability stays **DEFER until a #1508 Layer-3 GO** (Layer-3 /
+Elixir remains NO-GO under ADR #92).
+
+The recommended next milestone is not expanded by this completion; any later Era
+F rung requires a separate scope issue with explicit non-goals, regression
+coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
+
 ### Puzzle Solver and Over-Solution Detection v1 governance refresh
 
 Puzzle Solver and Over-Solution Detection v1 (Era F Milestone 28 under #1) has
