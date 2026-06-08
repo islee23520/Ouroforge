@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "producer-budget-gates-v1",
+  "orchestrationRef": "collect-and-exit-whole-game",
+  "stopConditions": [
+    {
+      "conditionId": "stop-budget",
+      "reason": "budget-exhausted",
+      "description": "halt when iteration or cost budget reaches the deterministic demo cap"
+    },
+    {
+      "conditionId": "stop-human",
+      "reason": "human-approval-required",
+      "description": "block release-candidate promotion while a mandatory human approval gate remains pending"
+    },
+    {
+      "conditionId": "stop-no-progress",
+      "reason": "no-progress",
+      "description": "halt when the trailing no-progress window shows no completed demo stage movement"
+    }
+  ],
+  "generatedStatePolicy": "Generated producer demo runs, assets, content, coverage, release-candidate artifacts, and local state remain untracked unless explicitly fixture-scoped.",
+  "boundary": "Reuses evolve-campaign/fuzz budget and stop-condition shape; no new control engine; game-scale budgets are hard Rust/local evidence gates; human approval gates mandatory; proposal-only producer progress; browser/Studio read-only; no direct trusted writes; no auto-apply; no auto-merge; no self-approval; no reviewer bypass; no production-ready claim; no engine replacement claim.",
+  "policyId": "autonomous-producer-demo-release-gate",
+  "budget": {
+    "maxIterations": 10,
+    "maxCostUnits": 250,
+    "noProgressWindow": 2
+  },
+  "usage": {
+    "iterationCount": 6,
+    "costUnits": 144,
+    "noProgressSteps": 0,
+    "lastEvidenceRef": "examples/autonomous-producer-v1/demo/evidence/release-candidate.audit.json"
+  },
+  "humanApprovalGates": [
+    {
+      "gateId": "gate-vision",
+      "gateKind": "vision",
+      "status": "approved",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/vision.approved.json",
+      "approverRole": "human creative director"
+    },
+    {
+      "gateId": "gate-legal",
+      "gateKind": "legal",
+      "status": "approved",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/legal.approved.json",
+      "approverRole": "human legal reviewer"
+    },
+    {
+      "gateId": "gate-release",
+      "gateKind": "release",
+      "status": "pending",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/release.pending.json",
+      "approverRole": "human release owner"
+    }
+  ],
+  "evidenceRefs": [
+    "examples/autonomous-producer-v1/demo/evidence/intent.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/concept.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/content.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/assets.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/qa.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/release-candidate.audit.json",
+    "examples/autonomous-producer-v1/demo/evidence/release.pending.json"
+  ]
+}

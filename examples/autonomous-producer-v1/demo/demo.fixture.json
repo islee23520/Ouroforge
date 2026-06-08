@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "autonomous-producer-demo-v1",
+  "demoId": "collect-and-exit-autonomous-producer-demo",
+  "intentRef": "examples/producer-plan-v1/design-intent.valid.fixture.json",
+  "releaseGatePolicyRef": "examples/autonomous-producer-v1/demo/release-gate.policy.json",
+  "budgetHaltPolicyRef": "examples/autonomous-producer-v1/demo/budget-halt.policy.json",
+  "stages": [
+    "intent",
+    "concept",
+    "content",
+    "assets",
+    "qa",
+    "release-candidate"
+  ],
+  "auditTrail": [
+    {
+      "stage": "intent",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/intent.audit.json",
+      "summary": "Human design intent fixture accepted for deterministic producer planning."
+    },
+    {
+      "stage": "concept",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/concept.audit.json",
+      "summary": "Producer plan records proposal-only concept/design-brief dispatch."
+    },
+    {
+      "stage": "content",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/content.audit.json",
+      "summary": "Requirements, mechanics, scaffold, scene, and behavior stages produce fixture-scoped proposals."
+    },
+    {
+      "stage": "assets",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/assets.audit.json",
+      "summary": "Asset stage records provenance-gated fixture references only."
+    },
+    {
+      "stage": "qa",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/qa.audit.json",
+      "summary": "QA stage records deterministic local evidence before release-candidate consideration."
+    },
+    {
+      "stage": "release-candidate",
+      "evidenceRef": "examples/autonomous-producer-v1/demo/evidence/release-candidate.audit.json",
+      "summary": "Release-candidate promotion is blocked by pending human release gate."
+    }
+  ],
+  "releaseCandidate": {
+    "status": "blocked-at-human-release-gate",
+    "humanGateId": "gate-release",
+    "policyRef": "examples/autonomous-producer-v1/demo/release-gate.policy.json"
+  },
+  "budgetHaltCase": {
+    "status": "halted-budget-exhausted",
+    "policyRef": "examples/autonomous-producer-v1/demo/budget-halt.policy.json"
+  },
+  "generatedStatePolicy": "Generated producer demo runs, assets, content, coverage, release-candidate artifacts, and local state remain untracked unless explicitly fixture-scoped.",
+  "boundary": "Deterministic fixture-scoped autonomous producer demo; Rust/local validation owns the demo evidence; browser/Studio read-only; producer outputs remain proposal-only through review/apply/trust-gradient and mandatory human gates; no network/live browser; no direct trusted writes; no auto-apply; no auto-merge; no self-approval; no reviewer bypass; no production-ready claim; no Godot replacement claim; no Godot parity claim; no quality/fun guarantee; #1 and #23 remain open."
+}

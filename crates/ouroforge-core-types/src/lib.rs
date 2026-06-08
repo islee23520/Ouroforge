@@ -3,7 +3,6 @@
 #![allow(clippy::all)]
 #![allow(dead_code)]
 use anyhow::{anyhow, Context, Result};
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_yaml;
@@ -13,10 +12,7 @@ use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
-use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tungstenite::client::IntoClientRequest;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

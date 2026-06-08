@@ -2,15 +2,15 @@ use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::{ErrorKind, Read, Write};
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Component, Path, PathBuf};
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+#[cfg(test)]
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tungstenite::client::IntoClientRequest;
 
 pub use ouroforge_core_types::*;
@@ -13792,7 +13792,6 @@ fn initial_journal() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     const VALID_SEED: &str = r#"
 id: platformer.v0
 title: Platformer Harness Seed
@@ -34975,18 +34974,21 @@ scenarios:
     fn parses_cdp_websocket_endpoint() {
         let endpoint = CdpWebSocketEndpoint::parse("ws://127.0.0.1:9222/devtools/page/page-1")
             .expect("websocket endpoint parses");
-        assert_eq!(endpoint.host, "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(
+            endpoint.host,
+            "127.0.0.1".parse::<std::net::IpAddr>().unwrap()
+        );
         assert_eq!(endpoint.port, 9222);
     }
 
     #[test]
     fn formats_ipv6_host_authority_with_brackets() {
         assert_eq!(
-            format_host_authority("::1".parse::<IpAddr>().unwrap(), 9222),
+            format_host_authority("::1".parse::<std::net::IpAddr>().unwrap(), 9222),
             "[::1]:9222"
         );
         assert_eq!(
-            format_host_authority("127.0.0.1".parse::<IpAddr>().unwrap(), 9222),
+            format_host_authority("127.0.0.1".parse::<std::net::IpAddr>().unwrap(), 9222),
             "127.0.0.1:9222"
         );
     }
@@ -34994,19 +34996,22 @@ scenarios:
     #[test]
     fn parses_ipv6_cdp_endpoints() {
         let http = CdpHttpEndpoint::parse("http://[::1]:9222/").expect("ipv6 http parses");
-        assert_eq!(http.host, "::1".parse::<IpAddr>().unwrap());
+        assert_eq!(http.host, "::1".parse::<std::net::IpAddr>().unwrap());
         assert_eq!(http.port, 9222);
 
         let websocket = CdpWebSocketEndpoint::parse("ws://[::1]:9222/devtools/page/page-1")
             .expect("ipv6 websocket parses");
-        assert_eq!(websocket.host, "::1".parse::<IpAddr>().unwrap());
+        assert_eq!(websocket.host, "::1".parse::<std::net::IpAddr>().unwrap());
         assert_eq!(websocket.port, 9222);
     }
 
     #[test]
     fn parses_cdp_http_endpoint() {
         let endpoint = CdpHttpEndpoint::parse("http://127.0.0.1:9222/").expect("endpoint parses");
-        assert_eq!(endpoint.host, "127.0.0.1".parse::<IpAddr>().unwrap());
+        assert_eq!(
+            endpoint.host,
+            "127.0.0.1".parse::<std::net::IpAddr>().unwrap()
+        );
         assert_eq!(endpoint.port, 9222);
     }
 
