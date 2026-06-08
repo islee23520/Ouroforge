@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v47.deckbuilder-ui.v1",
+  "issue": "1830",
+  "anchor": "#1 Era I Milestone 52",
+  "generatedStatePolicy": "fixture-scoped only; generated UI probe snapshots, browser runs, and demo outputs remain untracked outside this scenario coverage fixture",
+  "boundary": "Rust/local state/shape checks only; browser/Studio read-only; generated runs/artifacts remain untracked unless fixture-scoped; no timing flakes, no trusted writes, no auto-apply, no auto-merge, no self-approval, no fun/quality/production/Godot-replacement claim; #1 and #23 remain open",
+  "rows": [
+    {
+      "id": "V47.hand.pipeline",
+      "surface": "#1826 card hand and pipeline UI",
+      "fixtureRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi",
+      "expectedShape": "deckbuilder UI fixture exposes five hand cards through the existing deck-roguelike hand and three draft-only pipeline slots: intent, modifier, commit"
+    },
+    {
+      "id": "V47.shop.run_map",
+      "surface": "#1827 shop and run-map UI",
+      "fixtureRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi.shop+runMap",
+      "expectedShape": "shop has two deterministic offers with unavailable reason for insufficient gold; run map has start, shop, elite, boss nodes with blocked elite path"
+    },
+    {
+      "id": "V47.score.cascade_display",
+      "surface": "#1828 score-cascade display",
+      "fixtureRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json#deckbuilderUi.scoreDisplay",
+      "expectedShape": "score display preserves ordered phases, formatted final score, read-only evidence flags, and Rust/local score authority boundary"
+    },
+    {
+      "id": "V47.demo.smoke",
+      "surface": "#1829 deterministic deckbuilder UI demo",
+      "fixtureRef": "examples/deckbuilder-ui-v1/demo/demo-manifest.json",
+      "expectedShape": "demo manifest references fixture-scoped scene, expected probe state, disabled network, and no live browser dependency"
+    },
+    {
+      "id": "V47.runtime.backcompat",
+      "surface": "existing runtime UI/probe compatibility",
+      "fixtureRef": "examples/deckbuilder-ui-v1/scenario-coverage-v47/runtime-ui-probe-backcompat-golden.json",
+      "expectedShape": "runtime still loads deckbuilder-ui.js, exposes window.__OUROFORGE__ and draft-only probe methods, and keeps trustedWrite false"
+    },
+    {
+      "id": "V47.boundary.negative_shapes",
+      "surface": "invalid/stale UI interaction boundaries",
+      "fixtureRef": "examples/game-runtime/deckbuilder-ui.test.cjs#invalid-interaction",
+      "expectedShape": "invalid hand index, missing slot, missing offer, unavailable offer, and blocked path fail closed as observable state without trusted mutation"
+    }
+  ]
+}

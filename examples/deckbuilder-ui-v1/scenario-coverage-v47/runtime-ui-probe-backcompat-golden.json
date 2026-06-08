@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "ouroforge.scenario-coverage.v47.runtime-ui-probe-backcompat.v1",
+  "issue": "1830",
+  "generatedStatePolicy": "fixture-scoped only; generated runtime UI/probe snapshots remain untracked outside this golden",
+  "boundary": "state/shape-only backward compatibility for existing deckbuilder runtime UI/probe; not a live browser run, not a timing assertion, not a trusted write, and not a fun/quality verdict",
+  "expected": {
+    "runtimeIndexScript": "<script src=\"deckbuilder-ui.js\"></script>",
+    "probeNamespace": "__OUROFORGE__",
+    "stateSchemaVersion": "ouroforge.deckbuilder-ui-state.v1",
+    "renderSchemaVersion": "ouroforge.deckbuilder-ui-render.v1",
+    "moduleGlobal": "OuroforgeDeckbuilderUi",
+    "requiredProbeMethods": [
+      "deckbuilderUiSelectCard",
+      "deckbuilderUiQueueSelected",
+      "deckbuilderUiSelectShopOffer",
+      "deckbuilderUiPlanRunMapNode"
+    ],
+    "requiredRuntimeEvents": [
+      "runtime.deckbuilder_ui.select_card",
+      "runtime.deckbuilder_ui.queue_selected",
+      "runtime.deckbuilder_ui.select_shop_offer",
+      "runtime.deckbuilder_ui.plan_run_map_node"
+    ],
+    "draftOnlySignals": [
+      "trustedWrite: false",
+      "draftOnly: true",
+      "existing review/apply/trust-gradient path",
+      "browser-runtime-deckbuilder-ui-probe"
+    ],
+    "disallowedActions": [
+      "trusted writes",
+      "auto-apply",
+      "auto-merge",
+      "self-approval",
+      "score recomputation authority",
+      "automated fun verdict"
+    ]
+  }
+}
