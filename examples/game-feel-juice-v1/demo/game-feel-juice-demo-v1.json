@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "ouroforge.game-feel-juice-demo.v1",
+  "issue": 1822,
+  "anchor": "#1 Era I Milestone 51",
+  "docRef": "docs/game-feel-juice-v1-demo.md",
+  "generatedStatePolicy": "fixture-scoped only; generated demo runs, cascade traces, responsiveness reports, and browser snapshots remain untracked outside this demo fixture",
+  "boundary": "deterministic mechanical game-feel evidence only; not a fun/quality verdict, not a production claim, not a new engine, and not browser trusted authority",
+  "reusedSurfaces": [
+    "examples/game-runtime/juice-scene-v1.json",
+    "examples/game-runtime/score-cascade-feedback-v1.json",
+    "examples/game-runtime/responsiveness-v1.json",
+    "docs/game-feel-juice-v1.md"
+  ],
+  "demoSteps": [
+    {
+      "stepId": "load-juice-primitives",
+      "fixtureRef": "examples/game-runtime/juice-scene-v1.json",
+      "assertion": "runtime juice primitives are deterministic read-only feedback intents"
+    },
+    {
+      "stepId": "emit-score-cascade",
+      "fixtureRef": "examples/game-runtime/score-cascade-feedback-v1.json",
+      "assertion": "score cascade feedback follows the authoritative Rust/local substrate resolution order"
+    },
+    {
+      "stepId": "verify-responsiveness",
+      "fixtureRef": "examples/game-runtime/responsiveness-v1.json",
+      "assertion": "input-to-feedback responsiveness reports include one pass and one fail under the 100ms budget"
+    }
+  ],
+  "expected": {
+    "cascadeEventIds": [
+      "cascade-0001",
+      "cascade-0002",
+      "cascade-0003",
+      "cascade-0004",
+      "cascade-0005",
+      "cascade-0006",
+      "cascade-0007",
+      "cascade-0008"
+    ],
+    "cascadePhases": [
+      "base",
+      "modifier",
+      "modifier",
+      "card-total",
+      "base",
+      "modifier",
+      "card-total",
+      "cascade-complete"
+    ],
+    "finalScore": 24,
+    "juiceTrigger": "score_cascade",
+    "responsivenessStatuses": ["pass", "fail"],
+    "responsivenessMaxLatencyMs": [80, 112],
+    "budgetMs": 100
+  },
+  "readOnlyInspection": {
+    "trustedEmitter": "rust-game-feel-juice-demo-smoke",
+    "browserStudioMode": "read-only demo inspection of juice feedback, cascade traces, and responsiveness reports",
+    "disallowedActions": [
+      "trusted writes",
+      "command bridge",
+      "live browser dependency",
+      "network dependency",
+      "automated fun verdict",
+      "production-ready claim",
+      "Godot replacement claim"
+    ]
+  },
+  "governanceAudit": {
+    "issue1MustRemainOpen": true,
+    "issue23MustRemainOpen": true,
+    "browserStudioSurfacesReadOnly": true,
+    "rustLocalOwnsVerification": true,
+    "deckbuilderIsSubstrateConfiguration": true,
+    "humanEraJOwnsFeelJudgment": true
+  }
+}
