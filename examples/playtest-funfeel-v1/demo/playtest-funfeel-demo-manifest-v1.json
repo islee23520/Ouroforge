@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.playtest-funfeel-demo.v1",
+  "demoId": "playtest-funfeel-demo-v1",
+  "projectId": "signal-gate",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "fixtures": {
+    "capture": "examples/playtest-funfeel-v1/demo/playtest-session-demo-v1.json",
+    "noVerdictGate": "examples/playtest-funfeel-v1/demo/funfeel-gate-no-verdict-demo-v1.json",
+    "recordedVerdictGate": "examples/playtest-funfeel-v1/demo/funfeel-gate-recorded-verdict-demo-v1.json"
+  },
+  "expectedReadinessSequence": ["capture-valid", "needs-human-review", "approved-by-human"],
+  "determinism": "fixture-scoped local JSON only; no network and no live browser required",
+  "boundary": "demo asserts capture and gate states only; it does not produce an automated fun score, trusted write, release action, or production/fun claim",
+  "browserStudioMode": "read-only inspection of demo evidence and human verdict state",
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped"
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "ouroforge.funfeel-gate.v1",
+  "gateId": "playtest-funfeel-demo-no-verdict-v1",
+  "projectId": "signal-gate",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": [
+    "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+  ],
+  "playtestCaptureRefs": [
+    {
+      "path": "examples/playtest-funfeel-v1/demo/playtest-session-demo-v1.json",
+      "schemaVersion": "ouroforge.playtest-capture.v1",
+      "captureId": "playtest-funfeel-demo-capture-v1",
+      "candidateRefs": [
+        "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+      ]
+    }
+  ],
+  "mechanicalGateRefs": [
+    "examples/qa-playtest-demo-v1/playtest-demo-manifest.json#mechanical-smoke"
+  ],
+  "verdict": null,
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped",
+  "browserStudioMode": "read-only display of demo playtest capture and human fun/feel gate state",
+  "trustedWriteRequested": false,
+  "releaseButtonRequested": false,
+  "boundary": "human-funfeel-verdict-release-readiness-precondition"
+}

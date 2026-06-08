@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "ouroforge.funfeel-gate.v1",
+  "gateId": "playtest-funfeel-demo-recorded-verdict-v1",
+  "projectId": "signal-gate",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": [
+    "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+  ],
+  "playtestCaptureRefs": [
+    {
+      "path": "examples/playtest-funfeel-v1/demo/playtest-session-demo-v1.json",
+      "schemaVersion": "ouroforge.playtest-capture.v1",
+      "captureId": "playtest-funfeel-demo-capture-v1",
+      "candidateRefs": [
+        "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+      ]
+    }
+  ],
+  "mechanicalGateRefs": [
+    "examples/qa-playtest-demo-v1/playtest-demo-manifest.json#mechanical-smoke"
+  ],
+  "verdict": {
+    "verdictId": "playtest-funfeel-demo-human-verdict-v1",
+    "status": "approved",
+    "decidedBy": {
+      "actorId": "human-reviewer-demo-001",
+      "role": "human-reviewer",
+      "humanConfirmed": true
+    },
+    "decidedAtUnixMs": 1786000600000,
+    "rationale": "Reviewer approved the scoped candidate after inspecting the demo capture and mechanical evidence; this is human sign-off only, not an automated fun score.",
+    "candidateRefs": [
+      "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+    ],
+    "playtestCaptureRefs": ["playtest-funfeel-demo-capture-v1"],
+    "evidenceRefs": [
+      "examples/playtest-funfeel-v1/demo/playtest-session-demo-v1.json",
+      "examples/qa-playtest-demo-v1/playtest-demo-manifest.json"
+    ]
+  },
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped",
+  "browserStudioMode": "read-only display of demo playtest capture and human fun/feel gate state",
+  "trustedWriteRequested": false,
+  "releaseButtonRequested": false,
+  "boundary": "human-funfeel-verdict-release-readiness-precondition"
+}

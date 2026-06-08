@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "ouroforge.playtest-capture.v1",
+  "captureId": "playtest-funfeel-demo-capture-v1",
+  "projectId": "signal-gate",
+  "runId": "playtest-funfeel-demo-run-001",
+  "titleConfigId": "deckbuilder-signal-gate-config-v1",
+  "candidateRefs": [
+    "examples/curation-cockpit-v1/demo/candidate-generation-brief-demo-v1.json#demo-card-rivet-strike-v1"
+  ],
+  "playtestBuildRef": "examples/qa-playtest-demo-v1/playtest-demo-manifest.json",
+  "actor": {
+    "actorId": "human-playtester-demo-001",
+    "role": "human-playtester",
+    "humanConfirmed": true
+  },
+  "recordedAtUnixMs": 1786000500000,
+  "signals": {
+    "durationBucket": "15m-30m",
+    "runCount": 2,
+    "endReason": "completed",
+    "oneMoreRun": "yes",
+    "retentionProxy": "returned-within-local-window",
+    "replayRequested": true,
+    "confusionMarkers": ["shop-choice-copy"]
+  },
+  "feedback": {
+    "notes": "Demo player requested another run; this is captured evidence only and not an automated fun score.",
+    "likedMoments": ["rivet-strike combo turn"],
+    "dislikedMoments": ["shop labels need more contrast"],
+    "frictionTags": ["ui-readability"],
+    "severity": "medium",
+    "suggestedFollowUp": "Improve shop label contrast before a broader human review."
+  },
+  "evidenceRefs": [
+    { "kind": "runtime-probe", "path": "evidence/playtest/demo/runtime-probe.json" },
+    { "kind": "evaluator-verdict", "path": "evidence/playtest/demo/evaluator-verdict.json" },
+    { "kind": "playtest-log", "path": "evidence/playtest/demo/human-notes.json" }
+  ],
+  "boundary": "human-playtest-capture-evidence-only",
+  "generatedStatePolicy": "generated playtest runs/logs remain untracked unless explicitly fixture-scoped",
+  "trustedWriteRequested": false,
+  "releaseAuthority": false
+}
