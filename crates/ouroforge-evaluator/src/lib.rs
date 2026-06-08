@@ -13,6 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub mod asset_qa_gate;
 pub mod content_curation_gate;
 pub mod design_integrity_gate;
+pub mod dogfood_contract;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct EvaluationVerdict {
