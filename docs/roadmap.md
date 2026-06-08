@@ -1041,6 +1041,62 @@ The recommended next milestone is not expanded by this completion; any later Era
 F rung requires a separate scope issue with explicit non-goals, regression
 coverage, generated-state audits, and the same Layer-3 / hosted-paid boundaries.
 
+### Grid-Puzzle Game Class v1 governance refresh
+
+Grid-Puzzle Game Class v1 (Era F Milestone 27 under #1) is now complete as the
+Era F beachhead-genre milestone after the required implementation evidence
+merged. The realized capability is a deterministic, probe-observable grid-puzzle
+(block-pushing / Sokoban) game class that enters the existing loop and whose
+acceptance — solvability and intended-solution replay — is **machine-checked by
+the loop**, not asserted. This is the genre front door: a PuzzleScript-compatible
+document is validated and loaded into the existing runtime, and the deterministic
+verification loop decides it.
+
+The merged evidence chain is the scope/design gate #1573
+(`docs/grid-puzzle-game-class-v1.md`, PR #1621) — selecting the grid puzzle on
+evidence and defining the game-class and DSL-ingest contracts without authorizing
+behavior; the Grid-Puzzle Game Class and Runtime v1 #1574
+(`examples/game-runtime/grid-puzzle.js`,
+`crates/ouroforge-core/tests/grid_puzzle_game_class_contract.rs`, PR #1631) — a
+deterministic, fixed-step, fully probe-exposed grid game class over the existing
+runtime, fail-closed on malformed specs; the PuzzleScript-Compatible DSL Ingest v1
+#1575 (`crates/ouroforge-core/src/grid_puzzle_dsl_ingest.rs`, PR #1753) — a
+Rust/local **validate-then-load** front door that lowers a PuzzleScript-compatible
+document into the `ouroforge.grid-puzzle.v1` game-class spec and rejects malformed
+or out-of-subset input with a structured diagnostic, never a silent partial
+import; the Grid-Puzzle Game Class Demo v1 #1576
+(`docs/grid-puzzle-game-class-v1-demo.md`,
+`examples/grid-puzzle-game-class-v1/demo/`, PR #1748) — a deterministic,
+fixture-scoped demo that runs a grid-puzzle end to end with passing four-gate and
+loop-coverage evidence recorded as a Milestone 24 ladder rung; and Scenario
+Coverage v27 #1577 (`docs/scenario-coverage-v27.md`,
+`crates/ouroforge-core/tests/scenario_coverage_v27_grid_puzzle.rs`, PR #1763) — an
+enumerated grid-puzzle game-class regression matrix locking the run, gate, and
+fail-closed behaviors.
+
+The **remaining gaps** are demand-driven and tracked as their own rungs, not
+backfilled here: the trusted bounded solver and over-solution detection are
+Milestone 28 (#1579-#1585, recorded below, with the Design-Integrity Gate #1583
+still open); natural-language generation into this game class is Milestone 30; and
+any engine breadth beyond the grid-puzzle rung's gate requires a separate scope
+issue citing the specific gate it satisfies. The grid-puzzle class is the
+beachhead, not a general engine claim.
+
+The boundaries stay explicit and reaffirmed. Validation, the DSL ingest lowering,
+the solver, and gate evaluation are owned by **Rust/local** and operate **over the
+existing** `ouroforge.grid-puzzle.v1` state model and runtime — no new engine,
+runtime, writer, or parser engine. Generation and DSL ingest are **proposal-only**
+through the existing validate-then-load / review / apply / trust-gradient path and
+are never a direct trusted write or auto-apply; browser/Studio surfaces remain
+**read-only**. Genre and engine growth stay demand-driven under the Milestone 24
+ladder. The wording is conservative: the demo proves the class runs and is
+observable and carries no quality, fun, production-readiness, or Godot
+replacement/parity claim. Existing runtime/probe/evaluator four-gate aggregation
+contracts remain backward-compatible; generated runs/genre/evidence remain ignored
+unless explicitly fixture-scoped; Layer-3 distributed orchestration / Elixir
+remains NO-GO under ADR #92 and deferred under #1508. #1 and #23 remain open
+governance anchors and are not modified, closed, or narrowed by this refresh.
+
 ### Puzzle Solver and Over-Solution Detection v1 governance refresh
 
 Puzzle Solver and Over-Solution Detection v1 (Era F Milestone 28 under #1) has
