@@ -122,6 +122,7 @@ Use these for source-like models and fixture-backed engine capability references
 ## Migration and semantic re-derivation
 
 - [`semantic-re-derivation-methodology-adr-v1.md`](semantic-re-derivation-methodology-adr-v1.md) — Era R M107 design-gate ADR defining the one-way on-ramp, re-derivation-not-translation contract, behavioral-unit model, oracle-gated fidelity grades, outcome-level differential verification, O/P/Q hand-off, source-project/open-text legal boundary, Rust data plane, and Elixir/Phoenix control/presentation-only boundary.
+- [`legacy-logic-ingestion-behavioral-unit-contract-v1.md`](legacy-logic-ingestion-behavioral-unit-contract-v1.md) — Era R M108 contract for source-only legacy skeleton ingestion and behavioral-unit extraction, including exact inputs/outputs, Green/Yellow/Red fidelity grades, no-oracle-not-ported rule, clean-room one-way boundary, and Era R hand-off states.
 
 ## Authoring, Studio, and review surfaces
 
