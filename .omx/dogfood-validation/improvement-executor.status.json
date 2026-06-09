@@ -1,13 +1,13 @@
 {
-  "status": "pr_opened",
-  "selected_blocker": "B1 \u2014 No claim coverage matrix",
-  "branch": "dogfood/b1-claim-coverage-matrix-20260609211538",
-  "worktree": "/Users/jh0927/Ouroforge/..-Ouroforge-dogfood-b1-claim-coverage-matrix-20260609211538",
-  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2334",
-  "message": "Implemented, verified, pushed, and opened PR #2334. Returning to governor brief polling for the next cycle.",
+  "status": "ready_for_verifier",
+  "selected_blocker": "B2 \u2014 No compact demo spec",
+  "branch": "dogfood/b2-compact-demo-spec-20260609213312",
+  "worktree": "/Users/jh0927/Ouroforge-dogfood-b2-compact-demo-spec-20260609213312",
+  "message": "B2 compact demo spec and validator implemented, verified, pushed, and opened as PR #2335. Ready for focused verifier re-measurement.",
   "verification": [
-    "node examples/dogfood-claim-coverage-v1/claim-coverage-matrix-smoke.test.cjs \u2014 passed",
-    "cargo test --workspace --no-fail-fast \u2014 passed"
+    "node --test examples/dogfood-demo-spec-v1/demo-game-spec-smoke.test.cjs \u2014 passed",
+    "git diff --check origin/main...HEAD \u2014 passed"
   ],
-  "updated_at": "2026-06-09T21:27:01.225482+00:00"
+  "updated_at": "2026-06-09T21:34:57.075697+00:00",
+  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2335"
 }
