@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "scenario-coverage-v61-self-audit-attribution-v1",
+  "coverageVersion": 61,
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "rows": [
+    {
+      "id": "self-audit-contract-links",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-audit-attribution-v1/contract.fixture.json",
+      "locks": "Contract extends loop-coverage attribution and maps real dogfood evidence to milestones, gates, success criteria, and trends."
+    },
+    {
+      "id": "planted-bottleneck-attribution",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/bottleneck-attribution-v1/planted-failure.fixture.json",
+      "locks": "Planted four-gates/provenance failure ranks m68-real-title-run above lower-impact demo friction while ignoring passing coverage signals."
+    },
+    {
+      "id": "acceptance-per-milestone-pass",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_audit_acceptance_evaluator.rs",
+      "locks": "Acceptance evaluator emits declared-gate-style verdicts for every mapped milestone from existing evidence."
+    },
+    {
+      "id": "acceptance-regression-fail-closed",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_audit_acceptance_evaluator.rs",
+      "locks": "Previously satisfied predicates regress automatically when evidence changes and missing evidence is insufficient, not pass."
+    },
+    {
+      "id": "self-audit-demo-planted-defect",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_audit_demo.rs",
+      "locks": "Self-audit demo composes ranked bottlenecks and per-milestone acceptance verdicts over a planted defect."
+    },
+    {
+      "id": "autonomy-and-existing-pipeline-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/self-audit-attribution-demo-v1.md",
+      "locks": "Coverage remains test-only, no human on autonomous path, no high-risk auto-apply, no new verifier, and no new data plane."
+    }
+  ],
+  "boundary": "Coverage v61 records self-audit attribution and acceptance-audit regressions using existing dogfood evidence, ledger.jsonl, journal.md, verdicts, openchrome, loop-coverage attribution, evolve, source-apply, trust-gradient, and Rust tests; it is test-only and introduces no new verification engine and no new data plane; high-risk/source-affecting fixes are never auto-applied; fun/taste and release go/no-go remain human Ring 2; #1 and #23 remain open."
+}
