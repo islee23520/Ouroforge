@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "real-title-dogfood-compliance-v1",
+  "artifactId": "dogfood-compliance-rc-v1",
+  "status": "pass",
+  "humanRing2Required": true,
+  "funTasteAutomated": false,
+  "releaseGoNoGoAutomated": false,
+  "layer3Deferred": true,
+  "boundary": "Compliance evidence permits a verified RC claim only; fun/taste and release go/no-go remain human Ring 2."
+}

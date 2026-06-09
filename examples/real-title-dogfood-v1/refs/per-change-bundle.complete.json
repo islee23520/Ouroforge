@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "provenance-bundle-v1",
+  "bundleId": "dogfood-per-change-provenance-rc-v1",
+  "changeId": "dogfood-verified-rc-evidence-v1",
+  "status": "complete",
+  "chainLinks": [
+    { "kind": "intent-design-brief", "ref": "examples/real-title-dogfood-v1/refs/intent.json", "artifactId": "dogfood-intent-rc-v1" },
+    { "kind": "generated-edited-artifact", "ref": "examples/real-title-dogfood-v1/refs/release-candidate.json", "artifactId": "dogfood-release-candidate-rc-v1" },
+    { "kind": "validation-result", "ref": "examples/real-title-dogfood-v1/refs/validation-result.json", "artifactId": "dogfood-validation-rc-v1" },
+    { "kind": "runtime-observation", "ref": "examples/real-title-dogfood-v1/refs/runtime-observation.json", "artifactId": "dogfood-runtime-observation-rc-v1" },
+    { "kind": "evaluator-verdict", "ref": "examples/real-title-dogfood-v1/refs/evaluator-verdict.json", "artifactId": "dogfood-evaluator-verdict-rc-v1" },
+    { "kind": "regression-comparison", "ref": "examples/real-title-dogfood-v1/refs/regression-comparison.json", "artifactId": "dogfood-regression-comparison-rc-v1" },
+    { "kind": "journal-review-decision", "ref": "examples/real-title-dogfood-v1/refs/journal-review-decision.json", "artifactId": "dogfood-journal-review-rc-v1" },
+    { "kind": "promotion-rollback-record", "ref": "examples/real-title-dogfood-v1/refs/promotion-rollback-record.json", "artifactId": "dogfood-promotion-rollback-rc-v1" }
+  ],
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "incompleteReasons": [],
+  "compatibilityNotes": ["real-title dogfood composes existing provenance, evidence, rollback, review, regression, source-apply, and trust-gradient artifacts by reference only"],
+  "replayInputs": { "runRef": "examples/real-title-dogfood-v1/run/run.json", "expectedVerdictRef": "examples/real-title-dogfood-v1/run/verdict.json", "deterministicInputs": true, "deterministicMetadataRefs": ["examples/real-title-dogfood-v1/refs/replay-expected.json"] },
+  "boundary": "Read-only audit and replay surface only; no production quality guarantee and no Godot replacement claim.",
+  "guardrails": ["#2025 real-title dogfood evidence only", "#1 remains open", "#23 remains open", "generated bundles stay untracked unless fixture-scoped"]
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "real-title-dogfood-validation-v1",
+  "artifactId": "dogfood-validation-rc-v1",
+  "status": "pass",
+  "validatedStages": ["substrate", "scoring", "run-shop", "balance", "juice", "ui", "localization", "steam-export"],
+  "gates": { "semantic": "pass", "visual": "pass", "performance": "pass", "content-curation": "pass", "design-integrity": "pass" },
+  "boundary": "Validation summarizes existing gate evidence; it does not execute a new verifier."
+}

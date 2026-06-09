@@ -1,0 +1,18 @@
+{
+  "id": "dogfood-deckbuilder-rc-run-fixture",
+  "seed_id": "dogfood.deckbuilder.v1",
+  "seed_title": "Era I Engine-Builder Deckbuilder Dogfood Seed",
+  "status": "verified-rc",
+  "run_command_context": {
+    "schemaVersion": "run-command-context-v1",
+    "command": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+    "argv": ["cargo", "run", "-p", "ouroforge-cli", "--", "run", "seeds/dogfood-deckbuilder.yaml", "--workers", "2"],
+    "seedPath": "seeds/dogfood-deckbuilder.yaml",
+    "workers": 2,
+    "runsRoot": "runs",
+    "runtimeTarget": "local-static-browser",
+    "browserBoundary": "openchrome_cdp",
+    "cdpTransport": "chrome_devtools_protocol",
+    "environmentHints": ["Local Chrome/CDP is required for browser smoke and scenario execution.", "Generated run artifacts stay under the recorded runs root and remain untracked.", "Dashboard and cockpit surfaces may display this context but must not execute it."]
+  }
+}

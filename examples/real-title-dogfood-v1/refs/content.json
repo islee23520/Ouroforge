@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "real-title-dogfood-content-v1",
+  "artifactId": "dogfood-content-rc-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "stageEvidence": [
+    { "stage": "substrate", "ref": "examples/card-roguelite-substrate-v1/engine-builder/deckbuilder.config.golden.json", "status": "pass" },
+    { "stage": "scoring", "ref": "examples/game-runtime/score-cascade-feedback-v1.json", "status": "pass" },
+    { "stage": "run-shop", "ref": "examples/game-runtime/deckbuilder-ui-scene-v1.json", "status": "pass" },
+    { "stage": "balance", "ref": "docs/engine-builder-balance-v1.md", "status": "pass" },
+    { "stage": "juice", "ref": "examples/game-feel-juice-v1/demo/game-feel-juice-demo-v1.json", "status": "pass" },
+    { "stage": "ui", "ref": "examples/deckbuilder-ui-v1/demo/demo-manifest.json", "status": "pass" },
+    { "stage": "localization", "ref": "docs/localization-v1-demo.md", "status": "pass" },
+    { "stage": "steam-export", "ref": "docs/steam-desktop-export-v1-demo.md", "status": "pass" }
+  ],
+  "boundary": "Stage evidence links existing committed docs/fixtures; no new game or verifier is introduced."
+}

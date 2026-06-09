@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "real-title-dogfood-intent-v1",
+  "artifactId": "dogfood-intent-rc-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "seedRef": "seeds/dogfood-deckbuilder.yaml",
+  "chainStages": ["substrate", "scoring", "run-shop", "balance", "juice", "ui", "localization", "steam-export"],
+  "autonomousPath": ["detect", "explain", "trace", "attribute", "propose", "re-verify", "apply-or-queue"],
+  "boundary": "Real-title dogfood intent; improves the engine harness/pipeline, not game fun/taste; Rust data plane, Elixir control plane unchanged."
+}

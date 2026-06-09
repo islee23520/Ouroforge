@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "summary": "Era L dogfood deckbuilder reached verified RC evidence state",
+  "failures": [],
+  "evidence_refs": [
+    "examples/real-title-dogfood-v1/run/ledger.jsonl",
+    "examples/real-title-dogfood-v1/run/journal.md",
+    "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"
+  ],
+  "metadata": { "titleId": "era-i-engine-builder-deckbuilder", "verifiedRc": true, "newVerifier": false }
+}

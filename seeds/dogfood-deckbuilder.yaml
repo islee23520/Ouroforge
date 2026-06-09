@@ -1,0 +1,25 @@
+id: dogfood.deckbuilder.v1
+title: Era I Engine-Builder Deckbuilder Dogfood Seed
+goal: Carry the existing engine-builder deckbuilder from concept to verified release-candidate evidence through the Era L autonomous self-validation loop.
+constraints:
+  target: game-runtime
+acceptance:
+  - Dogfood subject is the existing era-i-engine-builder-deckbuilder real title.
+  - Autonomous path requires no human input on detect-explain-trace-attribute-propose-reverify-apply.
+  - High-risk source changes queue for human go/no-go and never auto-apply.
+  - Substrate, scoring, run/shop, balance, juice, UI, localization, and Steam-export stages are represented by existing evidence refs.
+  - The real-title run records openchrome/scenario verdicts, four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, source-apply, and trust-gradient refs.
+  - The release candidate is fixture-scoped, replayable, and requires human Ring 2 fun/taste and release go/no-go before any release claim.
+scenarios:
+  - id: dogfood-deckbuilder-real-title-rc
+    description: Verify the existing engine-builder deckbuilder evidence chain reaches a release-candidate bundle without a new verifier or data plane.
+    steps:
+      - wait:
+          frames: 1
+    assertions:
+      - world_state:
+          path: sceneId
+          equals: foundation-scene
+      - world_state:
+          path: assetManifest.enabled
+          equals: true

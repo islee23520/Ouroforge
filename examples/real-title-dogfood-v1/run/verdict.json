@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "summary": "Real-title dogfood deckbuilder verified release-candidate evidence is complete",
+  "failures": [],
+  "evidence_refs": ["ledger.jsonl", "journal.md", "../refs/loop-coverage-attribution.json"],
+  "metadata": {
+    "titleId": "era-i-engine-builder-deckbuilder",
+    "verifiedRc": true,
+    "fourGates": "pass",
+    "designIntegrity": "pass",
+    "humanFunTasteGate": "required",
+    "humanReleaseGoNoGo": "required"
+  }
+}

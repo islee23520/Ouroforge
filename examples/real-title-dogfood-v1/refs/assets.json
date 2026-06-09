@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "real-title-dogfood-assets-v1",
+  "artifactId": "dogfood-assets-rc-v1",
+  "assetEvidenceRefs": [
+    "examples/game-runtime/deckbuilder-ui-scene-v1.json",
+    "examples/deckbuilder-ui-v1/demo/deckbuilder-ui-demo-scene-v1.json",
+    "docs/steam-store-assets-v1.md"
+  ],
+  "status": "pass",
+  "boundary": "Asset refs are local committed evidence only; no generated asset promotion or release upload occurs."
+}

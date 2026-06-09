@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "real-title-dogfood-replay-expected-v1",
+  "artifactId": "dogfood-replay-expected-rc-v1",
+  "expectedStatus": "verified-rc",
+  "expectedVerdict": "pass",
+  "deterministicInputs": true
+}

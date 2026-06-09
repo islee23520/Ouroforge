@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "real-title-dogfood-regression-comparison-v1",
+  "artifactId": "dogfood-regression-comparison-rc-v1",
+  "status": "pass",
+  "beforeRef": "examples/real-title-dogfood-v1/refs/intent.json",
+  "afterRef": "examples/real-title-dogfood-v1/refs/release-candidate.json",
+  "regressions": [],
+  "boundary": "Regression comparison is evidence by reference; no source mutation or release promotion occurs."
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "real-title-dogfood-qa-v1",
+  "artifactId": "dogfood-qa-rc-v1",
+  "openchromeRunRef": "examples/real-title-dogfood-v1/run/ledger.jsonl",
+  "verdictRef": "examples/real-title-dogfood-v1/run/verdict.json",
+  "journalRef": "examples/real-title-dogfood-v1/run/journal.md",
+  "coverageAttributionRef": "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+  "fourGates": ["semantic", "visual", "performance", "content-curation"],
+  "designIntegrity": "pass",
+  "status": "pass",
+  "boundary": "QA evidence reuses openchrome/scenario verdicts, four gates, design-integrity, journal and ledger; no parallel verifier."
+}

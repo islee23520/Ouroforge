@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "loop-coverage-attribution-v1",
+  "artifactId": "dogfood-loop-coverage-rc-v1",
+  "status": "classified",
+  "artifactKind": "release-candidate",
+  "provenanceClass": "loop-verified",
+  "evidenceRefs": ["examples/real-title-dogfood-v1/run/ledger.jsonl", "examples/real-title-dogfood-v1/run/verdict.json"],
+  "verdictRefs": ["examples/real-title-dogfood-v1/run/verdict.json"],
+  "blockedReasons": [],
+  "boundary": "Loop coverage is descriptive authorship attribution only, not quality, no auto-apply, and read-only UI constraints."
+}

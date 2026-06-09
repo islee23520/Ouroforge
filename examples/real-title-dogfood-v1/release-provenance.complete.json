@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "release-provenance-bundle-v1",
+  "releaseId": "dogfood-deckbuilder-verified-rc-v1",
+  "status": "complete",
+  "chainLinks": [
+    { "kind": "intent", "ref": "examples/real-title-dogfood-v1/refs/intent.json", "artifactId": "dogfood-intent-rc-v1" },
+    { "kind": "content", "ref": "examples/real-title-dogfood-v1/refs/content.json", "artifactId": "dogfood-content-rc-v1" },
+    { "kind": "assets", "ref": "examples/real-title-dogfood-v1/refs/assets.json", "artifactId": "dogfood-assets-rc-v1" },
+    { "kind": "qa", "ref": "examples/real-title-dogfood-v1/refs/qa.json", "artifactId": "dogfood-qa-rc-v1" },
+    { "kind": "per-change-provenance", "ref": "examples/real-title-dogfood-v1/refs/per-change-bundle.complete.json", "artifactId": "dogfood-per-change-provenance-rc-v1" },
+    { "kind": "compliance", "ref": "examples/real-title-dogfood-v1/refs/compliance.json", "artifactId": "dogfood-compliance-rc-v1" },
+    { "kind": "release-candidate", "ref": "examples/real-title-dogfood-v1/refs/release-candidate.json", "artifactId": "dogfood-release-candidate-rc-v1" }
+  ],
+  "incompleteReasons": [],
+  "replayability": {
+    "deterministicInputs": true,
+    "perChangeBundleRefs": ["examples/real-title-dogfood-v1/refs/per-change-bundle.complete.json"],
+    "expectedReplayRefs": ["examples/real-title-dogfood-v1/refs/replay-expected.json"]
+  },
+  "generatedState": { "generated": true, "tracked": true, "fixtureScoped": true },
+  "boundary": "composition over Milestone 25 provenance; Rust/local read-only audit; browser and Studio read-only; no parallel provenance engine; no release authority",
+  "guardrails": ["do not fabricate missing chain links", "human release go/no-go remains required", "no auto-merge or quality/fun claim", "#1 and #23 remain open"]
+}

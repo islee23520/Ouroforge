@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "real-title-dogfood-journal-review-v1",
+  "artifactId": "dogfood-journal-review-rc-v1",
+  "journalRef": "examples/real-title-dogfood-v1/run/journal.md",
+  "decision": "verified-rc-evidence-complete",
+  "humanFunTasteGate": "pending-human-ring-2",
+  "humanReleaseGoNoGo": "pending-human-ring-2",
+  "boundary": "Review records evidence completeness only; it is not a release approval or fun/taste verdict."
+}

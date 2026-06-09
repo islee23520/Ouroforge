@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "real-title-dogfood-release-candidate-v1",
+  "artifactId": "dogfood-release-candidate-rc-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "status": "verified-rc",
+  "runRef": "examples/real-title-dogfood-v1/run/run.json",
+  "verdictRef": "examples/real-title-dogfood-v1/run/verdict.json",
+  "provenanceBundleRef": "examples/real-title-dogfood-v1/release-provenance.complete.json",
+  "humanReleaseGate": "required-after-verified-rc",
+  "boundary": "Verified release candidate evidence only; not a public release, not a fun/taste verdict, and not a production-ready market claim."
+}

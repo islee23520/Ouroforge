@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "real-title-dogfood-runtime-observation-v1",
+  "artifactId": "dogfood-runtime-observation-rc-v1",
+  "openchrome": "pass",
+  "scenarioId": "dogfood-deckbuilder-real-title-rc",
+  "runRef": "examples/real-title-dogfood-v1/run/run.json",
+  "ledgerRef": "examples/real-title-dogfood-v1/run/ledger.jsonl",
+  "journalRef": "examples/real-title-dogfood-v1/run/journal.md",
+  "boundary": "Runtime observation is browser evidence by reference through openchrome/CDP artifacts."
+}

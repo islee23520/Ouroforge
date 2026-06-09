@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "real-title-dogfood-promotion-rollback-v1",
+  "artifactId": "dogfood-promotion-rollback-rc-v1",
+  "promotion": "verified-rc-evidence-only",
+  "rollbackHandle": "fixture-scoped-no-source-mutation",
+  "highRiskAutoApply": false,
+  "sourceAffectingAutoApply": false,
+  "boundary": "No source-affecting or high-risk change was auto-applied; future source fixes route through source-apply and trust-gradient."
+}
