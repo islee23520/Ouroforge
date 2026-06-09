@@ -316,6 +316,15 @@ impl Gltf25dImportReport {
                 "stateHashPrimary must be a sha256-prefixed deterministic digest"
             ));
         }
+        let expected_state_hash = format!(
+            "sha256:{}",
+            sha256_hex(&serde_json::to_vec(&self.native_scene)?)
+        );
+        if self.state_hash_primary != expected_state_hash {
+            return Err(anyhow!(
+                "stateHashPrimary must match the deterministic nativeScene digest"
+            ));
+        }
         if !self
             .perceptual_render_secondary
             .role
@@ -330,7 +339,12 @@ impl Gltf25dImportReport {
             row.reason
                 .to_lowercase()
                 .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
-                .any(|token| matches!(token, "ported" | "auto-port" | "auto-ported"))
+                .any(|token| {
+                    matches!(
+                        token,
+                        "ported" | "auto-port" | "auto-ported" | "auto-translated"
+                    )
+                })
         }) {
             return Err(anyhow!("fidelity rows must not claim units were ported"));
         }

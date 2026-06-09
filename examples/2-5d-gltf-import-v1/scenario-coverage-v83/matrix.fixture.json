@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "scenario-coverage-v83-gltf-25d-import-v1",
+  "coverageVersion": 83,
+  "issueRef": "#2195",
+  "milestone": "Era P M97",
+  "contractRef": "docs/gltf-geometry-orthographic-camera-import-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+  "demoRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
+  "demoSummaryRef": "examples/2-5d-gltf-import-v1/demo-summary.fixture.json",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "stateHashBreakMustFail": true,
+    "perceptualRenderSecondaryOnly": true,
+    "runtimeBridgeAllowed": false,
+    "embeddedEngineRuntimeAllowed": false,
+    "decompiledSourceCopied": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v83.gltf-geometry-ortho-import",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v83_gltf_25d_import.rs",
+      "locks": "Eligible source-project glTF imports declarative 2.5D presentation geometry, material references, and orthographic camera settings into a Rust-owned native scene without a foreign runtime bridge or trusted Studio writes."
+    },
+    {
+      "id": "v83.lossy-import-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v83_gltf_25d_import.rs",
+      "locks": "Unsupported glTF extensions, custom shader notes, behavior-bearing logic, physics, shader, and VFX markers remain Yellow/Red fidelity gaps or Era R re-derivation tasks and must never be silently graded clean/Green."
+    },
+    {
+      "id": "v83.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "The report validator rejects fidelity rows that claim ported, auto-port, auto-ported, or auto-translated units, so an ungated finished-game auto-port claim fails until later captured oracle evidence passes."
+    },
+    {
+      "id": "v83.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "The report validator recomputes the canonical nativeScene state-hash primary and rejects stale or tampered hashes; perceptual rendering remains secondary corroboration only."
+    },
+    {
+      "id": "v83.coverage-ledger-and-demo-script",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v83-gltf-25d-import.md",
+      "locks": "Coverage v83 records the M97 glTF regression suite, scripted demo, Rust data-plane evidence boundaries, open #1/#23 governance anchors, and the exact verification command shape from #2195."
+    }
+  ],
+  "boundary": "Scenario Coverage v83 is a Rust data-plane regression suite for Era P M97 glTF geometry and orthographic-camera import. It locks source-project/open-text glTF 2.0 presentation import, one-way import to Ouroforge-native skeleton evidence, no foreign runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity gaps for lossy imports, deterministic state-hash primary behavior including stale-hash rejection, perceptual render secondary-only corroboration, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
