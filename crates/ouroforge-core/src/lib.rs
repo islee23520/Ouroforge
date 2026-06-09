@@ -35,6 +35,7 @@ pub use ouroforge_gdd::gdd_scene_level_plan;
 pub use ouroforge_source_apply::source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod optional_human_channel_contract;
+pub mod optional_human_channel_demo;
 pub mod safe_source_apply_demo;
 pub mod self_audit_acceptance_evaluator;
 pub mod self_audit_attribution_contract;
@@ -46,6 +47,7 @@ use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
 pub use optional_human_channel_contract::*;
+pub use optional_human_channel_demo::*;
 pub use ouroforge_source_apply::source_apply_sandbox_promotion;
 pub use self_audit_acceptance_evaluator::*;
 pub use self_audit_attribution_contract::*;

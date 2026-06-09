@@ -1,0 +1,234 @@
+{
+  "schemaVersion": "optional-human-channel-demo-input-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "noHumanRun": {
+    "runId": "m72-no-human-autonomous-run",
+    "command": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+    "completed": true,
+    "waitedForHuman": false,
+    "humanInputObserved": false,
+    "trustedWritesFromSurface": false,
+    "evidenceRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ]
+  },
+  "withHumanRun": {
+    "runId": "m72-with-human-optional-provenance-run",
+    "command": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+    "completed": true,
+    "waitedForHuman": false,
+    "humanInputObserved": true,
+    "trustedWritesFromSurface": false,
+    "evidenceRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1",
+      "journal.md:m72-override-provenance",
+      "M57 curation cockpit human selection provenance",
+      "M58 playtest fun-feel provenance"
+    ]
+  },
+  "oversightInput": {
+    "schemaVersion": "optional-human-oversight-input-v1",
+    "contract": {
+      "schemaVersion": "optional-human-channel-contract-v1",
+      "titleId": "era-i-engine-builder-deckbuilder",
+      "oversightSurface": {
+        "name": "read-only stage health oversight",
+        "purpose": "Shows stage health, blockers, diagnosis, and attribution from existing evidence without becoming a required loop step.",
+        "readOnly": true,
+        "optional": true,
+        "blocksAutonomousLoop": false,
+        "allowedInputs": [
+          "view stage health",
+          "view blocker summaries",
+          "view diagnosis and attribution refs"
+        ],
+        "forbiddenActions": [
+          "trusted_write",
+          "source_apply",
+          "auto_apply",
+          "block_loop",
+          "new_verifier",
+          "new_data_plane"
+        ],
+        "evidenceRefs": [
+          "openchrome:seeds/dogfood-deckbuilder.yaml",
+          "examples/real-title-dogfood-v1/run/verdict.json",
+          "examples/real-title-dogfood-v1/run/journal.md",
+          "examples/real-title-dogfood-v1/run/ledger.jsonl",
+          "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+          "source-apply:patch-preview.v1",
+          "trust-gradient:risk-tier-v1"
+        ]
+      },
+      "escapeHatch": {
+        "name": "non-blocking stuck-loop escape-hatch",
+        "purpose": "Records optional operator stop/override provenance for a stuck loop while unrelated autonomous work remains free to continue.",
+        "readOnly": true,
+        "optional": true,
+        "blocksAutonomousLoop": false,
+        "allowedInputs": [
+          "record stop provenance",
+          "record override reason",
+          "record resume note"
+        ],
+        "forbiddenActions": [
+          "trusted_write",
+          "source_apply",
+          "auto_apply",
+          "block_loop",
+          "new_verifier",
+          "new_data_plane"
+        ],
+        "evidenceRefs": [
+          "openchrome:seeds/dogfood-deckbuilder.yaml",
+          "examples/real-title-dogfood-v1/run/verdict.json",
+          "examples/real-title-dogfood-v1/run/journal.md",
+          "examples/real-title-dogfood-v1/run/ledger.jsonl",
+          "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+          "source-apply:patch-preview.v1",
+          "trust-gradient:kill-switch-v1"
+        ]
+      },
+      "tasteFeedback": {
+        "name": "fast taste/fun feedback capture",
+        "purpose": "Captures human taste and fun notes as provenance by reusing the M57 curation and M58 playtest/fun-feel contracts; it never automates fun/taste verdicts.",
+        "readOnly": true,
+        "optional": true,
+        "blocksAutonomousLoop": false,
+        "allowedInputs": [
+          "record taste note",
+          "record fun feedback",
+          "link playtest provenance"
+        ],
+        "forbiddenActions": [
+          "trusted_write",
+          "source_apply",
+          "auto_apply",
+          "block_loop",
+          "new_verifier",
+          "new_data_plane"
+        ],
+        "evidenceRefs": [
+          "openchrome:seeds/dogfood-deckbuilder.yaml",
+          "examples/real-title-dogfood-v1/run/verdict.json",
+          "examples/real-title-dogfood-v1/run/journal.md",
+          "examples/real-title-dogfood-v1/run/ledger.jsonl",
+          "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+          "source-apply:patch-preview.v1",
+          "trust-gradient:risk-tier-v1"
+        ]
+      },
+      "requiredPipelineRefs": [
+        "openchrome:seeds/dogfood-deckbuilder.yaml",
+        "examples/real-title-dogfood-v1/run/verdict.json",
+        "examples/real-title-dogfood-v1/run/journal.md",
+        "examples/real-title-dogfood-v1/run/ledger.jsonl",
+        "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+        "source-apply:patch-preview.v1",
+        "trust-gradient:risk-tier-v1"
+      ],
+      "reuseMilestoneRefs": [
+        "M57 curation cockpit human selection provenance",
+        "M58 playtest fun-feel capture provenance",
+        "M58 human fun/taste verdict remains Ring 2"
+      ],
+      "autonomousLoopBlocksOnChannel": false,
+      "noNewVerificationEngine": true,
+      "noNewDataPlane": true,
+      "boundary": "Optional, non-blocking, read-only human channel for Era L M72: stage health, blocker, diagnosis, and attribution oversight read existing openchrome verdict, journal.md, ledger.jsonl, loop-coverage attribution, source-apply, and trust-gradient evidence only; the stuck-loop escape-hatch records provenance but does not block the autonomous loop; taste and fun feedback reuse M57/M58 provenance and never automate fun/taste or release go/no-go. No trusted writes, no source-apply authority, no auto-apply authority, no new verification engine, no new data plane, no new store, Rust remains the data plane, Elixir executor remains unchanged, #1 and #23 remain open."
+    },
+    "stageHealthRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "blockerRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "diagnosisRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "attributionRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "loopCompletedWithoutHuman": true,
+    "noTrustedWrites": true,
+    "noNewDataPlane": true
+  },
+  "overrideInput": {
+    "schemaVersion": "optional-human-override-input-v1",
+    "titleId": "era-i-engine-builder-deckbuilder",
+    "stuckLoopRef": "ledger.jsonl:m72-explicit-stuck-loop",
+    "overrideReason": "operator recorded a non-blocking stop/resume nudge after repeated identical diagnosis",
+    "operatorProvenanceRef": "journal.md:m72-override-provenance",
+    "evidenceRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "blocksAutonomousLoop": false,
+    "trustedWriteRequested": false,
+    "sourceApplyRequested": false,
+    "noNewDataPlane": true
+  },
+  "tasteFeedbackInput": {
+    "schemaVersion": "optional-human-taste-feedback-input-v1",
+    "titleId": "era-i-engine-builder-deckbuilder",
+    "feedbackId": "m72-taste-note-cascade-readability",
+    "feedbackText": "The score cascade is readable, but shop reroll affordance still feels low-salience.",
+    "m57CurationRef": "M57 curation cockpit human selection provenance",
+    "m58PlaytestRef": "M58 playtest fun-feel provenance",
+    "evidenceRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "autoApplyRequested": false,
+    "sourceApplyRequested": false,
+    "noNewDataPlane": true
+  },
+  "noNewVerificationEngine": true,
+  "noNewDataPlane": true
+}
