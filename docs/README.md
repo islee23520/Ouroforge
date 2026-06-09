@@ -196,3 +196,5 @@ should remain ignored/untracked.
 - [GDD Prototype Evidence Bundle v1](gdd-prototype-evidence-bundle-v1.md) — run evidence, requirement coverage, and journal summary for bounded GDD-to-prototype validation.
 
 - [Scenario Coverage v11: GDD-to-Prototype Regression Suite](scenario-coverage-v11-gdd-to-prototype.md) — pipeline-stage regression matrix for GDD-to-prototype fixtures and fail-closed cases.
+
+- [Live Campaign Steering Directives Scope & Contract v1](live-campaign-steering-directives-v1.md) — Milestone 77 contract for intervention-as-evidence steering through read + gated-write Studio surfaces and existing Rust gates.
