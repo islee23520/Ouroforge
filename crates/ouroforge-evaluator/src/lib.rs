@@ -14,6 +14,7 @@ pub mod asset_qa_gate;
 pub mod content_curation_gate;
 pub mod design_integrity_gate;
 pub mod dogfood_contract;
+pub mod human_constraint_gate;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct EvaluationVerdict {
