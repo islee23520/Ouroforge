@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "scenario-coverage-v70-diagnosis-correction-intervention-feedback-v1",
+  "coverageVersion": 70,
+  "campaignId": "m79-diagnosis-correction-demo",
+  "issueRef": "#2072",
+  "milestone": "Era M M79",
+  "autonomyInvariants": {
+    "humanInputRequired": false,
+    "loopCompletesWithoutHuman": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "rustDataPlaneOwnsValidation": true,
+    "hostedCollaborativeStudioDeferred": true,
+    "cliFallbackIntact": true,
+    "opaqueMlUpdate": false,
+    "automatedFunTasteInference": false
+  },
+  "rows": [
+    {
+      "id": "diagnosis-correction-recorded-through-existing-gates",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/diagnosis_correction_contract.rs",
+      "locks": "Human diagnosis corrections are intervention evidence with review/apply, scene/source-apply, evaluator, evidence/provenance, and provenance refs before re-attribution can affect later decisions."
+    },
+    {
+      "id": "corrected-attribution-improves-subsequent-run",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/diagnosis_correction_contract.rs",
+      "locks": "A validated correction updates transparent heuristic priors so a later attribution can prefer the corrected diagnosis without opaque ML or fun/taste inference."
+    },
+    {
+      "id": "no-raw-bypass-from-elixir-diagnosis-correction-surface",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/diagnosis_correction_surface.ex",
+      "locks": "The Elixir control plane captures and routes only; it performs no artifact write, trusted Studio write, raw bypass, or diagnosis semantics ownership."
+    },
+    {
+      "id": "loop-completes-without-human-input",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/diagnosis_correction_demo_test.exs",
+      "locks": "The autonomous default path completes without waiting for or requiring the human diagnosis correction surface and keeps CLI fallback intact."
+    },
+    {
+      "id": "mandatory-human-and-opaque-inference-regressions-fail-closed",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/diagnosis_correction_surface_test.exs",
+      "locks": "Coverage rejects drift that marks human input required, disables CLI fallback, grants Studio trusted write authority, owns diagnosis semantics in Elixir, uses opaque ML, or automates fun/taste inference."
+    },
+    {
+      "id": "coverage-v70-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v70-diagnosis-correction-intervention-feedback.md",
+      "locks": "Coverage v70 records the agent-first, two-plane, local-first, gated-write-only, transparent-prior, no-new-store, no-hosted-collab, fun/taste human, release go/no-go human, and #1/#23 governance boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v70 is a regression suite for Era M M79 diagnosis correction and intervention feedback. Human intervention is opt-in and every correction is a validated, recorded proposal/constraint/directive through existing review/apply, scene/source-apply, evaluator, and evidence/provenance gates before attribution priors can change. Elixir/Phoenix is local control and presentation only and never writes artifacts, ledger, evidence, diagnosis, scene, source, release, merge, or deploy semantics. Rust remains the data plane for truth, validation, determinism, evidence, provenance, diagnosis semantics, transparent heuristic prior updates, scene/source-apply, and gated writes. The autonomous loop completes with zero human input. No raw bypass, no new write path, no new data store, no hosted/multi-user/collaborative Studio, no mandatory human dependency, no opaque ML, no fun/taste automation, and no release go/no-go automation are introduced. CLI fallback remains intact. #1 and #23 remain open."
+}
