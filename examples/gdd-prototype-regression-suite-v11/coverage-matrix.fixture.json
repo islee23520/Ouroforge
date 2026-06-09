@@ -29,7 +29,7 @@
       "id": "GDD11.design-brief-schema",
       "stage": "gdd schema/design brief",
       "doc": "docs/gdd-design-brief-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_design_brief_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-design-brief-v1/design-brief.valid.fixture.json",
         "examples/gdd-design-brief-v1/design-brief.partial.fixture.json",
@@ -52,7 +52,7 @@
       "id": "GDD11.requirements",
       "stage": "requirement extraction",
       "doc": "docs/gdd-requirement-extraction-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_requirement_extraction_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-requirement-extraction-v1/requirements.valid.fixture.json",
         "examples/gdd-requirement-extraction-v1/requirements.partial.fixture.json",
@@ -76,7 +76,7 @@
       "id": "GDD11.mechanics-core-loop",
       "stage": "mechanics/core-loop mapping",
       "doc": "docs/gdd-mechanics-mapping-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_mechanics_mapping_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-mechanics-mapping-v1/mechanics.supported.fixture.json",
         "examples/gdd-mechanics-mapping-v1/mechanics.partial.fixture.json",
@@ -102,7 +102,7 @@
       "id": "GDD11.feasibility",
       "stage": "feasibility gate",
       "doc": "docs/gdd-feasibility-gate-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_feasibility_gate_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-feasibility-gate-v1/feasibility.feasible.fixture.json",
         "examples/gdd-feasibility-gate-v1/feasibility.infeasible.fixture.json",
@@ -128,7 +128,7 @@
       "id": "GDD11.scaffold",
       "stage": "project scaffold plan",
       "doc": "docs/gdd-project-scaffold-plan-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_project_scaffold_plan_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-project-scaffold-plan-v1/scaffold.valid.fixture.json",
         "examples/gdd-project-scaffold-plan-v1/scaffold.deferred.fixture.json",
@@ -153,7 +153,7 @@
       "id": "GDD11.scene-level",
       "stage": "scene/level plan",
       "doc": "docs/gdd-scene-level-plan-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_scene_level_plan_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-scene-level-plan-v1/scene-level-plan.valid.fixture.json",
         "examples/gdd-scene-level-plan-v1/scene-level-plan.partial.fixture.json",
@@ -179,7 +179,7 @@
       "id": "GDD11.behavior",
       "stage": "gameplay behavior plan",
       "doc": "docs/gdd-gameplay-behavior-plan-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_gameplay_behavior_plan_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-gameplay-behavior-plan-v1/behavior-plan.valid.fixture.json",
         "examples/gdd-gameplay-behavior-plan-v1/behavior-plan.partial.fixture.json",
@@ -206,7 +206,7 @@
       "id": "GDD11.assets",
       "stage": "asset placeholder/reference plan",
       "doc": "docs/gdd-asset-placeholder-plan-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_asset_placeholder_plan_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-asset-placeholder-plan-v1/asset-plan.valid.fixture.json",
         "examples/gdd-asset-placeholder-plan-v1/asset-plan.missing.fixture.json",
@@ -231,7 +231,7 @@
       "id": "GDD11.scenarios",
       "stage": "scenario/acceptance generation",
       "doc": "docs/gdd-scenario-acceptance-plan-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_scenario_acceptance_plan_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-scenario-acceptance-plan-v1/scenario-plan.valid.fixture.json",
         "examples/gdd-scenario-acceptance-plan-v1/scenario-plan.partial.fixture.json",
@@ -257,7 +257,7 @@
       "id": "GDD11.task-graph",
       "stage": "prototype task graph",
       "doc": "docs/gdd-prototype-task-graph-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_prototype_task_graph_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-prototype-task-graph-v1/task-graph.valid.fixture.json",
         "examples/gdd-prototype-task-graph-v1/task-graph.stale.fixture.json",
@@ -282,7 +282,7 @@
       "id": "GDD11.bundle-apply-evidence-read-models",
       "stage": "bundle/apply/run/evidence/journal/dashboard/Studio",
       "doc": "docs/gdd-to-prototype-demo-v1.md",
-      "contractTest": "crates/ouroforge-core/tests/gdd_to_prototype_demo_contract.rs",
+      "contractTest": "crates/ouroforge-core/tests/gdd_contracts.rs",
       "positiveFixtures": [
         "examples/gdd-prototype-draft-bundle-v1/bundle.valid.fixture.json",
         "examples/gdd-prototype-apply-v1/apply.valid.fixture.json",
