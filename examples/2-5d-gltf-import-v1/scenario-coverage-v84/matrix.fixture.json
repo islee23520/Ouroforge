@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "scenario-coverage-v84-m98-presentation-v1",
+  "coverageVersion": 84,
+  "issueRef": "#2199",
+  "milestone": "Era P M98",
+  "contractRef": "docs/billboard-sprite-stack-presentation-contract-v1.md",
+  "parentContractRef": "docs/2-5d-migration-on-ramp-scope-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+  "demoRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
+  "demoSummaryRef": "examples/2-5d-gltf-import-v1/demo-summary.fixture.json",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "stateHashBreakMustFail": true,
+    "perceptualRenderSecondaryOnly": true,
+    "m98PresentationCannotMutateLogic": true,
+    "billboardCovered": true,
+    "spriteStackCovered": true,
+    "twoDInThreeDPlaneCovered": true,
+    "runtimeBridgeAllowed": false,
+    "embeddedEngineRuntimeAllowed": false,
+    "decompiledSourceCopied": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v84.m98-presentation-primitives",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v84_m98_presentation.rs",
+      "locks": "The source-project glTF fixture covers billboard, sprite-stack, and 2D-in-3D plane extras normalized into Rust-owned nativeScene.presentationLayers as presentation-only evidence."
+    },
+    {
+      "id": "v84.presentation-cannot-mutate-logic",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "Every M98 presentation layer carries presentation-only authority and validation rejects any bounded primitive that drifts into deterministic logic or evidence mutation authority."
+    },
+    {
+      "id": "v84.lossy-presentation-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v84_m98_presentation.rs",
+      "locks": "Unsupported presentation kinds and logic-coupled presentation extras fail or remain Yellow fidelity gaps instead of being silently graded clean/Green."
+    },
+    {
+      "id": "v84.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "Forged ported, auto-ported, auto-translated, or behavior-equivalent claims fail validation without captured passing oracle evidence."
+    },
+    {
+      "id": "v84.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "The report validator recomputes stateHashPrimary over the Rust-owned native scene and fails stale hashes; changed M98 presentation source changes the deterministic hash."
+    },
+    {
+      "id": "v84.coverage-ledger-and-demo-script",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v84-m98-presentation.md",
+      "locks": "Coverage v84 records the M98 presentation regression suite, demo fixture, render smoke, open #1/#23 governance anchors, and exact verification command shape from #2199."
+    }
+  ],
+  "boundary": "Scenario Coverage v84 is a Rust data-plane regression suite for Era P M98 billboard, sprite-stack, and 2D-in-3D presentation layers. It locks source-project/open-text glTF presentation extras, one-way import to Ouroforge-native skeleton evidence, no foreign runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity for lossy or logic-coupled presentation, deterministic state-hash primary behavior including stale-hash rejection, perceptual render secondary-only corroboration, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
