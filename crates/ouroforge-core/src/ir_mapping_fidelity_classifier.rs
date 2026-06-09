@@ -372,6 +372,12 @@ pub fn validate_mapping_artifact(artifact: &OuroforgeMappingArtifact) -> Result<
     if !artifact.behavioral_units.is_empty() && artifact.fidelity_report.red == 0 {
         return Err(anyhow!("behavioral or unsupported units must be red"));
     }
+    let expected_hash = mapping_state_hash(artifact)?;
+    if artifact.state_hash != expected_hash {
+        return Err(anyhow!(
+            "IR mapping state hash does not match canonical mapping artifact"
+        ));
+    }
     Ok(())
 }
 

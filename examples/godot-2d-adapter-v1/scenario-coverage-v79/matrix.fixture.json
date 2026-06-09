@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "scenario-coverage-v79-ir-mapping-fidelity-classifier-v1",
+  "coverageVersion": 79,
+  "issueRef": "#2175",
+  "milestone": "Era O M90",
+  "contractRef": "docs/scenario-coverage-v79-ir-mapping-fidelity-classifier.md",
+  "implementationRef": "crates/ouroforge-core/src/ir_mapping_fidelity_classifier.rs",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "deterministicStateHashRequired": true,
+    "staleStateHashAllowed": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v79.ir-to-native-mapping-report",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v79_ir_mapping_fidelity_classifier.rs",
+      "locks": "Godot adapter IR maps into Ouroforge-native candidate scenes, entities, assets, inputs, oracle records, and an honest fidelity report without claiming any mapped unit is ported."
+    },
+    {
+      "id": "v79.lossy-import-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v79_ir_mapping_fidelity_classifier.rs",
+      "locks": "Lossy imports, unsupported features, script callbacks, physics-sensitive collider facts, and behavioral units remain visible Yellow/Red gaps and cannot be laundered into a clean Green report."
+    },
+    {
+      "id": "v79.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/ir_mapping_fidelity_classifier.rs",
+      "locks": "The mapping validator rejects claimed_ported_units and oracle-missing records with port permission, so ungated or auto-translated port claims fail until later Ouroforge-native oracle evidence passes."
+    },
+    {
+      "id": "v79.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v79_ir_mapping_fidelity_classifier.rs",
+      "locks": "The mapping artifact state-hash is stable for identical canonical IR mappings, changes when source data changes, and validation rejects stale hashes after artifact tampering."
+    },
+    {
+      "id": "v79.coverage-ledger-and-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v79-ir-mapping-fidelity-classifier.md",
+      "locks": "Coverage v79 records the one-way on-ramp, source-project/open-text legal boundary, clean-room re-derivation hand-off, Rust data-plane ownership, no Studio trusted writes, and #1/#23 open governance anchors."
+    }
+  ],
+  "boundary": "Scenario Coverage v79 is a Rust data-plane regression suite for Era O M90 IR to Ouroforge mapping and fidelity classification. It locks source-project/open-text adapter IR mapping into Ouroforge-native candidate skeleton artifacts, no foreign runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity gaps for lossy imports, deterministic state-hash behavior including stale-hash rejection, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
