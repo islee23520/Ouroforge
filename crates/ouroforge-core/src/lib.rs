@@ -94,6 +94,7 @@ pub mod differential_verification;
 pub mod internal_sprite_audit;
 pub mod legacy_logic_ingestion;
 pub mod loop_coverage_attribution;
+pub mod semantic_port_coverage;
 pub mod tacit_oracle_capture;
 pub mod trust_gradient_auto_apply;
 pub mod unity_2d_adapter_ir;

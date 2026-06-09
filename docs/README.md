@@ -132,6 +132,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`scenario-coverage-v92-deterministic-reexpression.md`](scenario-coverage-v92-deterministic-reexpression.md) — Scenario Coverage v92 regression suite for M110 deterministic re-expression, locking no clean grade for lossy imports, no ungated auto-port/translation, state-hash determinism, 3D render evidence as secondary, and Rust/Studio boundaries.
 - [`differential-verification-behavioral-ab-contract-v1.md`](differential-verification-behavioral-ab-contract-v1.md) — Era R M111 contract for behavioral A/B differential verification, defining exact inputs/outputs, clean-room one-way gates, Green/Yellow/Red fidelity and oracle rules, deterministic state-hash comparison, and M112 hand-off.
 - [`scenario-coverage-v93-differential-verification.md`](scenario-coverage-v93-differential-verification.md) — Scenario Coverage v93 regression suite for M111 differential verification, locking no auto-port without oracle, lossy A/B mismatches not Green, ungated/auto-translated ports failing, state-hash determinism, 3D render evidence as secondary, and Rust/Studio boundaries.
+- [`semantic-port-coverage-convergence-v1.md`](semantic-port-coverage-convergence-v1.md) — Era R M112 Rust data-plane coverage and convergence ledger for verified/pending/human-feel-escalated units, residual backlog, deterministic evidence, and no fully-ported claim.
 
 ## Authoring, Studio, and review surfaces
 
