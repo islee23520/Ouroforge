@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "scenario-coverage-v72-non-developer-generative-front-door-v1",
+  "coverageVersion": 72,
+  "campaignId": "campaign-m82-guided-front-door-demo",
+  "issueRef": "#2081",
+  "milestone": "Era N M82",
+  "autonomyInvariants": {
+    "humanInputRequired": false,
+    "loopCompletesWithoutHuman": true,
+    "guidedInputIsInterventionEvidence": true,
+    "proposalPreviewIsDeterministic": true,
+    "proposalOnlyUntilReviewApply": true,
+    "humanWriteRoutesThroughRustGate": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "elixirOwnsProposalSemantics": false,
+    "autoApplyPerformed": false,
+    "reviewerBypass": false,
+    "rustDataPlaneOwnsValidation": true,
+    "hostedCollaborativeStudioDeferred": true,
+    "cliFallbackIntact": true
+  },
+  "rows": [
+    {
+      "id": "guided-intake-captures-intervention-evidence",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/guided_generative_front_door_test.exs",
+      "locks": "Guided intake captures a non-developer brief and conversation summary as intervention-as-evidence with provenance and no direct artifact write authority."
+    },
+    {
+      "id": "proposal-preview-is-deterministic-and-proposal-only",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/guided_generative_front_door.ex",
+      "locks": "The preview is deterministic, proposal-only, and exposes required gates while explicitly carrying no trusted write or auto-apply authority."
+    },
+    {
+      "id": "human-write-routes-through-rust-gates",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/guided_generative_front_door_demo_test.exs",
+      "locks": "The demo routes the inert guided submission through generative-front-door validate and leaves review/apply required before any trusted write."
+    },
+    {
+      "id": "no-raw-bypass-from-elixir-guided-surface",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v72_non_developer_front_door.rs",
+      "locks": "Coverage scans the guided front-door Studio surface and demo for file-write, raw bypass, trusted write, auto-apply, and reviewer-bypass drift."
+    },
+    {
+      "id": "loop-completes-without-human-input",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/guided_generative_front_door_demo_test.exs",
+      "locks": "The scripted demo includes a no-human autonomous path that completes without requiring or waiting for a Studio human surface."
+    },
+    {
+      "id": "coverage-v72-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v72-non-developer-generative-front-door.md",
+      "locks": "Coverage v72 records read + gated-write, intervention-as-evidence, Rust data-plane validation, local-first CLI fallback, no hosted collaboration, no new store, no fun/release automation, and #1/#23 governance boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v72 is a regression suite for Era N M82 non-developer generative front-door UX. Human brief and conversation input is opt-in and captured as intervention-as-evidence with provenance, deterministic proposal preview, and proposal-only status. Every human write-affecting intent routes through generative-front-door validate and later review/apply, scene/source-apply, evaluator, evidence, and provenance gates before any trusted effect. Elixir/Phoenix is local control and presentation only and never writes artifacts, ledger, evidence, scene, source, release, merge, deploy, proposal semantics, evaluator truth, auto-apply, or reviewer-bypass authority. Rust remains the data plane for truth, validation, determinism, evidence, provenance, review/apply, scene/source-apply, and gated writes. The autonomous loop completes with zero human input. No raw bypass, no new write path, no new data store, no hosted/multi-user/collaborative Studio, no mandatory human dependency, no browser command bridge, no fun/taste automation, and no release go/no-go automation are introduced. CLI fallback remains intact. #1 and #23 remain open."
+}
