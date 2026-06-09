@@ -1,13 +1,13 @@
 {
   "status": "ready_for_verifier",
-  "selected_blocker": "B2 \u2014 No compact demo spec",
-  "branch": "dogfood/b2-compact-demo-spec-20260609213312",
-  "worktree": "/Users/jh0927/Ouroforge-dogfood-b2-compact-demo-spec-20260609213312",
-  "message": "B2 compact demo spec and validator implemented, verified, pushed, and opened as PR #2335. Ready for focused verifier re-measurement.",
+  "selected_blocker": "B3 \u2014 canonical compact-demo pipeline dry-run evidence",
+  "branch": "dogfood/b3-pipeline-dry-run-20260609214129",
+  "worktree": "/Users/jh0927/Ouroforge-dogfood-b3-pipeline-dry-run-20260609214129",
+  "message": "B3 pipeline dry-run evidence report and validator implemented, verified, pushed, and opened as PR #2336. Ready for focused verifier re-measurement.",
   "verification": [
-    "node --test examples/dogfood-demo-spec-v1/demo-game-spec-smoke.test.cjs \u2014 passed",
+    "node --test examples/dogfood-pipeline-dry-run-v1/pipeline-dry-run-smoke.test.cjs \u2014 passed",
     "git diff --check origin/main...HEAD \u2014 passed"
   ],
-  "updated_at": "2026-06-09T21:34:57.075697+00:00",
-  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2335"
+  "updated_at": "2026-06-09T21:47:55.771225+00:00",
+  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2336"
 }
