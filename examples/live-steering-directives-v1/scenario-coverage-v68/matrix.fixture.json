@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "scenario-coverage-v68-live-campaign-steering-directives-v1",
+  "coverageVersion": 68,
+  "campaignId": "m77-live-steering-demo",
+  "issueRef": "#2064",
+  "milestone": "Era M M77",
+  "autonomyInvariants": {
+    "humanInputRequired": false,
+    "loopCompletesWithoutHuman": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "rustDataPlaneOwnsValidation": true,
+    "hostedCollaborativeStudioDeferred": true,
+    "cliFallbackIntact": true
+  },
+  "rows": [
+    {
+      "id": "live-steering-directives-recorded-through-gates",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/live_steering_test.exs",
+      "locks": "Accepted human steering directives are validated and recorded through the constrained Rust CLI phases before changing local executor ready-task ordering."
+    },
+    {
+      "id": "no-raw-bypass-from-elixir-control-plane",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/live_steering.ex",
+      "locks": "The Elixir control plane captures, routes, broadcasts, and renders only; it has no trusted artifact, ledger, evidence, scene, source, release, merge, or deploy write authority."
+    },
+    {
+      "id": "loop-completes-without-human-input",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/live_steering_demo_test.exs",
+      "locks": "The autonomous no-directive path remains running_autonomously, produces ready task IDs, and never waits for or requires a human."
+    },
+    {
+      "id": "mandatory-human-regression-fails-closed",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v68_live_campaign_steering.rs",
+      "locks": "Coverage rejects any drift that marks human input as required, disables zero-human completion, or grants Studio trusted write authority."
+    },
+    {
+      "id": "pause-is-control-state-not-artifact-mutation",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/live_steering_test.exs",
+      "locks": "A validated pause changes only ephemeral scheduling presentation state and records evidence; it is not an artifact mutation or raw write."
+    },
+    {
+      "id": "coverage-v68-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v68-live-campaign-steering-directives.md",
+      "locks": "Coverage v68 records local-first Studio, Rust data-plane validation, gated-write only human intervention, no new store, no hosted collaboration, CLI fallback, and #1/#23 governance boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v68 is a regression suite for Era M M77 live campaign steering directives. Human intervention is opt-in and every proposal, constraint, or directive is validated and recorded through existing Rust gates before any scheduling effect. Elixir/Phoenix is local control and presentation only and never writes artifacts, ledger, evidence, scene, source, release, merge, or deploy semantics. Rust remains the data plane for truth, validation, determinism, evidence, provenance, scene/source-apply, and gated writes. The autonomous loop completes with zero human input. No new write path, no new data store, no hosted/multi-user/collaborative Studio, no mandatory human dependency, no fun/taste automation, and no release go/no-go automation are introduced. CLI fallback remains intact. #1 and #23 remain open."
+}
