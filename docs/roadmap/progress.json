@@ -17,17 +17,15 @@
     "M": {"title": "Active Human Intervention", "status": "complete", "milestones": "M74-M81", "coverage": "v66-v71", "issues": "#2052-#2077"},
     "N": {"title": "Human-Grade Studio & Adoption UX", "status": "complete", "milestones": "M82-M87", "coverage": "v72-v77", "issues": "#2078-#2099"},
     "O": {"title": "External-Engine 2D Migration On-Ramp", "status": "complete", "milestones": "M88-M95", "coverage": "v78-v82", "issues": "#2167-#2190"},
-    "P": {"title": "2.5D Migration On-Ramp", "status": "complete", "milestones": "M96-M100", "coverage": "v83-v85", "issues": "#2191-#2203", "completed": "2026-06-09"},
-    "Q": {"title": "Full-3D On-Ramp Re-evaluation", "status": "gate", "milestones": "M101-M106", "coverage": "v86-v89", "issues": "#2204-#2219", "notes": "Gate #2204 OPEN; DEFER default; no active implementation"},
+    "P": {"title": "2.5D Migration On-Ramp", "status": "complete", "milestones": "M96-M100", "coverage": "v83-v85", "issues": "#2191-#2203", "completed": "2026-06-09", "notes": "complete on merged evidence; state-hash primary and perceptual secondary"},
+    "Q": {"title": "Full-3D On-Ramp Re-evaluation", "status": "deferred", "milestones": "M101-M106", "coverage": "v86-v89", "issues": "#2204-#2219", "notes": "M101 DEFER recorded; M102-M106 remain GO-gated"},
     "R": {"title": "Interrogated Semantic Re-Derivation", "status": "complete", "milestones": "M107-M114", "coverage": "v90-v95", "issues": "#2220-#2241"}
   },
-  "active_focus": [
-    {"era": "Q", "priority": 1, "description": "Gate #2204 evaluation; DEFER default until gate passes"}
-  ],
+  "active_focus": [],
   "summary": {
     "total_eras": 18,
     "complete": 15,
-    "gate_pending": 1,
+    "deferred": 1,
     "planned": 2
   }
 }

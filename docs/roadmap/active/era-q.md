@@ -9,6 +9,10 @@ Goal: decide, on evidence, whether to build a bounded full-3D on-ramp, given the
 Target deliverables: a re-evaluation ADR (the two-tier evidence change, the deterministic-3D-physics requirement, the glTF-3D-runtime requirement, the "re-simulate, not reproduce" physics rule, demand evidence); a per-capability GO/DEFER with DEFER as default.
 Success criteria: a documented GO/DEFER with evidence exists; DEFER remains the default absent strong demand; #1/#23 remain open.
 
+#### Milestone 101 Decision: DEFER recorded (#2204)
+
+M101 is recorded as DEFER in `docs/full-3d-on-ramp-reevaluation-gate-v1.md`. M102-M106 remain GO-gated and no implementation work is created by this lane. The decision preserves the 2D bit-exact moat, treats 3D state-hash evidence as primary and perceptual render comparison as secondary, and keeps full-3D physics as native deterministic re-simulation rather than source-runtime reproduction. #1/#23 remain open.
+
 #### Milestone 102: glTF 3D Scene Import and Normalization (GO-gated)
 Goal: import 3D scene/geometry/PBR materials via glTF with web normalization.
 Target deliverables: a glTF 3D importer (mesh/PBR-metallic-roughness/skeleton/morph/cameras/punctual lights), normalization (axis/handedness/units/color-space), Draco/Meshopt/KTX2 optimization; a Scenario Coverage v86 regression suite.
