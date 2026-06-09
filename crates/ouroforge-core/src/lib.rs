@@ -17,6 +17,7 @@ pub use ouroforge_core_types::*;
 
 pub mod behavior_runtime;
 pub mod complexity_ladder;
+pub mod diagnosis_correction;
 pub mod engine_growth_justification;
 pub use ouroforge_gdd::gdd_asset_placeholder_plan;
 pub use ouroforge_gdd::gdd_design_brief;
@@ -48,6 +49,7 @@ pub mod self_improvement_loop_contract;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
+pub use diagnosis_correction::*;
 pub use human_artifact_intake::*;
 pub use optional_human_channel_contract::*;
 pub use optional_human_channel_demo::*;
