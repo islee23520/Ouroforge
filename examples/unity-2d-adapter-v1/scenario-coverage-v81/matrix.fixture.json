@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "scenario-coverage-v81-unity-2d-adapter-ir-v1",
+  "coverageVersion": 81,
+  "issueRef": "#2185",
+  "milestone": "Era O M93",
+  "contractRef": "docs/scenario-coverage-v81-unity-2d-adapter-ir.md",
+  "implementationRef": "crates/ouroforge-core/src/unity_2d_adapter_ir.rs",
+  "demoRef": "examples/unity-2d-adapter-v1/demo/run-demo.sh",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "unityForceTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "deterministicStateHashRequired": true,
+    "staleStateHashAllowed": false,
+    "runtimeBridgeAllowed": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "decompiledSourceCopied": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v81.unity-force-text-skeleton-import",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v81_unity_2d_adapter_ir.rs",
+      "locks": "The M93 Unity demo fixture parses Force-Text .unity/.prefab/.asset plus .meta GUID references into Rust-owned IR with scenes, prefabs, assets, inputs, fidelity records, missing oracle records, and zero claimed ported units."
+    },
+    {
+      "id": "v81.unity-lossy-import-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v81_unity_2d_adapter_ir.rs",
+      "locks": "Unity behavior-bearing MonoBehaviour data, prefab override caveats, physics re-simulation, and unsupported gaps remain Yellow/Red fidelity findings; validation rejects attempts to launder these gaps into a clean report."
+    },
+    {
+      "id": "v81.unity-no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/unity_2d_adapter_ir.rs",
+      "locks": "The Unity adapter validators reject auto-translated claimed_ported_units and oracle-missing records with port permission, so no imported Unity unit is treated as ported without captured passing oracle evidence."
+    },
+    {
+      "id": "v81.unity-deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v81_unity_2d_adapter_ir.rs",
+      "locks": "Unity adapter state hashes are stable for identical canonical Force-Text inputs, change when source data changes, and validation rejects stale hashes after IR tampering."
+    },
+    {
+      "id": "v81.unity-coverage-ledger-and-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v81-unity-2d-adapter-ir.md",
+      "locks": "Coverage v81 records the Unity Force-Text source-only legal boundary, one-way on-ramp, clean-room Era R re-derivation hand-off, Rust data-plane ownership, no Studio trusted writes, no decompiled source copying, and #1/#23 open governance anchors."
+    }
+  ],
+  "boundary": "Scenario Coverage v81 is a Rust data-plane regression suite for Era O M93 Unity 2D adapter to IR. It locks source-project/open-text Unity Force-Text skeleton import, .meta GUID reference resolution, no Unity runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity gaps for lossy imports, deterministic state-hash behavior including stale-hash rejection, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
