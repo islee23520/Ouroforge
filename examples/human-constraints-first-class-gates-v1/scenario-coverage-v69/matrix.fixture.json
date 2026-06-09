@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "scenario-coverage-v69-human-constraints-first-class-gates-v1",
+  "coverageVersion": 69,
+  "campaignId": "m78-human-constraints-demo",
+  "issueRef": "#2068",
+  "milestone": "Era M M78",
+  "autonomyInvariants": {
+    "humanInputRequired": false,
+    "loopCompletesWithoutHuman": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "rustDataPlaneOwnsValidation": true,
+    "hostedCollaborativeStudioDeferred": true,
+    "cliFallbackIntact": true
+  },
+  "rows": [
+    {
+      "id": "constraints-recorded-through-existing-gates",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/human_constraint_surface_test.exs",
+      "locks": "Human constraints are captured as intervention evidence with review/apply, evaluator, normalized constraint, and provenance refs before being routed to Rust."
+    },
+    {
+      "id": "violating-output-blocked-with-evidence",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-evaluator/tests/human_constraint_gate_contract.rs",
+      "locks": "A candidate that violates a forbidden mechanic, required style, or budget cap is blocked by the Rust evaluator humanConstraints gate with evidence refs."
+    },
+    {
+      "id": "no-raw-bypass-from-elixir-human-constraint-surface",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/human_constraint_surface.ex",
+      "locks": "The Elixir control plane captures and routes only; it performs no artifact write, trusted Studio write, raw bypass, or semantic validation ownership."
+    },
+    {
+      "id": "loop-completes-without-human-input",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/human_constraint_demo_test.exs",
+      "locks": "The autonomous default path completes without waiting for or requiring a human constraint surface and keeps CLI fallback intact."
+    },
+    {
+      "id": "mandatory-human-regression-fails-closed",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/human_constraint_surface_test.exs",
+      "locks": "Coverage rejects any drift that marks human input as required, disables CLI fallback, or grants trusted write authority to Studio."
+    },
+    {
+      "id": "coverage-v69-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v69-human-constraints-first-class-gates.md",
+      "locks": "Coverage v69 records the agent-first, two-plane, local-first, gated-write-only, no-new-store, no-hosted-collab, fun/taste human, release go/no-go human, and #1/#23 governance boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v69 is a regression suite for Era M M78 human constraints as first-class gates. Human intervention is opt-in and every constraint is a validated, recorded proposal/constraint/directive through existing review/apply, scene/source-apply, evaluator, and evidence/provenance gates before any candidate can be promoted. Elixir/Phoenix is local control and presentation only and never writes artifacts, ledger, evidence, scene, source, release, merge, or deploy semantics. Rust remains the data plane for truth, validation, determinism, evidence, provenance, scene/source-apply, and gated writes. The autonomous loop completes with zero human input. No raw bypass, no new write path, no new data store, no hosted/multi-user/collaborative Studio, no mandatory human dependency, no fun/taste automation, and no release go/no-go automation are introduced. CLI fallback remains intact. #1 and #23 remain open."
+}
