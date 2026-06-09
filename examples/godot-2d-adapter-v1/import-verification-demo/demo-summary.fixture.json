@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "import-verification-demo-v1",
+  "issueRef": "#2180",
+  "milestone": "Era O M92",
+  "scriptRef": "examples/godot-2d-adapter-v1/import-verification-demo/run-demo.sh",
+  "sourceProject": "examples/godot-2d-adapter-v1/sample-project",
+  "reportCommand": "cargo run -p ouroforge-cli -- migration verify-demo --project examples/godot-2d-adapter-v1/sample-project --output examples/godot-2d-adapter-v1/generated/import-verification-report.json",
+  "loopCommand": "cargo run -p ouroforge-cli -- run seeds/migration-demo.yaml --workers 2 || true",
+  "expectedSummary": {
+    "sourceEngine": "godot",
+    "openchromeRunner": "openchrome-local-skeleton-smoke",
+    "skeletonVerificationStatus": "passed",
+    "minClean": 1,
+    "minFlagged": 1,
+    "minReDerive": 1,
+    "claimedPortedUnits": 0,
+    "deterministicStateHash": true,
+    "assetOrigin": "godot",
+    "decompiledSourceCopied": false,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "anchorsRemainOpen": true
+  },
+  "boundary": "Scripted local demo only: source-project/open-text Godot skeleton import to Rust-owned report, openchrome skeleton smoke evidence, generated output under ignored generated state, no trusted Studio write, no foreign runtime bridge, no auto-port claim, and logic remains Era R clean-room re-derivation until oracle evidence passes."
+}
