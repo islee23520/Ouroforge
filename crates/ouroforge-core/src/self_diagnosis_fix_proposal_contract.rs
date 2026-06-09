@@ -10,14 +10,204 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::{
-    SelfAuditBottleneckReport, SourcePatchPreviewApplyStatus, SourcePatchPreviewArtifact,
-    SourcePatchPreviewRiskLevel, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
+    classify_source_file_path_str, source_file_class_label_value, source_patch_sandbox_sha256_hex,
+    SelfAuditBottleneckReport, SourceFileClassDecision, SourcePatchPreviewApplyStatus,
+    SourcePatchPreviewArtifact, SourcePatchPreviewBaseRef, SourcePatchPreviewDiffStats,
+    SourcePatchPreviewDiffSummary, SourcePatchPreviewEvidenceRef, SourcePatchPreviewHunkSummary,
+    SourcePatchPreviewProducer, SourcePatchPreviewReadModelPrototype,
+    SourcePatchPreviewRequiredTest, SourcePatchPreviewRiskLevel,
+    SourcePatchPreviewRollbackExpectations, SourcePatchPreviewTarget,
+    SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
 };
 
 pub const SELF_DIAGNOSIS_FIX_PROPOSAL_CONTRACT_SCHEMA_VERSION: &str =
     "self-diagnosis-fix-proposal-contract-v1";
 
 pub const SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION: &str = "self-diagnosis-generator-input-v1";
+
+pub const SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION: &str =
+    "self-fix-proposal-generator-input-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfFixProposalGeneratorInput {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "proposalId")]
+    pub proposal_id: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "baseBranch")]
+    pub base_branch: String,
+    #[serde(rename = "baseCommit")]
+    pub base_commit: String,
+    #[serde(rename = "targetPath")]
+    pub target_path: String,
+    #[serde(rename = "targetBeforeHash")]
+    pub target_before_hash: String,
+    #[serde(rename = "diffText")]
+    pub diff_text: String,
+    #[serde(rename = "expectedBehaviorChange")]
+    pub expected_behavior_change: String,
+    #[serde(rename = "noSelfApply")]
+    pub no_self_apply: bool,
+}
+
+pub fn generate_source_apply_fix_proposal(
+    diagnosis: &SelfDiagnosisRecord,
+    input: &SelfFixProposalGeneratorInput,
+) -> Result<SourcePatchPreviewArtifact> {
+    diagnosis.validate()?;
+    input.validate()?;
+    let primary = diagnosis
+        .root_cause_hypotheses
+        .first()
+        .ok_or_else(|| anyhow!("diagnosis must include at least one root-cause hypothesis"))?;
+
+    let class_report = classify_source_file_path_str(&input.target_path);
+    if class_report.decision != SourceFileClassDecision::NeedsApproval {
+        return Err(anyhow!(
+            "fix proposal target must reuse source-apply high-risk/source classification requiring separate approval"
+        ));
+    }
+    let (additions, deletions) = diff_line_counts(&input.diff_text);
+    if additions + deletions == 0 {
+        return Err(anyhow!(
+            "fix proposal diffText must contain a concrete scoped change"
+        ));
+    }
+
+    let mut evidence_paths = BTreeSet::new();
+    evidence_paths.extend(diagnosis.based_on_refs.iter().cloned());
+    evidence_paths.extend(primary.evidence_refs.iter().cloned());
+    let linked_evidence = evidence_paths
+        .into_iter()
+        .map(|path| SourcePatchPreviewEvidenceRef {
+            kind: evidence_kind_for_path(&path).to_string(),
+            path,
+        })
+        .collect::<Vec<_>>();
+
+    let target = SourcePatchPreviewTarget {
+        path: input.target_path.clone(),
+        before_hash: input.target_before_hash.clone(),
+        after_hash: None,
+        file_class: source_file_class_label_value(&class_report.class),
+        review_level: class_report.review_level.clone(),
+        classification_status: "restricted_separate_approval".to_string(),
+        classification_rationale: format!(
+            "{}; generated from diagnosis {} and kept proposal-only through source-apply",
+            class_report.rationale, diagnosis.diagnosis_id
+        ),
+        blocked_reasons: vec![
+            "high-risk/source-affecting Rust trust-boundary change requires thin human go/no-go"
+                .to_string(),
+            "M70 emits proposals only; sourceMutationApplyStatus remains blocked".to_string(),
+        ],
+    };
+
+    let artifact_hash = format!(
+        "sha256:{}",
+        source_patch_sandbox_sha256_hex(
+            format!(
+                "{}\n{}\n{}\n{}",
+                input.patch_preview_id, input.proposal_id, input.target_path, input.diff_text
+            )
+            .as_bytes(),
+        )
+    );
+
+    let artifact = SourcePatchPreviewArtifact {
+        schema_version: SOURCE_PATCH_PREVIEW_SCHEMA_VERSION.to_string(),
+        patch_preview_id: input.patch_preview_id.clone(),
+        proposal_id: input.proposal_id.clone(),
+        created_at: input.created_at.clone(),
+        producer: SourcePatchPreviewProducer {
+            name: "era-l-self-diagnosis-fix-proposal-generator".to_string(),
+            version: SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION.to_string(),
+            trusted_boundary: "read-only proposal generator over diagnosis evidence; no source apply, no merge, no command execution".to_string(),
+        },
+        source_mutation_apply_status: SourcePatchPreviewApplyStatus::Blocked,
+        base_ref: SourcePatchPreviewBaseRef {
+            branch: input.base_branch.clone(),
+            commit: input.base_commit.clone(),
+            target_freshness: "requires source-apply stale-target guard before any later sandbox/review step".to_string(),
+        },
+        stale_target_policy: "block if target hash or branch head changes before source-apply review".to_string(),
+        artifact_hash,
+        targets: vec![target],
+        diff_summary: SourcePatchPreviewDiffSummary {
+            summary: format!(
+                "Scoped engine fix proposal for {} based on {}",
+                diagnosis.attributed_milestone_id, primary.hypothesis_id
+            ),
+            diff_text: Some(input.diff_text.clone()),
+            diff_stats: SourcePatchPreviewDiffStats {
+                files_changed: 1,
+                additions,
+                deletions,
+                binary_or_opaque: false,
+                generated_origin: false,
+                truncated: false,
+            },
+            hunks: vec![SourcePatchPreviewHunkSummary {
+                path: input.target_path.clone(),
+                summary: primary.proposed_fix_scope.clone(),
+            }],
+            large_diff_warning: None,
+            binary_or_opaque_warning: None,
+        },
+        risk_level: SourcePatchPreviewRiskLevel::High,
+        risk_ids: vec!["STM-01".to_string(), "STM-04".to_string()],
+        linked_evidence,
+        expected_behavior_change: input.expected_behavior_change.clone(),
+        required_tests: vec![
+            required_test(vec!["cargo", "fmt", "--check"]),
+            required_test(vec![
+                "cargo",
+                "test",
+                "-p",
+                "ouroforge-core",
+                "--test",
+                "self_diagnosis_fix_proposal_contract",
+                "--jobs",
+                "2",
+            ]),
+        ],
+        reviewer_checklist: vec![
+            "Confirm diagnosis evidence refs still resolve to verdict/journal/ledger/loop-coverage artifacts.".to_string(),
+            "Confirm target freshness and rollback evidence before any later source-apply transaction.".to_string(),
+            "Human go/no-go required for this high-risk/source-affecting Rust trust-boundary change.".to_string(),
+            "No auto-apply, no merge, and no command execution is authorized by this proposal.".to_string(),
+        ],
+        rollback_expectations: SourcePatchPreviewRollbackExpectations {
+            required_before_apply: true,
+            minimum_fields: vec![
+                "beforeHash".to_string(),
+                "reversePatchRef".to_string(),
+                "verificationRerunRef".to_string(),
+            ],
+        },
+        read_model_prototype: Some(SourcePatchPreviewReadModelPrototype {
+            status: "blocked".to_string(),
+            display_label: "High-risk engine fix proposal queued for human go/no-go".to_string(),
+            file_class_summary: "rust_trust_boundary/restricted_separate_approval".to_string(),
+            risk_summary: "source-affecting engine change; source-apply and trust-gradient required".to_string(),
+            primary_blocked_reason: "high-risk source-affecting proposal only; no auto-apply at M70".to_string(),
+            allowed_actions: vec!["read".to_string(), "review".to_string()],
+            forbidden_actions: vec![
+                "apply".to_string(),
+                "merge".to_string(),
+                "auto_apply".to_string(),
+                "execute_tests".to_string(),
+            ],
+        }),
+    };
+    validate_source_apply_proposal(&artifact)?;
+    Ok(artifact)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -181,6 +371,85 @@ pub struct SelfRootCauseHypothesis {
     #[serde(rename = "proposedFixScope")]
     pub proposed_fix_scope: String,
     pub confidence: String,
+}
+
+impl SelfFixProposalGeneratorInput {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "fix proposal generator schemaVersion must be {SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION}"
+            ));
+        }
+        for (label, value) in [
+            ("patchPreviewId", &self.patch_preview_id),
+            ("proposalId", &self.proposal_id),
+            ("baseBranch", &self.base_branch),
+            ("baseCommit", &self.base_commit),
+        ] {
+            require_id(label, value)?;
+        }
+        require_ref("targetPath", &self.target_path)?;
+        if !self.target_path.starts_with("crates/") {
+            return Err(anyhow!(
+                "targetPath must be an engine Rust/source-apply target under crates/"
+            ));
+        }
+        if !(self.target_before_hash.starts_with("sha256:")
+            && self.target_before_hash.len() == "sha256:".len() + 64)
+        {
+            return Err(anyhow!("targetBeforeHash must use sha256:<64-hex>"));
+        }
+        require_text("createdAt", &self.created_at)?;
+        require_text("diffText", &self.diff_text)?;
+        require_text("expectedBehaviorChange", &self.expected_behavior_change)?;
+        if !self.no_self_apply {
+            return Err(anyhow!(
+                "fix proposal generator must keep noSelfApply=true at M70"
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn required_test(argv: Vec<&str>) -> SourcePatchPreviewRequiredTest {
+    let argv = argv.into_iter().map(str::to_string).collect::<Vec<_>>();
+    SourcePatchPreviewRequiredTest {
+        command: argv.join(" "),
+        argv,
+        allowlist_policy_id: Some("source-patch-preview-safe-local-checks-v1".to_string()),
+        execution_authority: "copyable_not_executed_metadata".to_string(),
+    }
+}
+
+fn diff_line_counts(diff_text: &str) -> (usize, usize) {
+    let additions = diff_text
+        .lines()
+        .filter(|line| line.starts_with('+') && !line.starts_with("+++"))
+        .count();
+    let deletions = diff_text
+        .lines()
+        .filter(|line| line.starts_with('-') && !line.starts_with("---"))
+        .count();
+    (additions, deletions)
+}
+
+fn evidence_kind_for_path(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    if lower.contains("verdict") {
+        "verdict"
+    } else if lower.contains("journal") {
+        "journal"
+    } else if lower.contains("ledger") {
+        "ledger"
+    } else if lower.contains("loop-coverage") {
+        "loop-coverage-attribution"
+    } else if lower.contains("source-apply") {
+        "source-apply"
+    } else if lower.contains("trust-gradient") {
+        "trust-gradient"
+    } else {
+        "diagnosis-evidence"
+    }
 }
 
 impl SelfDiagnosisGeneratorInput {

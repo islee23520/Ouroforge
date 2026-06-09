@@ -4,12 +4,15 @@ use std::path::{Path, PathBuf};
 
 use ouroforge_core::{
     attribute_self_audit_bottlenecks, generate_self_diagnosis_record,
-    self_audit_bottleneck_input_from_json_str, SelfAuditAttributionContract,
-    SelfDiagnosisFixProposalContract, SelfDiagnosisGeneratorInput, SourcePatchPreviewApplyStatus,
+    generate_source_apply_fix_proposal, self_audit_bottleneck_input_from_json_str,
+    source_patch_sandbox_sha256_hex, validate_source_patch_preview_artifact,
+    PatchDiffIntegrityLimits, SelfAuditAttributionContract, SelfDiagnosisFixProposalContract,
+    SelfDiagnosisGeneratorInput, SelfFixProposalGeneratorInput, SourcePatchPreviewApplyStatus,
     SourcePatchPreviewRiskLevel, SELF_AUDIT_ATTRIBUTION_CONTRACT_SCHEMA_VERSION,
     SELF_AUDIT_BOTTLENECK_ATTRIBUTION_SCHEMA_VERSION,
     SELF_DIAGNOSIS_FIX_PROPOSAL_CONTRACT_SCHEMA_VERSION,
-    SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
+    SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION,
+    SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
 };
 
 fn repo_root() -> PathBuf {
@@ -59,6 +62,29 @@ fn bottleneck_report() -> ouroforge_core::SelfAuditBottleneckReport {
     );
     attribute_self_audit_bottlenecks(&attribution, &bottleneck_input)
         .expect("bottleneck attribution succeeds")
+}
+
+fn fix_proposal_input() -> SelfFixProposalGeneratorInput {
+    let target_path = "crates/ouroforge-core/src/self_diagnosis_fix_proposal_contract.rs";
+    let target_bytes = read_text(target_path);
+    SelfFixProposalGeneratorInput {
+        schema_version: SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION.to_string(),
+        patch_preview_id: "m70-generated-fix-preview-001".to_string(),
+        proposal_id: "m70-generated-engine-fix-proposal-001".to_string(),
+        created_at: "2026-06-09T00:00:00Z".to_string(),
+        base_branch: "main".to_string(),
+        base_commit: "origin-main-fixture".to_string(),
+        target_path: target_path.to_string(),
+        target_before_hash: format!(
+            "sha256:{}",
+            source_patch_sandbox_sha256_hex(target_bytes.as_bytes())
+        ),
+        diff_text: format!(
+            "diff --git a/{target_path} b/{target_path}\n--- a/{target_path}\n+++ b/{target_path}\n@@ -1,1 +1,2 @@\n //! Self-diagnosis and fix-proposal contract v1 (#2033 / Era L M70).\n+//! Generated M70 fix proposals stay blocked in source-apply until human go/no-go.\n"
+        ),
+        expected_behavior_change: "Engine diagnosis proposals carry an explicit source-apply blocked preview for the attributed root cause without mutating sources.".to_string(),
+        no_self_apply: true,
+    }
 }
 
 fn contract() -> SelfDiagnosisFixProposalContract {
@@ -242,4 +268,77 @@ fn generator_fails_closed_on_hidden_human_or_new_store_drift() {
     let error = generate_self_diagnosis_record(&new_store, &report)
         .expect_err("high-risk auto-apply drift rejected");
     assert!(error.to_string().contains("high-risk"));
+}
+
+#[test]
+fn fix_proposal_generator_emits_blocked_source_apply_preview_from_diagnosis() {
+    let diagnosis = generate_self_diagnosis_record(&generator_input(), &bottleneck_report())
+        .expect("diagnosis generator succeeds");
+    let proposal = generate_source_apply_fix_proposal(&diagnosis, &fix_proposal_input())
+        .expect("fix proposal generator succeeds");
+
+    assert_eq!(proposal.schema_version, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION);
+    assert_eq!(
+        proposal.source_mutation_apply_status,
+        SourcePatchPreviewApplyStatus::Blocked
+    );
+    assert_eq!(proposal.risk_level, SourcePatchPreviewRiskLevel::High);
+    assert_eq!(
+        proposal.targets[0].classification_status,
+        "restricted_separate_approval"
+    );
+    assert!(proposal.targets[0]
+        .file_class
+        .contains("rust_trust_boundary"));
+    assert!(proposal.targets[0]
+        .blocked_reasons
+        .join("\n")
+        .to_ascii_lowercase()
+        .contains("human go/no-go"));
+    assert!(proposal
+        .linked_evidence
+        .iter()
+        .any(|evidence| evidence.path.contains("verdict.json")));
+    assert!(proposal
+        .linked_evidence
+        .iter()
+        .any(|evidence| evidence.path.contains("journal.md")));
+    assert!(proposal
+        .linked_evidence
+        .iter()
+        .any(|evidence| evidence.path.contains("ledger.jsonl")));
+    assert!(proposal
+        .linked_evidence
+        .iter()
+        .any(|evidence| evidence.path.contains("loop-coverage")));
+    let forbidden = proposal
+        .read_model_prototype
+        .as_ref()
+        .expect("read model")
+        .forbidden_actions
+        .join("\n");
+    assert!(forbidden.contains("auto_apply"));
+    assert!(forbidden.contains("merge"));
+
+    validate_source_patch_preview_artifact(&proposal, PatchDiffIntegrityLimits::default())
+        .expect("generated proposal satisfies source-apply preview validation");
+}
+
+#[test]
+fn fix_proposal_generator_fails_closed_on_apply_or_non_source_target_drift() {
+    let diagnosis = generate_self_diagnosis_record(&generator_input(), &bottleneck_report())
+        .expect("diagnosis generator succeeds");
+
+    let mut self_apply = fix_proposal_input();
+    self_apply.no_self_apply = false;
+    let error = generate_source_apply_fix_proposal(&diagnosis, &self_apply)
+        .expect_err("self-apply drift rejected");
+    assert!(error.to_string().contains("noSelfApply=true"));
+
+    let mut non_source = fix_proposal_input();
+    non_source.target_path = "examples/real-title-dogfood-v1/run/verdict.json".to_string();
+    non_source.diff_text = "diff --git a/examples/real-title-dogfood-v1/run/verdict.json b/examples/real-title-dogfood-v1/run/verdict.json\n--- a/examples/real-title-dogfood-v1/run/verdict.json\n+++ b/examples/real-title-dogfood-v1/run/verdict.json\n@@ -1,1 +1,2 @@\n {\n+  \"drift\": true,\n".to_string();
+    let error = generate_source_apply_fix_proposal(&diagnosis, &non_source)
+        .expect_err("non-source engine target rejected");
+    assert!(error.to_string().contains("crates/"));
 }
