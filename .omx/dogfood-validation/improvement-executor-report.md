@@ -1,42 +1,37 @@
-# Improvement Executor Report — B1 Claim Coverage Matrix
+# Improvement Executor Report — B2 Compact Demo Spec
 
 ## Selected blocker
 
-- **Blocker:** B1 — No claim coverage matrix
-- **Linked #1 claim:** [#1](https://github.com/shaun0927/Ouroforge/issues/1) final goal and roadmap claim: evidence-native game engine loop `Seed → Build → Observe → Verify → Journal → Evolve` plus active Era boundaries.
-- **Evidence/reproduction:** `.omx/dogfood-validation/blocker-driven-pr-plan.md` ranks B1 Critical because `.omx/dogfood-validation/claim-coverage-matrix.md` was missing.
+- **Blocker:** B2 — No compact demo spec / missing shared local Steam-RC-shaped demo contract.
+- **Linked #1 claim:** [#1](https://github.com/shaun0927/Ouroforge/issues/1) evidence-native loop and roadmap-boundary claim.
+- **Evidence/reproduction:** `.omx/dogfood-validation/current-iteration-brief.md` iteration 9 states `.omx/dogfood-validation/demo-game-spec.md` is absent and B2 blocks pipeline, Studio UX, runtime stress, asset/content, QA/evolve, and export readiness lanes.
 
-## Implementation
+## Files changed
 
-- Added `.omx/dogfood-validation/claim-coverage-matrix.md` as the dogfood evidence register.
-- Added `examples/dogfood-claim-coverage-v1/claim-coverage-matrix-smoke.test.cjs` to enforce required row schema and guardrails.
-- Kept the fix documentation/test-only; no engine behavior changed.
+- `.omx/dogfood-validation/demo-game-spec.md` — tracked compact demo contract anchored to existing Collect-and-Exit fixtures.
+- `examples/dogfood-demo-spec-v1/demo-game-spec-smoke.test.cjs` — tracked validator for required fields, referenced paths, and forbidden-scope guardrails.
+- `.omx/dogfood-validation/improvement-executor.status.json` — B2 handoff status.
+- `.omx/dogfood-validation/improvement-executor-report.md` — this report.
 
-## Regression protection
+## Acceptance criteria mapping
 
-The new smoke test fails if:
-
-- A claim row lacks claim id/text, #1/#23 link, owner lane, evidence path, verdict, or gap classification.
-- A verified row cites a missing local evidence path.
-- Era Q M102–M106 do not remain `deferred`.
-- #1/#23 protection language is missing or a PR-closing keyword line is introduced.
+- Version/demo identity: covered by `Spec metadata` and validator required phrase checks.
+- Existing demo basis: Collect-and-Exit source paths are listed and validator checks referenced paths exist.
+- Scenario loop/controls/content/Studio UX/runtime/export/lane evidence: each has a required section and phrase/path coverage in the validator.
+- Forbidden scope: non-goals cover #1/#23, Era Q M102–M106, hosted/multi-user, trusted writes, auto-port/live bridge/runtime embedding, release automation/sign/upload/publishing, and production/store readiness overclaims.
 
 ## Verification
 
-- `node examples/dogfood-claim-coverage-v1/claim-coverage-matrix-smoke.test.cjs` — passed.
-- `cargo test --workspace --no-fail-fast` — passed.
+- `node --test examples/dogfood-demo-spec-v1/demo-game-spec-smoke.test.cjs` — passed.
+- `git diff --check origin/main...HEAD` — passed.
 
 ## Non-goals preserved
 
-- Did not close #1 or #23.
-- Did not implement Era Q full-3D M102–M106.
-- Did not add hosted/cloud/multi-user scope.
-- Did not add trusted browser/source writes.
-- Did not add auto-port/live bridge/runtime embedding.
-- Did not add release automation, signing, upload, Steam publishing, or production/store readiness claims.
+- Leaves #1 and #23 open.
+- Does not implement Era Q full-3D M102–M106.
+- Does not add hosted/cloud/multi-user scope, trusted writes, auto-port/live bridge/runtime embedding, release automation/signing/upload/publishing, or production/store readiness claims.
+- Does not implement gameplay, export, runtime, Studio, plugin, or asset features.
 
-## PR readiness
+## PR
 
-- Branch: `dogfood/b1-claim-coverage-matrix-20260609211538`
-- Worktree: `/Users/jh0927/Ouroforge/..-Ouroforge-dogfood-b1-claim-coverage-matrix-20260609211538`
-- Status: implemented and verified; PR opened at https://github.com/shaun0927/Ouroforge/pull/2334.
+- https://github.com/shaun0927/Ouroforge/pull/2335
