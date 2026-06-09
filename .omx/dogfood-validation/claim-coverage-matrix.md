@@ -1,17 +1,17 @@
 # Dogfood Claim Coverage Matrix
 
-Blocker: **B1 — No claim coverage matrix**  
-Linked issue claim source: [#1](https://github.com/shaun0927/Ouroforge/issues/1) — final goal and implementation roadmap.  
-Issue #1 state at capture: **OPEN**.  
-Issue #23 state at capture: **OPEN**.  
-Matrix version: `dogfood-claim-coverage-v1`  
+Blocker: **B1 — No claim coverage matrix**
+Linked issue claim source: [#1](https://github.com/shaun0927/Ouroforge/issues/1) — final goal and implementation roadmap.
+Issue #1 state at capture: **OPEN**.
+Issue #23 state at capture: **OPEN**.
+Matrix version: `dogfood-claim-coverage-v1`
 Updated: `2026-06-09T21:16:00Z`
 
 ## Purpose
 
 This matrix is an evidence register for dogfood validation. It maps #1 and compact-demo claims to owner lanes, concrete evidence paths, a verdict, and a gap classification. It does not implement engine behavior and does not close #1 or #23.
 
-Allowed verdicts: `verified`, `unverified`, `deferred`, `non-goal`.  
+Allowed verdicts: `verified`, `unverified`, `deferred`, `non-goal`.
 Allowed gap classifications: `verified`, `unverified`, `deferred`, `non-goal`.
 
 ## Coverage matrix
