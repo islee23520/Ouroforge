@@ -3038,6 +3038,43 @@ plane. Era L improves the engine harness/pipeline, not game taste. Layer-3
 distributed/hosted/live-ops scope remains DEFER. #1 and #23 remain open
 governance anchors.
 
+### Era M Active Human Intervention governance refresh
+
+Era M — Active Human Intervention (Agent-First, Human-Steerable) — is recorded
+as **complete on merged evidence** for Milestones 74-80 plus this M81
+governance refresh. The completed evidence chain covers the M74 posture and
+Phoenix/two-plane design gate (#2052 / PR #2101), M75 proposal amendment
+(#2053-#2056 / PRs #2146, #2149, #2151, #2152; Scenario Coverage v66), M76
+human-authored artifact intake (#2057-#2060 / PRs #2155, #2158, #2160, #2161;
+Scenario Coverage v67), M77 live campaign steering directives (#2064 / PR
+#2153; Scenario Coverage v68), M78 human constraints as first-class gates
+(#2065-#2068 / PRs #2162-#2165; Scenario Coverage v69), M79 diagnosis
+correction and intervention feedback (#2069-#2072 / PRs #2166, #2242, #2243,
+#2244; Scenario Coverage v70), M80 stage takeover and handback (#2076 / PR
+#2159; Scenario Coverage v71), and this M81 governance refresh (#2077).
+
+The human-steerability assessment is recorded in
+[`docs/era-m-human-steerability-assessment.md`](era-m-human-steerability-assessment.md).
+For the covered intervention classes, coverage is `6 / 6 = 100%`: proposal
+amendment, human-authored artifact intake, live campaign steering, human
+constraints, diagnosis correction/attribution feedback, and stage
+takeover/handback all route human input as validated, recorded intervention
+evidence through the existing review/apply, scene/source-apply, evaluator,
+evidence, and provenance gates. No covered class grants raw writes.
+
+The agent-first invariant is reaffirmed. Human intervention is opt-in at defined
+points and never required; the autonomous loop still completes with zero human
+input and the CLI fallback remains sufficient. Studio surfaces are now read +
+gated-write, but only locally: Elixir/OTP + Phoenix LiveView capture, route, and
+render intervention intent as control/presentation-plane data, while Rust
+remains the data plane for artifact truth, validation, determinism, evidence,
+provenance, diagnosis semantics, scene/source-apply, and gated writes. Hosted,
+multi-user, collaborative, or real-time remote Studio remains Layer-3 DEFER.
+Fun/taste verdict and release go/no-go remain human Ring 2 decisions. Era M does
+not introduce raw bypasses, a new write path, a new data store, opaque ML
+authority, browser command bridges, auto-merge, production-readiness claims, or
+Godot-replacement positioning. #1 and #23 remain open governance anchors.
+
 ## Active anchors
 
 - #1 remains the broad vision and implementation-roadmap anchor until a separate
