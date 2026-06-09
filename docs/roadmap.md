@@ -10,6 +10,7 @@ M108 is scoped by `docs/legacy-logic-ingestion-behavioral-unit-contract-v1.md`, 
 The first M108 Rust data-plane implementation lives in `crates/ouroforge-core::legacy_logic_ingestion` and performs read-only C# / degraded IL2CPP-signature analysis into IR nodes, engine touchpoints, behavioral-unit candidates, fidelity reports, and re-derivation tasks.
 Scenario Coverage v90 (`docs/scenario-coverage-v90-legacy-logic-ingestion.md`) locks the M108 regression ledger for false-clean lossy imports, no auto-port without oracle, deterministic digest/state-hash drift, and decompiled-source rejection.
 M109 is scoped by `docs/tacit-knowledge-interrogation-oracle-capture-contract-v1.md`, which defines source-independent tacit intent records, deterministic oracle-capture specs, conservative Green/Yellow/Red oracle readiness grades, and the hand-off from interrogation to capture, re-expression, verification, reject, or defer.
+The first M109 Rust data-plane implementation lives in `crates/ouroforge-core::tacit_oracle_capture` and converts per-unit questions, provenance answers, and observed deterministic traces into source-independent intent records, oracle specs, fidelity reports, and follow-up re-derivation tasks.
 
 Ouroforge is a local, evidence-native MVP. It now supports a small project
 workspace loop in addition to the original run-centered demo, with hardened
