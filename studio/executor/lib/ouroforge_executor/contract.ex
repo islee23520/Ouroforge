@@ -64,7 +64,11 @@ defmodule OuroforgeExecutor.Contract do
     ["loop", "handoff"],
     ["proposal-amendment", "validate"],
     ["human-artifact-intake", "validate"],
-    ["generative-front-door", "validate"]
+    ["generative-front-door", "validate"],
+    ["migration", "godot-demo"],
+    ["migration", "unity-demo"],
+    ["migration", "mapping-demo"],
+    ["migration", "verify-demo"]
   ]
 
   @forbidden_cli_surface [
