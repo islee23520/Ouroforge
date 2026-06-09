@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "self-improvement-loop-demo-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "seedPath": "seeds/dogfood-deckbuilder.yaml",
+  "openchromeRunCommand": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+  "stageChain": [
+    {
+      "stage": "detect",
+      "evidenceRef": "examples/real-title-dogfood-v1/run/verdict.json",
+      "summary": "Planted low-risk and high-risk engine defects surface through the existing scenario verdicts and four gates."
+    },
+    {
+      "stage": "explain",
+      "evidenceRef": "examples/real-title-dogfood-v1/run/journal.md",
+      "summary": "Journal evidence explains the failing gate and preserves the real-title dogfood context."
+    },
+    {
+      "stage": "trace",
+      "evidenceRef": "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "summary": "Ledger events trace the autonomous loop stages without human input."
+    },
+    {
+      "stage": "attribute",
+      "evidenceRef": "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "summary": "Loop-coverage attribution ties the defect to the responsible milestone evidence."
+    },
+    {
+      "stage": "propose",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-diagnosis-fix-proposal-v1/contract.fixture.json",
+      "summary": "Diagnosis emits source-apply patch previews rather than trusted writes."
+    },
+    {
+      "stage": "re-verify",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-improvement-loop-v1/contract.fixture.json",
+      "summary": "The proposal reruns openchrome, four gates, design-integrity, rollback, kill-switch, and trust-gradient checks."
+    },
+    {
+      "stage": "apply",
+      "evidenceRef": "source-apply:patch-preview.v1#m71-low-risk-demo",
+      "summary": "The low-risk reversible proposal improves attributed evidence and routes to existing source-apply/trust-gradient auto-apply."
+    },
+    {
+      "stage": "queue",
+      "evidenceRef": "ledger.jsonl:m71-high-risk-demo-queued",
+      "summary": "The high-risk/source-affecting proposal is verified and reversible, then queued for one-click human go/no-go provenance."
+    }
+  ],
+  "lowRiskPath": {
+    "plantedDefectRef": "dogfood:planted-low-risk-evaluator-boundary",
+    "proposalRef": "source-apply:patch-preview.v1#m71-low-risk-demo",
+    "riskLevel": "low",
+    "sourceAffecting": false,
+    "reversible": true,
+    "beforeEvidenceScore": 7,
+    "afterEvidenceScore": 9,
+    "outcome": "auto-applied",
+    "autonomousSourceMutationApplied": true,
+    "humanInputRequired": false,
+    "attributedMilestoneId": "m68-real-title-run"
+  },
+  "highRiskPath": {
+    "plantedDefectRef": "dogfood:planted-high-risk-source-tail",
+    "proposalRef": "source-apply:patch-preview.v1#m71-high-risk-demo",
+    "riskLevel": "high",
+    "sourceAffecting": true,
+    "reversible": true,
+    "beforeEvidenceScore": 7,
+    "afterEvidenceScore": 9,
+    "outcome": "human-go-no-go-queued",
+    "autonomousSourceMutationApplied": false,
+    "humanInputRequired": true,
+    "queueProvenanceRef": "ledger.jsonl:m71-high-risk-demo-queued",
+    "attributedMilestoneId": "m71-high-risk-tail"
+  },
+  "beforeAfterEvidenceRefs": [
+    "openchrome:seeds/dogfood-deckbuilder.yaml",
+    "examples/real-title-dogfood-v1/run/verdict.json",
+    "examples/real-title-dogfood-v1/run/journal.md",
+    "examples/real-title-dogfood-v1/run/ledger.jsonl",
+    "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+    "source-apply:patch-preview.v1",
+    "trust-gradient:risk-tier-v1:auto-apply-v1",
+    "source-apply:rollback-snapshot-v1",
+    "trust-gradient:kill-switch-v1"
+  ],
+  "autonomyInvariants": {
+    "noHumanInputOnAutonomousPath": true,
+    "noNewVerificationEngine": true,
+    "noNewDataPlane": true,
+    "highRiskAutoApplied": false,
+    "unrelatedLoopWorkBlocksOnHumanGate": false,
+    "rustKernelDataPlane": true,
+    "elixirExecutorControlPlaneUnchanged": true,
+    "funTasteAndReleaseGoNoGoRemainHumanRing2": true
+  },
+  "boundary": "End-to-end Era L M71 self-improvement demo for the existing Era I engine-builder deckbuilder: detect, explain, trace, attribute, propose, re-verify, apply, and queue reuse openchrome, scenario verdicts, four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, trust-gradient, rollback, and kill-switch artifacts. The low-risk reversible defect is auto-applied only after before/after evidence improves. The high-risk/source-affecting defect is verified, reversible, and queued for thin one-click human go/no-go provenance without autonomous source mutation. No new verification engine, no new data plane, no new store, no blocking human dependency on unrelated autonomous loop work; fun/taste and release go/no-go remain human Ring 2; #1 and #23 remain open."
+}
