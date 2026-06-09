@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "real-title-dogfood-demo-friction-summary-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "demoId": "real-title-dogfood-demo-v1",
+  "summarySourceRefs": [
+    "examples/real-title-dogfood-v1/run/ledger.jsonl",
+    "examples/real-title-dogfood-v1/run/journal.md",
+    "examples/real-title-dogfood-v1/run/verdict.json"
+  ],
+  "frictionPoints": [],
+  "hiddenFriction": false,
+  "explicitNoFrictionEvent": "dogfood.friction.none",
+  "autonomousPathRequiresHumanInput": false,
+  "boundary": "Friction summary is derived from existing ledger/journal/verdict evidence; it is not a telemetry store, verifier, or human blocking surface."
+}

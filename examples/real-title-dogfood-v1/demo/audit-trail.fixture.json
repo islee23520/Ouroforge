@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "real-title-dogfood-demo-audit-trail-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "demoId": "real-title-dogfood-demo-v1",
+  "scriptRef": "examples/real-title-dogfood-v1/demo/run-demo-v1.sh",
+  "runCommand": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+  "harnessCommand": "cargo run -p ouroforge-cli -- dogfood harness --seed-path seeds/dogfood-deckbuilder.yaml --runs-root runs --workers 2 --resume-run-dir <run-dir> --friction-json []",
+  "stageAudit": [
+    { "stage": "detect", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json"] },
+    { "stage": "explain", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json"] },
+    { "stage": "trace", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json"] },
+    { "stage": "attribute", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json", "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"] },
+    { "stage": "propose", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json", "examples/real-title-dogfood-v1/refs/promotion-rollback-record.json"] },
+    { "stage": "re-verify", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json", "examples/real-title-dogfood-v1/refs/validation-result.json"] },
+    { "stage": "apply-or-queue", "ledgerEvent": "dogfood.campaign.stage.completed", "evidenceRefs": ["ledger.jsonl", "journal.md", "verdict.json", "examples/real-title-dogfood-v1/refs/promotion-rollback-record.json"] }
+  ],
+  "pipelineRefs": [
+    "openchrome",
+    "scenario-verdicts",
+    "four-gates",
+    "design-integrity",
+    "journal.md",
+    "ledger.jsonl",
+    "loop-coverage-attribution",
+    "evolve",
+    "source-apply",
+    "trust-gradient"
+  ],
+  "highRiskAutoApply": false,
+  "sourceAffectingAutoApply": false,
+  "newVerificationEngine": false,
+  "newDataPlane": false,
+  "boundary": "Audit trail links demo stages to existing evidence artifacts only; source-affecting/high-risk changes remain queued for thin human go/no-go and fun/taste plus release go/no-go remain Ring 2."
+}
