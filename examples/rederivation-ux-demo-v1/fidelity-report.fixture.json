@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "rederivation-ux-demo-v1",
+  "projectId": "era-r-m113-demo",
+  "sourceProjectRef": "source-projects/m113/sample-project/project.gltf",
+  "targetDimensionality": "three_d",
+  "claimedPortedUnits": [],
+  "determinism": {
+    "primaryStateHash": "fnv64:aaaaaaaaaaaaaaaa",
+    "secondaryRenderDigest": "ssim:0.996;pixel-diff:0.001",
+    "stateHashPrimary": true,
+    "perceptualRenderSecondaryOnly": true
+  },
+  "units": [
+    {
+      "unitId": "unit.door-open",
+      "behavioralUnitRef": "ir/m108/unit.door-open.json",
+      "sourceRef": "source-projects/m113/sample-project/door.tscn",
+      "oracleRef": "oracles/m109/unit.door-open.json",
+      "reexpressionRef": "drafts/m110/unit.door-open.json",
+      "abEvidenceRef": "evidence/m111/unit.door-open.json",
+      "coverageRef": "coverage/m112/unit.door-open.json",
+      "primaryStateHash": "fnv64:aaaaaaaaaaaaaaaa",
+      "secondaryRenderDigest": "ssim:0.996;pixel-diff:0.001",
+      "grade": "green",
+      "oracleStatus": "captured",
+      "abStatus": "passed",
+      "coverageStatus": "verified",
+      "pipelineStage": "semantic_coverage",
+      "gapSummary": []
+    },
+    {
+      "unitId": "unit.jump-feel",
+      "behavioralUnitRef": "ir/m108/unit.jump-feel.json",
+      "sourceRef": "source-projects/m113/sample-project/player.tscn",
+      "oracleRef": "oracles/m109/unit.jump-feel.json",
+      "abEvidenceRef": "evidence/m111/unit.jump-feel.json",
+      "coverageRef": "coverage/m112/unit.jump-feel.json",
+      "primaryStateHash": "fnv64:bbbbbbbbbbbbbbbb",
+      "secondaryRenderDigest": "ssim:0.982;pixel-diff:0.010",
+      "grade": "yellow",
+      "oracleStatus": "captured",
+      "abStatus": "needs_repair",
+      "coverageStatus": "human_escalated",
+      "pipelineStage": "verify",
+      "questionPrompt": "Does the jump apex feel intentional?",
+      "intentFeelEscalation": true,
+      "gapSummary": ["jump feel needs Ring 2 human intent review"],
+      "reDerivationTasks": ["retune native jump arc after human clarification"]
+    },
+    {
+      "unitId": "unit.shader-vfx",
+      "behavioralUnitRef": "ir/m108/unit.shader-vfx.json",
+      "sourceRef": "source-projects/m113/sample-project/vfx.tres",
+      "grade": "red",
+      "oracleStatus": "missing",
+      "abStatus": "not_run",
+      "coverageStatus": "blocked",
+      "pipelineStage": "interrogate",
+      "questionPrompt": "Should this VFX be approximated or deferred?",
+      "gapSummary": ["source shader behavior is unsupported and must be re-derived"],
+      "reDerivationTasks": ["capture human intent and reject/defer unsupported shader feel"]
+    }
+  ]
+}

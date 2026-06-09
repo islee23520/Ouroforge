@@ -135,6 +135,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`semantic-port-coverage-convergence-v1.md`](semantic-port-coverage-convergence-v1.md) — Era R M112 Rust data-plane coverage and convergence ledger for verified/pending/human-feel-escalated units, residual backlog, deterministic evidence, and no fully-ported claim.
 - [`scenario-coverage-v94-semantic-port-coverage.md`](scenario-coverage-v94-semantic-port-coverage.md) — Scenario Coverage v94 regression suite for M112 semantic-port coverage, locking no auto-port without oracle, lossy imports not clean, ungated translation refs failing, deterministic state-hash evidence, 3D render evidence as secondary, and Rust/Studio boundaries.
 - [`rederivation-ux-human-intent-feel-escalation-contract-v1.md`](rederivation-ux-human-intent-feel-escalation-contract-v1.md) — Era R M113 contract for Studio-facing re-derivation UX, human intent/feel escalation, gated review evidence, fidelity/oracle display rules, and the Rust data-plane / Studio presentation-only split.
+- [`rederivation-ux-demo-v1.md`](rederivation-ux-demo-v1.md) — Era R M113 scripted Studio demo for re-derivation UX and human intent/feel escalation, with an honest fidelity summary, oracle-gated no-port claim, deterministic state-hash evidence, and no Studio trusted writes.
 
 ## Authoring, Studio, and review surfaces
 
