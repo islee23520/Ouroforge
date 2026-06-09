@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "scenario-coverage-v65-autonomous-self-improvement-e2e-v1",
+  "coverageVersion": 65,
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "issueRef": "#2046",
+  "milestone": "Era L M73",
+  "rows": [
+    {
+      "id": "m68-dogfood-run-detects-real-title-evidence",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/run/verdict.json",
+      "locks": "The end-to-end chain starts from the real-title dogfood run over the existing Era I engine-builder deckbuilder and reuses openchrome, scenario verdicts, journal.md, and ledger.jsonl evidence."
+    },
+    {
+      "id": "m69-self-audit-attributes-bottleneck",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-audit-attribution-v1/contract.fixture.json",
+      "locks": "Self-audit attribution maps failures to milestone evidence through loop-coverage attribution without introducing a new verifier or data plane."
+    },
+    {
+      "id": "m70-diagnose-and-propose-source-apply-preview",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-diagnosis-fix-proposal-v1/contract.fixture.json",
+      "locks": "Diagnosis explains and proposes a source-apply patch preview only; it never applies source, never bypasses gates, and keeps Rust kernel/evaluator scope distinct from game content."
+    },
+    {
+      "id": "m71-reverify-low-risk-auto-apply-no-human",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-improvement-loop-demo-v1/demo.fixture.json",
+      "locks": "The low-risk reversible path re-verifies through openchrome, four gates plus design-integrity, source-apply, rollback, kill-switch, and trust-gradient, then auto-applies only when evidence improves with zero human input."
+    },
+    {
+      "id": "m71-high-risk-never-auto-applies",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_improvement_human_go_no_go_queue.rs",
+      "locks": "The verified high-risk/source-affecting tail queues thin human go/no-go provenance and never auto-applies source-affecting mutation."
+    },
+    {
+      "id": "m72-optional-human-channel-non-blocking",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/optional-human-channel-v1/demo.fixture.json",
+      "locks": "Optional oversight, override, and taste feedback remain read-only/provenance-only and cannot block the autonomous loop."
+    },
+    {
+      "id": "coverage-v65-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v65-autonomous-self-improvement-e2e.md",
+      "locks": "Coverage v65 composes M68 through M72 as test-only Rust regressions over existing artifacts; no new verification engine, data plane, or store is introduced."
+    }
+  ],
+  "stageChain": ["dogfood-run", "self-audit", "diagnose", "propose", "re-verify", "auto-apply-low-risk", "queue-high-risk", "optional-human-non-blocking"],
+  "boundary": "Scenario Coverage v65 is test-only end-to-end regression coverage for the Era L autonomous self-validation and improvement loop over the existing Era I engine-builder deckbuilder. It composes M68 real-title dogfood run evidence, M69 self-audit attribution, M70 diagnosis and source-apply proposal, M71 re-verify/apply routing, and M72 optional human channel coverage. The autonomous detect-explain-trace-attribute-propose-reverify-apply loop completes with zero human input for the low-risk reversible path only after openchrome, scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, rollback, kill-switch, and trust-gradient evidence improve. High-risk/source-affecting changes are never auto-applied and remain queued for thin human go/no-go provenance. Optional human surfaces never block. No new verification engine, no new data plane, no new persistent store; Rust remains the data plane, Elixir executor remains unchanged, fun/taste and release go/no-go remain human Ring 2, Layer-3 remains DEFER, #1 and #23 remain open."
+}
