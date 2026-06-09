@@ -16,6 +16,10 @@ pub const SELF_IMPROVEMENT_LOOP_CONTRACT_SCHEMA_VERSION: &str = "self-improvemen
 pub const SELF_IMPROVEMENT_ROUTING_INPUT_SCHEMA_VERSION: &str = "self-improvement-routing-input-v1";
 pub const SELF_IMPROVEMENT_ROUTING_DECISION_SCHEMA_VERSION: &str =
     "self-improvement-routing-decision-v1";
+pub const SELF_IMPROVEMENT_APPLY_LOOP_INPUT_SCHEMA_VERSION: &str =
+    "self-improvement-apply-loop-input-v1";
+pub const SELF_IMPROVEMENT_APPLY_LOOP_REPORT_SCHEMA_VERSION: &str =
+    "self-improvement-apply-loop-report-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -144,6 +148,66 @@ pub struct SelfImprovementRoutingDecision {
     pub allowed_actions: Vec<String>,
     #[serde(rename = "forbiddenActions")]
     pub forbidden_actions: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfImprovementApplyLoopInput {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: String,
+    #[serde(rename = "attributedMilestoneId")]
+    pub attributed_milestone_id: String,
+    #[serde(rename = "routingInput")]
+    pub routing_input: SelfImprovementRoutingInput,
+    #[serde(rename = "beforeEvidenceRefs")]
+    pub before_evidence_refs: Vec<String>,
+    #[serde(rename = "afterEvidenceRefs")]
+    pub after_evidence_refs: Vec<String>,
+    #[serde(rename = "beforeEvidenceScore")]
+    pub before_evidence_score: u32,
+    #[serde(rename = "afterEvidenceScore")]
+    pub after_evidence_score: u32,
+    #[serde(rename = "regressionDetected")]
+    pub regression_detected: bool,
+    #[serde(rename = "noHumanInput")]
+    pub no_human_input: bool,
+    #[serde(rename = "noNewDataPlane")]
+    pub no_new_data_plane: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SelfImprovementApplyLoopOutcome {
+    AutoApplied,
+    RejectedRolledBack,
+    HumanGoNoGoQueued,
+    Blocked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfImprovementApplyLoopReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: String,
+    #[serde(rename = "attributedMilestoneId")]
+    pub attributed_milestone_id: String,
+    pub outcome: SelfImprovementApplyLoopOutcome,
+    #[serde(rename = "routingDecision")]
+    pub routing_decision: SelfImprovementRoutingDecision,
+    #[serde(rename = "rollbackCommand")]
+    pub rollback_command: Option<String>,
+    #[serde(rename = "improvedAttributedMilestoneEvidence")]
+    pub improved_attributed_milestone_evidence: bool,
+    #[serde(rename = "sourceMutationApplied")]
+    pub source_mutation_applied: bool,
+    #[serde(rename = "humanInputRequired")]
+    pub human_input_required: bool,
+    pub reasons: Vec<String>,
     pub boundary: String,
 }
 
@@ -431,6 +495,160 @@ pub fn route_self_improvement_fix(
         ],
         boundary: "Read-only Era L M71 routing decision over existing openchrome verdict/journal.md/ledger.jsonl evidence, loop-coverage attribution, source-apply, trust-gradient, rollback, and kill-switch artifacts; no new verification engine, no new data plane, no auto-merge, high-risk/source-affecting tail keeps thin human go/no-go, fun/taste and release go/no-go remain human Ring 2, #1 and #23 remain open.".to_string(),
     })
+}
+
+impl SelfImprovementApplyLoopInput {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SELF_IMPROVEMENT_APPLY_LOOP_INPUT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "self-improvement apply loop input schemaVersion must be {SELF_IMPROVEMENT_APPLY_LOOP_INPUT_SCHEMA_VERSION}"
+            ));
+        }
+        require_ref("proposalRef", &self.proposal_ref)?;
+        require_id("attributedMilestoneId", &self.attributed_milestone_id)?;
+        if self.proposal_ref != self.routing_input.proposal_ref {
+            return Err(anyhow!(
+                "apply loop proposalRef must match routingInput proposalRef"
+            ));
+        }
+        self.routing_input.validate()?;
+        validate_pipeline_refs(&self.before_evidence_refs)?;
+        validate_pipeline_refs(&self.after_evidence_refs)?;
+        if !(self.no_human_input && self.no_new_data_plane) {
+            return Err(anyhow!(
+                "apply loop must preserve no human input and no new data plane"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub fn run_self_improvement_reverify_apply_loop(
+    input: &SelfImprovementApplyLoopInput,
+) -> Result<SelfImprovementApplyLoopReport> {
+    input.validate()?;
+    let routing_decision = route_self_improvement_fix(&input.routing_input)?;
+    let improved = input.after_evidence_score > input.before_evidence_score;
+    let regression =
+        input.regression_detected || input.after_evidence_score < input.before_evidence_score;
+    let mut reasons = Vec::new();
+
+    let (outcome, rollback_command, source_mutation_applied, human_input_required) = if regression {
+        reasons.push(
+            "post-apply re-verify detected regression; reject proposal and reuse existing rollback"
+                .to_string(),
+        );
+        (
+            SelfImprovementApplyLoopOutcome::RejectedRolledBack,
+            Some(format!(
+                "ouroforge rollback --proposal {} --evidence {}",
+                input.proposal_ref, input.routing_input.reverify_evidence.rollback_ref
+            )),
+            false,
+            false,
+        )
+    } else {
+        match routing_decision.route {
+            SelfImprovementRoute::AutoApplyEligible if improved => {
+                reasons.push(
+                    "low-risk reversible proposal re-verified and improved attributed milestone evidence"
+                        .to_string(),
+                );
+                (
+                    SelfImprovementApplyLoopOutcome::AutoApplied,
+                    None,
+                    true,
+                    false,
+                )
+            }
+            SelfImprovementRoute::HumanGoNoGo => {
+                reasons.push(
+                    "proposal queued for thin human go/no-go; no autonomous source mutation applied"
+                        .to_string(),
+                );
+                (
+                    SelfImprovementApplyLoopOutcome::HumanGoNoGoQueued,
+                    None,
+                    false,
+                    true,
+                )
+            }
+            SelfImprovementRoute::Blocked => {
+                reasons.push("proposal blocked by re-verify/routing evidence".to_string());
+                (SelfImprovementApplyLoopOutcome::Blocked, None, false, false)
+            }
+            SelfImprovementRoute::AutoApplyEligible => {
+                reasons.push(
+                    "auto-apply route requires improved attributed milestone evidence".to_string(),
+                );
+                (SelfImprovementApplyLoopOutcome::Blocked, None, false, false)
+            }
+        }
+    };
+
+    let report = SelfImprovementApplyLoopReport {
+        schema_version: SELF_IMPROVEMENT_APPLY_LOOP_REPORT_SCHEMA_VERSION.to_string(),
+        proposal_ref: input.proposal_ref.clone(),
+        attributed_milestone_id: input.attributed_milestone_id.clone(),
+        outcome,
+        routing_decision,
+        rollback_command,
+        improved_attributed_milestone_evidence: improved && outcome == SelfImprovementApplyLoopOutcome::AutoApplied,
+        source_mutation_applied,
+        human_input_required,
+        reasons,
+        boundary: "Deterministic Era L M71 re-verify/apply-loop report over existing openchrome verdict/journal.md/ledger.jsonl evidence, loop-coverage attribution, source-apply, trust-gradient, rollback, and kill-switch artifacts; no human input for low-risk reversible auto-apply, high-risk/source-affecting changes queue for thin human go/no-go, regressions are rejected/rolled back, no new verification engine, no new data plane, no new store, #1 and #23 remain open.".to_string(),
+    };
+    validate_apply_loop_report(&report)?;
+    Ok(report)
+}
+
+fn validate_apply_loop_report(report: &SelfImprovementApplyLoopReport) -> Result<()> {
+    if report.schema_version != SELF_IMPROVEMENT_APPLY_LOOP_REPORT_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "self-improvement apply loop report schemaVersion must be {SELF_IMPROVEMENT_APPLY_LOOP_REPORT_SCHEMA_VERSION}"
+        ));
+    }
+    if report.outcome == SelfImprovementApplyLoopOutcome::AutoApplied
+        && !report.improved_attributed_milestone_evidence
+    {
+        return Err(anyhow!(
+            "auto-applied fixes must improve the attributed milestone evidence"
+        ));
+    }
+    if report.outcome == SelfImprovementApplyLoopOutcome::RejectedRolledBack
+        && report.rollback_command.is_none()
+    {
+        return Err(anyhow!("rejected regressions must record rollback command"));
+    }
+    if report.routing_decision.route == SelfImprovementRoute::HumanGoNoGo
+        && report.source_mutation_applied
+    {
+        return Err(anyhow!(
+            "human go/no-go route must not apply source mutations autonomously"
+        ));
+    }
+    let boundary = report.boundary.to_ascii_lowercase();
+    for required in [
+        "openchrome",
+        "journal.md",
+        "ledger.jsonl",
+        "loop-coverage",
+        "source-apply",
+        "trust-gradient",
+        "rollback",
+        "kill-switch",
+        "no human input",
+        "human go/no-go",
+        "no new verification engine",
+        "no new data plane",
+        "#1 and #23 remain open",
+    ] {
+        if !boundary.contains(required) {
+            return Err(anyhow!("apply loop boundary must mention {required}"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_pipeline_refs(refs: &[String]) -> Result<()> {

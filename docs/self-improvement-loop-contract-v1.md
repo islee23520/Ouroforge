@@ -45,3 +45,22 @@ remain human Ring 2. #1 and #23 remain open.
 grep -RIlqi "loop.coverage\|ledger\|journal\|verdict" docs/ || true
 cargo build --workspace --jobs 2
 ```
+
+## Re-verify-then-apply loop
+
+The M71 apply loop is deterministic over recorded evidence. It reads the
+proposal, the existing source-apply preview/transaction refs, the openchrome
+re-run verdict, `journal.md`, `ledger.jsonl`, loop-coverage attribution,
+trust-gradient routing, rollback metadata, and kill-switch state.
+
+- A reversible low-risk proposal that passes re-verify and improves the
+  attributed milestone evidence can be auto-applied with zero human input via
+  the existing source-apply/trust-gradient path.
+- A regression after re-verify is rejected and rolled back through the existing
+  rollback handle; the failed evidence remains visible instead of being treated
+  as success.
+- A high-risk or source-affecting proposal never auto-applies and remains queued
+  for the thin human go/no-go.
+
+The loop records a report only; it does not create a new store, telemetry schema,
+verification engine, browser executor, or data plane.
