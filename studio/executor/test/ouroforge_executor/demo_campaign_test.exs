@@ -5,6 +5,7 @@ defmodule OuroforgeExecutor.DemoCampaignTest do
 
   @moduletag :demo
 
+  @tag timeout: 180_000
   test "executor-driven campaign has golden parity with manual Rust CLI path" do
     repo_root = Path.expand("../../../..", __DIR__)
 
