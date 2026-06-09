@@ -136,6 +136,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`scenario-coverage-v94-semantic-port-coverage.md`](scenario-coverage-v94-semantic-port-coverage.md) — Scenario Coverage v94 regression suite for M112 semantic-port coverage, locking no auto-port without oracle, lossy imports not clean, ungated translation refs failing, deterministic state-hash evidence, 3D render evidence as secondary, and Rust/Studio boundaries.
 - [`rederivation-ux-human-intent-feel-escalation-contract-v1.md`](rederivation-ux-human-intent-feel-escalation-contract-v1.md) — Era R M113 contract for Studio-facing re-derivation UX, human intent/feel escalation, gated review evidence, fidelity/oracle display rules, and the Rust data-plane / Studio presentation-only split.
 - [`rederivation-ux-demo-v1.md`](rederivation-ux-demo-v1.md) — Era R M113 scripted Studio demo for re-derivation UX and human intent/feel escalation, with an honest fidelity summary, oracle-gated no-port claim, deterministic state-hash evidence, and no Studio trusted writes.
+- [`scenario-coverage-v95-rederivation-ux.md`](scenario-coverage-v95-rederivation-ux.md) — Scenario Coverage v95 regression suite for M113 re-derivation UX and human intent/feel escalation, locking no auto-port without oracle, lossy imports not clean, ungated translation/write failures, deterministic state-hash evidence, and Ring 2 human ownership.
 
 ## Authoring, Studio, and review surfaces
 
