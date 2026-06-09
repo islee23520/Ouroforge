@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "scenario-coverage-v64-optional-human-channel-v1",
+  "coverageVersion": 64,
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "issueRef": "#2045",
+  "milestone": "Era L M72",
+  "rows": [
+    {
+      "id": "oversight-surface-read-only",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/optional_human_channel_surface.rs",
+      "locks": "Optional oversight renders stage health, blockers, diagnosis, and attribution from existing evidence only; it is read-only, optional, non-blocking, and performs no trusted writes."
+    },
+    {
+      "id": "loop-completes-zero-human-input",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/optional-human-channel-v1/demo.fixture.json",
+      "locks": "The no-human real-title dogfood run uses cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2 and completes without observing or waiting for human input."
+    },
+    {
+      "id": "optional-human-run-never-waits",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/optional_human_channel_demo.rs",
+      "locks": "The with-human spot-check, override, and taste feedback path records provenance while the loop never waits and both compared runs complete."
+    },
+    {
+      "id": "override-provenance-no-source-authority",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/optional_human_channel_surface.rs",
+      "locks": "The escape-hatch override is a non-blocking nudge provenance record only; trusted writes, source-apply, auto-apply, and block-loop regressions fail closed."
+    },
+    {
+      "id": "taste-feedback-never-auto-applies",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/optional_human_channel_surface.rs",
+      "locks": "Taste/fun feedback reuses M57 curation and M58 playtest provenance, remains Ring 2, and any auto-apply or source-apply request is rejected."
+    },
+    {
+      "id": "coverage-v64-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v64-optional-human-channel.md",
+      "locks": "Coverage v64 is test-only and preserves openchrome, verdict, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, trust-gradient, no-new-engine, and no-new-data-plane boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v64 is test-only Rust regression coverage for the Era L M72 optional human channel over the existing openchrome/evidence pipeline: scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, and trust-gradient. It introduces no new verification engine, no new data plane, and no new persistent store. The autonomous run completes with zero human input; the optional human run records spot-check, override, and taste/fun-feedback provenance without waiting, trusted writes, source-apply authority, or auto-apply. Taste feedback is never auto-applied and fun/taste plus release go/no-go remain human Ring 2. #1 and #23 remain open."
+}
