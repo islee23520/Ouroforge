@@ -4,9 +4,11 @@
   "scenes": [{ "name": "Ortho Demo Scene", "nodes": [0] }],
   "scene": 0,
   "nodes": [
-    { "name": "Scene Root", "children": [1, 2] },
+    { "name": "Scene Root", "children": [1, 2, 3, 4] },
     { "name": "Ortho Camera", "camera": 0, "translation": [0, 8, 12] },
-    { "name": "Ground Tile", "mesh": 0, "translation": [2, 0, -1], "extras": { "logicHint": "collision/physics intent must be re-derived by Era R" } }
+    { "name": "Ground Tile", "mesh": 0, "translation": [2, 0, -1], "extras": { "logicHint": "collision/physics intent must be re-derived by Era R" } },
+    { "name": "Hero Billboard", "mesh": 0, "translation": [-1, 0, 0], "extras": { "m98Presentation": { "id": "hero-billboard", "kind": "billboard", "cameraFacing": "screen", "axisLock": "y", "sortingKey": 20, "textureRef": "textures/hero.png", "alphaMode": "blend", "pixelFilter": "nearest" } } },
+    { "name": "Crate Sprite Stack", "mesh": 0, "translation": [1, 0, 1], "extras": { "m98Presentation": { "id": "crate-sprite-stack", "kind": "sprite-stack", "cameraFacing": "none", "axisLock": "y", "sortingKey": 30, "textureRef": "textures/crate-stack.png", "alphaMode": "mask", "pixelFilter": "nearest", "stackSlices": ["crate-00", "crate-01", "crate-02"] } } }
   ],
   "cameras": [
     { "name": "Main Ortho", "type": "orthographic", "orthographic": { "xmag": 10, "ymag": 6, "znear": 0.1, "zfar": 100 } }

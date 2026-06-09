@@ -81,6 +81,52 @@
           }
         },
         "role": "presentation-geometry"
+      },
+      {
+        "id": "hero-billboard",
+        "parent": "scene-root",
+        "meshRef": "tile-mesh",
+        "localTransform": {
+          "translation": {
+            "x": -1.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-geometry"
+      },
+      {
+        "id": "crate-sprite-stack",
+        "parent": "scene-root",
+        "meshRef": "tile-mesh",
+        "localTransform": {
+          "translation": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 1.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-geometry"
       }
     ],
     "meshes": [
@@ -116,6 +162,40 @@
         "fidelityGrade": "green"
       }
     ],
+    "presentationLayers": [
+      {
+        "id": "hero-billboard",
+        "sourceNodeId": "hero-billboard",
+        "kind": "billboard",
+        "cameraFacing": "screen",
+        "axisLock": "y",
+        "sortingKey": 20,
+        "textureRef": "textures/hero.png",
+        "alphaMode": "blend",
+        "pixelFilter": "nearest",
+        "stackSlices": [],
+        "fidelityGrade": "green",
+        "authority": "presentation-only; cannot mutate deterministic logic/evidence; state-hash primary and perceptual render secondary"
+      },
+      {
+        "id": "crate-sprite-stack",
+        "sourceNodeId": "crate-sprite-stack",
+        "kind": "sprite-stack",
+        "cameraFacing": "none",
+        "axisLock": "y",
+        "sortingKey": 30,
+        "textureRef": "textures/crate-stack.png",
+        "alphaMode": "mask",
+        "pixelFilter": "nearest",
+        "stackSlices": [
+          "crate-00",
+          "crate-01",
+          "crate-02"
+        ],
+        "fidelityGrade": "green",
+        "authority": "presentation-only; cannot mutate deterministic logic/evidence; state-hash primary and perceptual render secondary"
+      }
+    ],
     "activeCameraId": "main-ortho"
   },
   "fidelityRows": [
@@ -135,6 +215,18 @@
       "unit": "camera:main-ortho",
       "grade": "green",
       "reason": "orthographic/isometric camera imported for presentation",
+      "oracleRequired": false
+    },
+    {
+      "unit": "presentation:hero-billboard",
+      "grade": "green",
+      "reason": "M98 billboard/sprite-stack/2D-in-3D primitive normalized as presentation-only; cannot mutate deterministic logic/evidence",
+      "oracleRequired": false
+    },
+    {
+      "unit": "presentation:crate-sprite-stack",
+      "grade": "green",
+      "reason": "M98 billboard/sprite-stack/2D-in-3D primitive normalized as presentation-only; cannot mutate deterministic logic/evidence",
       "oracleRequired": false
     },
     {
@@ -164,7 +256,7 @@
       "eraRInput": "observed behavior + interrogated intent + captured oracle + deterministic state expectations"
     }
   ],
-  "stateHashPrimary": "sha256:8f55986c49b158a183735be4637fdea5616d23cb8e4e6ed649a5a5ac69e5058e",
+  "stateHashPrimary": "sha256:db7ada0c011c2759f375b3a76e69079353ac1b8c94a48add8863b94042f26fa9",
   "perceptualRenderSecondary": {
     "method": "SSIM/pixel-diff tolerance over normalized presentation render",
     "threshold": "fixture-defined tolerance; never cross-machine bit hash",

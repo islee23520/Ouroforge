@@ -29,6 +29,14 @@ fn fixture_import_normalizes_geometry_camera_and_fidelity() {
     assert_eq!(report.native_scene.cameras[0].orthographic_height, 6.0);
     assert_eq!(report.native_scene.meshes[0].id, "tile-mesh");
     assert_eq!(report.native_scene.meshes[0].fidelity_grade, "green");
+    assert_eq!(report.native_scene.presentation_layers.len(), 2);
+    assert!(report
+        .native_scene
+        .presentation_layers
+        .iter()
+        .all(|layer| layer
+            .authority
+            .contains("cannot mutate deterministic logic/evidence")));
     assert!(report
         .fidelity_rows
         .iter()
@@ -42,6 +50,48 @@ fn fixture_import_normalizes_geometry_camera_and_fidelity() {
         report.perceptual_render_secondary.role,
         "secondary corroboration only"
     );
+}
+
+#[test]
+fn billboard_and_sprite_stack_primitives_are_presentation_only() {
+    let report = example_report_from_fixture().expect("fixture glTF normalizes");
+    report.validate().expect("report validates");
+
+    let billboard = report
+        .native_scene
+        .presentation_layers
+        .iter()
+        .find(|layer| layer.kind == "billboard")
+        .expect("billboard layer");
+    assert_eq!(billboard.id, "hero-billboard");
+    assert_eq!(billboard.camera_facing, "screen");
+    assert_eq!(billboard.axis_lock, "y");
+    assert_eq!(billboard.pixel_filter, "nearest");
+    assert_eq!(billboard.fidelity_grade, "green");
+
+    let stack = report
+        .native_scene
+        .presentation_layers
+        .iter()
+        .find(|layer| layer.kind == "sprite-stack")
+        .expect("sprite-stack layer");
+    assert_eq!(stack.id, "crate-sprite-stack");
+    assert_eq!(stack.stack_slices, ["crate-00", "crate-01", "crate-02"]);
+    assert_eq!(stack.alpha_mode, "mask");
+    assert_eq!(stack.fidelity_grade, "green");
+
+    assert!(report.fidelity_rows.iter().any(|row| {
+        row.unit == "presentation:hero-billboard"
+            && row.grade == "green"
+            && row
+                .reason
+                .contains("cannot mutate deterministic logic/evidence")
+    }));
+    assert!(report.fidelity_rows.iter().any(|row| {
+        row.unit == "presentation:crate-sprite-stack"
+            && row.grade == "green"
+            && !row.oracle_required
+    }));
 }
 
 #[test]

@@ -79,6 +79,8 @@ pub struct Gltf25dNativeScene {
     pub meshes: Vec<Gltf25dNativeMesh>,
     pub materials: Vec<Gltf25dNativeMaterial>,
     pub cameras: Vec<Gltf25dNativeCamera>,
+    #[serde(rename = "presentationLayers")]
+    pub presentation_layers: Vec<Gltf25dPresentationLayer>,
     #[serde(rename = "activeCameraId")]
     pub active_camera_id: String,
 }
@@ -135,6 +137,36 @@ pub struct Gltf25dNativeCamera {
     pub viewport: Gltf25dViewport,
     #[serde(rename = "fidelityGrade")]
     pub fidelity_grade: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dPresentationLayer {
+    pub id: String,
+    #[serde(rename = "sourceNodeId")]
+    pub source_node_id: String,
+    pub kind: String,
+    #[serde(rename = "cameraFacing")]
+    pub camera_facing: String,
+    #[serde(rename = "axisLock")]
+    pub axis_lock: String,
+    #[serde(rename = "sortingKey")]
+    pub sorting_key: i64,
+    #[serde(
+        rename = "textureRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub texture_ref: Option<String>,
+    #[serde(rename = "alphaMode")]
+    pub alpha_mode: String,
+    #[serde(rename = "pixelFilter")]
+    pub pixel_filter: String,
+    #[serde(rename = "stackSlices")]
+    pub stack_slices: Vec<String>,
+    #[serde(rename = "fidelityGrade")]
+    pub fidelity_grade: String,
+    pub authority: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -220,6 +252,7 @@ pub fn normalize_gltf_25d_import_from_str(
     if nodes.is_empty() {
         return Err(anyhow!("glTF nodes must not be empty"));
     }
+    let presentation_layers = normalize_presentation_layers(&document, &nodes)?;
 
     let active_camera_id = cameras
         .iter()
@@ -237,6 +270,7 @@ pub fn normalize_gltf_25d_import_from_str(
         meshes,
         materials: materials.into_values().collect(),
         cameras,
+        presentation_layers,
         active_camera_id,
     };
 
@@ -334,6 +368,19 @@ impl Gltf25dImportReport {
         }
         if self.fidelity_rows.is_empty() {
             return Err(anyhow!("fidelityRows must not be empty"));
+        }
+        if self.native_scene.presentation_layers.iter().any(|layer| {
+            !layer
+                .authority
+                .contains("cannot mutate deterministic logic/evidence")
+                || !matches!(
+                    layer.kind.as_str(),
+                    "billboard" | "sprite-stack" | "2d-in-3d-plane"
+                )
+        }) {
+            return Err(anyhow!(
+                "presentation layers must be bounded M98 presentation-only primitives"
+            ));
         }
         if self.fidelity_rows.iter().any(|row| {
             row.reason
@@ -579,6 +626,85 @@ fn normalize_nodes(document: &Value, unit_scale: f64) -> Result<Vec<Gltf25dNativ
     Ok(output)
 }
 
+fn normalize_presentation_layers(
+    document: &Value,
+    nodes: &[Gltf25dNativeNode],
+) -> Result<Vec<Gltf25dPresentationLayer>> {
+    let Some(source_nodes) = document.get("nodes").and_then(Value::as_array) else {
+        return Ok(Vec::new());
+    };
+    let mut layers = Vec::new();
+    for (index, node) in source_nodes.iter().enumerate() {
+        let Some(extra) = node
+            .get("extras")
+            .and_then(|extras| extras.get("m98Presentation"))
+        else {
+            continue;
+        };
+        let kind = extra.get("kind").and_then(Value::as_str).unwrap_or("");
+        if !matches!(kind, "billboard" | "sprite-stack" | "2d-in-3d-plane") {
+            return Err(anyhow!(
+                "unsupported M98 presentation primitive kind: {kind}"
+            ));
+        }
+        let source_node_id = nodes
+            .get(index)
+            .map(|node| node.id.clone())
+            .unwrap_or_else(|| named_id(node, "node", index));
+        let stack_slices = extra
+            .get("stackSlices")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let has_logic_coupling = extra.to_string().to_lowercase().contains("logic");
+        layers.push(Gltf25dPresentationLayer {
+            id: extra
+                .get("id")
+                .and_then(Value::as_str)
+                .map(safe_id)
+                .filter(|id| !id.is_empty())
+                .unwrap_or_else(|| format!("{source_node_id}-presentation")),
+            source_node_id,
+            kind: kind.to_string(),
+            camera_facing: extra
+                .get("cameraFacing")
+                .and_then(Value::as_str)
+                .unwrap_or(if kind == "billboard" { "screen" } else { "none" })
+                .to_string(),
+            axis_lock: extra
+                .get("axisLock")
+                .and_then(Value::as_str)
+                .unwrap_or("none")
+                .to_string(),
+            sorting_key: extra
+                .get("sortingKey")
+                .and_then(Value::as_i64)
+                .unwrap_or(index as i64),
+            texture_ref: extra
+                .get("textureRef")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            alpha_mode: extra
+                .get("alphaMode")
+                .and_then(Value::as_str)
+                .unwrap_or("opaque")
+                .to_string(),
+            pixel_filter: extra
+                .get("pixelFilter")
+                .and_then(Value::as_str)
+                .unwrap_or("nearest")
+                .to_string(),
+            stack_slices,
+            fidelity_grade: if has_logic_coupling { "yellow" } else { "green" }.to_string(),
+            authority: "presentation-only; cannot mutate deterministic logic/evidence; state-hash primary and perceptual render secondary".to_string(),
+        });
+    }
+    Ok(layers)
+}
+
 fn build_fidelity_rows(document: &Value, scene: &Gltf25dNativeScene) -> Vec<Gltf25dFidelityRow> {
     let mut rows = Vec::new();
     for mesh in &scene.meshes {
@@ -618,6 +744,19 @@ fn build_fidelity_rows(document: &Value, scene: &Gltf25dNativeScene) -> Vec<Gltf
             }
             .to_string(),
             oracle_required: false,
+        });
+    }
+    for layer in &scene.presentation_layers {
+        rows.push(Gltf25dFidelityRow {
+            unit: format!("presentation:{}", layer.id),
+            grade: layer.fidelity_grade.clone(),
+            reason: if layer.fidelity_grade == "green" {
+                "M98 billboard/sprite-stack/2D-in-3D primitive normalized as presentation-only; cannot mutate deterministic logic/evidence"
+            } else {
+                "M98 presentation primitive has behavior coupling and remains a named re-authoring gap, not auto-translated"
+            }
+            .to_string(),
+            oracle_required: layer.fidelity_grade != "green",
         });
     }
     for extension in document

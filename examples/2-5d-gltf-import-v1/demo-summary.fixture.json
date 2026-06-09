@@ -17,7 +17,15 @@
     "deterministicStateHashPrimary": true,
     "perceptualRenderSecondaryOnly": true,
     "decompiledSourceCopied": false,
-    "elixirOwnsArtifactSemantics": false
+    "elixirOwnsArtifactSemantics": false,
+    "presentationLayerCount": 2,
+    "presentationKinds": [
+      "billboard",
+      "sprite-stack"
+    ],
+    "visibleObjectCount": 3,
+    "m98PresentationCannotMutateLogic": true
   },
-  "boundary": "glTF 2.5D source-project presentation import demo only; no live engine bridge, no embedded runtime, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority."
+  "boundary": "glTF 2.5D source-project presentation import demo only; M98 billboard/sprite-stack layers are presentation-only and cannot mutate deterministic logic/evidence; no live engine bridge, no embedded runtime, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority.",
+  "implementationIssueRef": "#2197"
 }
