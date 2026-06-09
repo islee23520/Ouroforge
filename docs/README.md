@@ -125,6 +125,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`legacy-logic-ingestion-behavioral-unit-contract-v1.md`](legacy-logic-ingestion-behavioral-unit-contract-v1.md) — Era R M108 contract for source-only legacy skeleton ingestion and behavioral-unit extraction, including exact inputs/outputs, Green/Yellow/Red fidelity grades, no-oracle-not-ported rule, clean-room one-way boundary, and Era R hand-off states.
 - [`scenario-coverage-v90-legacy-logic-ingestion.md`](scenario-coverage-v90-legacy-logic-ingestion.md) — Scenario Coverage v90 regression suite for M108 legacy logic ingestion, locking no auto-port without oracle, lossy imports not Green, deterministic digest/state-hash behavior, decompiled-source rejection, and Rust data-plane boundaries.
 - [`tacit-knowledge-interrogation-oracle-capture-contract-v1.md`](tacit-knowledge-interrogation-oracle-capture-contract-v1.md) — Era R M109 contract for tacit-knowledge interrogation and oracle capture, defining source-independent intent records, deterministic oracle specs, conservative fidelity/oracle grades, and the Rust data-plane / Studio presentation-only boundary.
+- [`tacit-oracle-capture-demo-v1.md`](tacit-oracle-capture-demo-v1.md) — Era R M109 fixture-backed demo showing a captured oracle, an explicitly oracle-less unit, deterministic state-hash evidence, no port claim, and no Studio trusted-write authority.
 
 ## Authoring, Studio, and review surfaces
 

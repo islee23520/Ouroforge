@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "tacit.oracle.capture.demo.v1",
+  "issueRef": "#2226",
+  "contractRef": "docs/tacit-knowledge-interrogation-oracle-capture-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/tacit_oracle_capture.rs",
+  "docRef": "docs/tacit-oracle-capture-demo-v1.md",
+  "summary": {
+    "capturedOracleUnits": 1,
+    "oracleMissingUnits": 2,
+    "portedClaimsAllowed": 0,
+    "determinismEvidence": "2D bit-exact state hash primary",
+    "studioTrustedWriteAuthority": false,
+    "cleanRoomSourceOnly": true,
+    "foreignRuntimeBridgeAllowed": false
+  },
+  "requiredRows": [
+    "demo.source-only-ingestion",
+    "demo.intent-answer-provenance",
+    "demo.oracle-state-hash",
+    "demo.oracle-less-unit-flagged",
+    "demo.no-ported-claim",
+    "demo.rust-owned-no-studio-write"
+  ]
+}
