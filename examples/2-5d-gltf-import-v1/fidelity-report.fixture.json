@@ -127,6 +127,29 @@
           }
         },
         "role": "presentation-geometry"
+      },
+      {
+        "id": "dialogue-plane-2d-in-3d",
+        "parent": "scene-root",
+        "meshRef": "tile-mesh",
+        "localTransform": {
+          "translation": {
+            "x": 0.0,
+            "y": 1.0,
+            "z": 2.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-geometry"
       }
     ],
     "meshes": [
@@ -194,6 +217,20 @@
         ],
         "fidelityGrade": "green",
         "authority": "presentation-only; cannot mutate deterministic logic/evidence; state-hash primary and perceptual render secondary"
+      },
+      {
+        "id": "dialogue-plane-2d-in-3d",
+        "sourceNodeId": "dialogue-plane-2d-in-3d",
+        "kind": "2d-in-3d-plane",
+        "cameraFacing": "none",
+        "axisLock": "none",
+        "sortingKey": 40,
+        "textureRef": "textures/dialogue-panel.png",
+        "alphaMode": "blend",
+        "pixelFilter": "nearest",
+        "stackSlices": [],
+        "fidelityGrade": "green",
+        "authority": "presentation-only; cannot mutate deterministic logic/evidence; state-hash primary and perceptual render secondary"
       }
     ],
     "activeCameraId": "main-ortho"
@@ -230,6 +267,12 @@
       "oracleRequired": false
     },
     {
+      "unit": "presentation:dialogue-plane-2d-in-3d",
+      "grade": "green",
+      "reason": "M98 billboard/sprite-stack/2D-in-3D primitive normalized as presentation-only; cannot mutate deterministic logic/evidence",
+      "oracleRequired": false
+    },
+    {
       "unit": "extension:VENDOR_custom_shader_note",
       "grade": "yellow",
       "reason": "unsupported glTF extension is recorded as a fidelity gap, not silently dropped",
@@ -256,7 +299,7 @@
       "eraRInput": "observed behavior + interrogated intent + captured oracle + deterministic state expectations"
     }
   ],
-  "stateHashPrimary": "sha256:db7ada0c011c2759f375b3a76e69079353ac1b8c94a48add8863b94042f26fa9",
+  "stateHashPrimary": "sha256:d59bb7f7f8854bcb3aabcbde6081ac62e77c304784f87c7250982207636a9c22",
   "perceptualRenderSecondary": {
     "method": "SSIM/pixel-diff tolerance over normalized presentation render",
     "threshold": "fixture-defined tolerance; never cross-machine bit hash",

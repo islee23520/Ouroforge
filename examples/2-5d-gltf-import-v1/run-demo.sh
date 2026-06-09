@@ -20,6 +20,9 @@ assert "one-way source-project" in report["boundary"]
 assert report["nativeScene"]["sceneKind"] == "2.5d-presentation"
 assert report["nativeScene"]["cameras"][0]["projection"] == "orthographic"
 assert report["nativeScene"]["logicAuthority"].endswith("cannot mutate gameplay truth")
+assert len(report["nativeScene"].get("presentationLayers", [])) == 3
+assert {layer["kind"] for layer in report["nativeScene"]["presentationLayers"]} == {"billboard", "sprite-stack", "2d-in-3d-plane"}
+assert all("cannot mutate deterministic logic/evidence" in layer["authority"] for layer in report["nativeScene"]["presentationLayers"])
 assert report["stateHashPrimary"].startswith("sha256:")
 assert report["perceptualRenderSecondary"]["role"] == "secondary corroboration only"
 assert any(row["grade"] == "green" for row in report["fidelityRows"])

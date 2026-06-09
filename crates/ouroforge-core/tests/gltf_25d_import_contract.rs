@@ -29,7 +29,7 @@ fn fixture_import_normalizes_geometry_camera_and_fidelity() {
     assert_eq!(report.native_scene.cameras[0].orthographic_height, 6.0);
     assert_eq!(report.native_scene.meshes[0].id, "tile-mesh");
     assert_eq!(report.native_scene.meshes[0].fidelity_grade, "green");
-    assert_eq!(report.native_scene.presentation_layers.len(), 2);
+    assert_eq!(report.native_scene.presentation_layers.len(), 3);
     assert!(report
         .native_scene
         .presentation_layers
@@ -53,7 +53,7 @@ fn fixture_import_normalizes_geometry_camera_and_fidelity() {
 }
 
 #[test]
-fn billboard_and_sprite_stack_primitives_are_presentation_only() {
+fn billboard_sprite_stack_and_2d_plane_primitives_are_presentation_only() {
     let report = example_report_from_fixture().expect("fixture glTF normalizes");
     report.validate().expect("report validates");
 
@@ -87,8 +87,27 @@ fn billboard_and_sprite_stack_primitives_are_presentation_only() {
                 .reason
                 .contains("cannot mutate deterministic logic/evidence")
     }));
+    let plane = report
+        .native_scene
+        .presentation_layers
+        .iter()
+        .find(|layer| layer.kind == "2d-in-3d-plane")
+        .expect("2D-in-3D plane layer");
+    assert_eq!(plane.id, "dialogue-plane-2d-in-3d");
+    assert_eq!(
+        plane.texture_ref.as_deref(),
+        Some("textures/dialogue-panel.png")
+    );
+    assert_eq!(plane.alpha_mode, "blend");
+    assert_eq!(plane.pixel_filter, "nearest");
+
     assert!(report.fidelity_rows.iter().any(|row| {
         row.unit == "presentation:crate-sprite-stack"
+            && row.grade == "green"
+            && !row.oracle_required
+    }));
+    assert!(report.fidelity_rows.iter().any(|row| {
+        row.unit == "presentation:dialogue-plane-2d-in-3d"
             && row.grade == "green"
             && !row.oracle_required
     }));
@@ -106,7 +125,13 @@ fn fixture_report_matches_committed_render_smoke_input() {
 fn demo_summary_and_script_prove_honest_end_to_end_boundary() {
     let fixture = read_repo_json("examples/2-5d-gltf-import-v1/demo-summary.fixture.json");
     assert_eq!(fixture["schemaVersion"], "gltf-25d-import-demo-v1");
-    assert_eq!(fixture["issueRef"], "#2194");
+    assert_eq!(fixture["issueRef"], "#2198");
+    assert_eq!(fixture["implementationIssueRef"], "#2197");
+    assert!(fixture["contractRefs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "docs/billboard-sprite-stack-presentation-contract-v1.md"));
     let script_ref = fixture["scriptRef"].as_str().unwrap();
     assert!(
         repo_root().join(script_ref).exists(),
@@ -142,6 +167,8 @@ fn demo_summary_and_script_prove_honest_end_to_end_boundary() {
         "perceptualRenderSecondary",
         "reDerivationTasks",
         "no auto-port claim",
+        "2d-in-3d-plane",
+        "presentationLayers",
     ] {
         assert!(script.contains(required), "script missing {required}");
     }
@@ -190,6 +217,24 @@ fn demo_summary_matches_live_gltf_report_shape() {
     );
     assert_eq!(expected["decompiledSourceCopied"], false);
     assert_eq!(expected["elixirOwnsArtifactSemantics"], false);
+    assert_eq!(
+        report.native_scene.presentation_layers.len(),
+        expected["presentationLayerCount"].as_u64().unwrap() as usize
+    );
+    let kinds = report
+        .native_scene
+        .presentation_layers
+        .iter()
+        .map(|layer| layer.kind.as_str())
+        .collect::<Vec<_>>();
+    let expected_kinds = expected["presentationKinds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(kinds, expected_kinds);
+    assert_eq!(expected["demonstratesM98EndToEnd"], true);
     assert!(report
         .oracle_rule
         .contains("Nothing is claimed ported without captured acceptance evidence"));

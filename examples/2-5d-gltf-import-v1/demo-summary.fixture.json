@@ -1,6 +1,6 @@
 {
   "schemaVersion": "gltf-25d-import-demo-v1",
-  "issueRef": "#2194",
+  "issueRef": "#2198",
   "scriptRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
   "sourceProject": "examples/2-5d-gltf-import-v1/source-project",
   "sourcePath": "examples/2-5d-gltf-import-v1/source/ortho-demo.gltf",
@@ -18,14 +18,20 @@
     "perceptualRenderSecondaryOnly": true,
     "decompiledSourceCopied": false,
     "elixirOwnsArtifactSemantics": false,
-    "presentationLayerCount": 2,
+    "presentationLayerCount": 3,
     "presentationKinds": [
       "billboard",
-      "sprite-stack"
+      "sprite-stack",
+      "2d-in-3d-plane"
     ],
-    "visibleObjectCount": 3,
-    "m98PresentationCannotMutateLogic": true
+    "visibleObjectCount": 4,
+    "m98PresentationCannotMutateLogic": true,
+    "demonstratesM98EndToEnd": true
   },
-  "boundary": "glTF 2.5D source-project presentation import demo only; M98 billboard/sprite-stack layers are presentation-only and cannot mutate deterministic logic/evidence; no live engine bridge, no embedded runtime, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority.",
-  "implementationIssueRef": "#2197"
+  "boundary": "glTF 2.5D M98 presentation demo only; billboard, sprite-stack, and 2D-in-3D plane layers are presentation-only and cannot mutate deterministic logic/evidence; no live engine bridge, no embedded runtime, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority.",
+  "implementationIssueRef": "#2197",
+  "contractRefs": [
+    "docs/billboard-sprite-stack-presentation-contract-v1.md",
+    "docs/2-5d-migration-on-ramp-scope-contract-v1.md"
+  ]
 }

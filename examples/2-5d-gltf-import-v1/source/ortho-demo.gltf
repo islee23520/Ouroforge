@@ -1,22 +1,170 @@
 {
-  "asset": { "version": "2.0", "generator": "Ouroforge M97 fixture" },
-  "extensionsUsed": ["KHR_materials_unlit", "VENDOR_custom_shader_note"],
-  "scenes": [{ "name": "Ortho Demo Scene", "nodes": [0] }],
+  "asset": {
+    "version": "2.0",
+    "generator": "Ouroforge M98 fixture"
+  },
+  "extensionsUsed": [
+    "KHR_materials_unlit",
+    "VENDOR_custom_shader_note"
+  ],
+  "scenes": [
+    {
+      "name": "Ortho Demo Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
   "scene": 0,
   "nodes": [
-    { "name": "Scene Root", "children": [1, 2, 3, 4] },
-    { "name": "Ortho Camera", "camera": 0, "translation": [0, 8, 12] },
-    { "name": "Ground Tile", "mesh": 0, "translation": [2, 0, -1], "extras": { "logicHint": "collision/physics intent must be re-derived by Era R" } },
-    { "name": "Hero Billboard", "mesh": 0, "translation": [-1, 0, 0], "extras": { "m98Presentation": { "id": "hero-billboard", "kind": "billboard", "cameraFacing": "screen", "axisLock": "y", "sortingKey": 20, "textureRef": "textures/hero.png", "alphaMode": "blend", "pixelFilter": "nearest" } } },
-    { "name": "Crate Sprite Stack", "mesh": 0, "translation": [1, 0, 1], "extras": { "m98Presentation": { "id": "crate-sprite-stack", "kind": "sprite-stack", "cameraFacing": "none", "axisLock": "y", "sortingKey": 30, "textureRef": "textures/crate-stack.png", "alphaMode": "mask", "pixelFilter": "nearest", "stackSlices": ["crate-00", "crate-01", "crate-02"] } } }
+    {
+      "name": "Scene Root",
+      "children": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "name": "Ortho Camera",
+      "camera": 0,
+      "translation": [
+        0,
+        8,
+        12
+      ]
+    },
+    {
+      "name": "Ground Tile",
+      "mesh": 0,
+      "translation": [
+        2,
+        0,
+        -1
+      ],
+      "extras": {
+        "logicHint": "collision/physics intent must be re-derived by Era R"
+      }
+    },
+    {
+      "name": "Hero Billboard",
+      "mesh": 0,
+      "translation": [
+        -1,
+        0,
+        0
+      ],
+      "extras": {
+        "m98Presentation": {
+          "id": "hero-billboard",
+          "kind": "billboard",
+          "cameraFacing": "screen",
+          "axisLock": "y",
+          "sortingKey": 20,
+          "textureRef": "textures/hero.png",
+          "alphaMode": "blend",
+          "pixelFilter": "nearest"
+        }
+      }
+    },
+    {
+      "name": "Crate Sprite Stack",
+      "mesh": 0,
+      "translation": [
+        1,
+        0,
+        1
+      ],
+      "extras": {
+        "m98Presentation": {
+          "id": "crate-sprite-stack",
+          "kind": "sprite-stack",
+          "cameraFacing": "none",
+          "axisLock": "y",
+          "sortingKey": 30,
+          "textureRef": "textures/crate-stack.png",
+          "alphaMode": "mask",
+          "pixelFilter": "nearest",
+          "stackSlices": [
+            "crate-00",
+            "crate-01",
+            "crate-02"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Dialogue Plane 2D In 3D",
+      "mesh": 0,
+      "translation": [
+        0,
+        1,
+        2
+      ],
+      "extras": {
+        "m98Presentation": {
+          "id": "dialogue-plane-2d-in-3d",
+          "kind": "2d-in-3d-plane",
+          "cameraFacing": "none",
+          "axisLock": "none",
+          "sortingKey": 40,
+          "textureRef": "textures/dialogue-panel.png",
+          "alphaMode": "blend",
+          "pixelFilter": "nearest"
+        }
+      }
+    }
   ],
   "cameras": [
-    { "name": "Main Ortho", "type": "orthographic", "orthographic": { "xmag": 10, "ymag": 6, "znear": 0.1, "zfar": 100 } }
+    {
+      "name": "Main Ortho",
+      "type": "orthographic",
+      "orthographic": {
+        "xmag": 10,
+        "ymag": 6,
+        "znear": 0.1,
+        "zfar": 100
+      }
+    }
   ],
   "materials": [
-    { "name": "Tile Unlit", "extensions": { "KHR_materials_unlit": {}, "VENDOR_custom_shader_note": { "note": "bake or re-author" } }, "pbrMetallicRoughness": { "baseColorFactor": [0.2, 0.7, 1.0, 1.0], "metallicFactor": 0, "roughnessFactor": 1 } }
+    {
+      "name": "Tile Unlit",
+      "extensions": {
+        "KHR_materials_unlit": {},
+        "VENDOR_custom_shader_note": {
+          "note": "bake or re-author"
+        }
+      },
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.2,
+          0.7,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      }
+    }
   ],
   "meshes": [
-    { "name": "Tile Mesh", "primitives": [{ "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 }, "indices": 3, "material": 0, "mode": 4 }] }
+    {
+      "name": "Tile Mesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
   ]
 }
