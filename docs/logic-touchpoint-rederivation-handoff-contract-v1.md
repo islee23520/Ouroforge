@@ -50,8 +50,9 @@ trusted artifact writes.
 
 ## Outputs
 
-The detector emits a deterministic, Rust-owned hand-off artifact with these
-fields or their direct Rust equivalents:
+The detector emits a deterministic, Rust-owned hand-off artifact in
+`crates/ouroforge-core/src/logic_touchpoint_handoff.rs` with these fields or
+their direct Rust equivalents:
 
 1. `schema_version` — pinned hand-off schema.
 2. `boundary` — one-way on-ramp, source-project/open-text, clean-room,
