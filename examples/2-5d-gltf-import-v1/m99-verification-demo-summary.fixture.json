@@ -1,0 +1,39 @@
+{
+  "boundary": "M99 verification demo evidence only: skeleton imports best-effort; logic is re-derived and oracle-gated; no auto-port claim; no trusted Studio write; state-hash primary with perceptual render secondary-only; #1 and #23 remain open.",
+  "commands": [
+    "cargo run -p ouroforge-cli -- migration gltf25d-demo --source examples/2-5d-gltf-import-v1/source/ortho-demo.gltf --output runs/gltf-25d-import-demo/fidelity-report.json",
+    "node examples/2-5d-gltf-import-v1/render-smoke.test.cjs",
+    "cargo run -p ouroforge-cli -- run seeds/migration-demo.yaml --workers 2 || true"
+  ],
+  "fidelitySummary": {
+    "claimedPortedUnits": [],
+    "gapUnits": [
+      "material:tile-unlit",
+      "extension:VENDOR_custom_shader_note"
+    ],
+    "greenRows": 5,
+    "redRows": 0,
+    "yellowRows": 2
+  },
+  "issueRef": "#2201",
+  "perceptualRenderGate": {
+    "maxPixelDiff": 0.01,
+    "method": "SSIM/pixel-diff tolerance over normalized presentation render",
+    "minSsim": 0.985,
+    "name": "perceptual-render-secondary",
+    "pixelDiff": 0.004,
+    "role": "secondary corroboration only",
+    "ssim": 0.997,
+    "status": "pass"
+  },
+  "reDerivationTaskCount": 3,
+  "schemaVersion": "gltf-25d-m99-verification-demo-v1",
+  "scriptRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
+  "sourceReportRef": "examples/2-5d-gltf-import-v1/fidelity-report.fixture.json",
+  "stateHashGate": {
+    "name": "deterministic-state-hash-primary",
+    "stateHashPrimary": "sha256:d59bb7f7f8854bcb3aabcbde6081ac62e77c304784f87c7250982207636a9c22",
+    "status": "pass"
+  },
+  "verificationSummaryOutput": "runs/gltf-25d-import-demo/verification-summary.json"
+}

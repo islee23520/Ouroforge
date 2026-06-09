@@ -243,6 +243,87 @@ fn demo_summary_matches_live_gltf_report_shape() {
 }
 
 #[test]
+fn m99_demo_summary_records_verification_and_no_port_claim() {
+    let summary =
+        read_repo_json("examples/2-5d-gltf-import-v1/m99-verification-demo-summary.fixture.json");
+    assert_eq!(
+        summary["schemaVersion"],
+        "gltf-25d-m99-verification-demo-v1"
+    );
+    assert_eq!(summary["issueRef"], "#2201");
+    assert_eq!(
+        summary["stateHashGate"]["name"],
+        "deterministic-state-hash-primary"
+    );
+    assert_eq!(summary["stateHashGate"]["status"], "pass");
+    assert!(summary["stateHashGate"]["stateHashPrimary"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
+    assert_eq!(
+        summary["perceptualRenderGate"]["name"],
+        "perceptual-render-secondary"
+    );
+    assert_eq!(summary["perceptualRenderGate"]["status"], "pass");
+    assert_eq!(
+        summary["perceptualRenderGate"]["role"],
+        "secondary corroboration only"
+    );
+    assert!(
+        summary["perceptualRenderGate"]["ssim"].as_f64().unwrap()
+            >= summary["perceptualRenderGate"]["minSsim"].as_f64().unwrap()
+    );
+    assert!(
+        summary["perceptualRenderGate"]["pixelDiff"]
+            .as_f64()
+            .unwrap()
+            <= summary["perceptualRenderGate"]["maxPixelDiff"]
+                .as_f64()
+                .unwrap()
+    );
+    assert!(summary["fidelitySummary"]["yellowRows"].as_u64().unwrap() > 0);
+    assert!(summary["fidelitySummary"]["gapUnits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|unit| unit == "extension:VENDOR_custom_shader_note"));
+    assert!(summary["fidelitySummary"]["claimedPortedUnits"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(summary["reDerivationTaskCount"].as_u64().unwrap() > 0);
+    let boundary = summary["boundary"].as_str().unwrap();
+    for required in [
+        "skeleton imports best-effort",
+        "logic is re-derived and oracle-gated",
+        "no auto-port claim",
+        "no trusted Studio write",
+        "state-hash primary",
+        "perceptual render secondary-only",
+        "#1 and #23 remain open",
+    ] {
+        assert!(boundary.contains(required), "boundary missing {required}");
+    }
+}
+
+#[test]
+fn m99_run_demo_script_emits_verification_summary() {
+    let script = read_repo_text("examples/2-5d-gltf-import-v1/run-demo.sh");
+    for required in [
+        "VERIFY_OUTPUT",
+        "verification-summary.json",
+        "gltf-25d-m99-verification-demo-v1",
+        "deterministic-state-hash-primary",
+        "perceptual-render-secondary",
+        "claimedPortedUnits",
+        "no auto-port claim",
+        "state-hash primary verified",
+    ] {
+        assert!(script.contains(required), "script missing {required}");
+    }
+}
+
+#[test]
 fn m99_verification_report_passes_state_hash_primary_and_render_secondary() {
     let import_report = example_report_from_fixture().expect("fixture glTF normalizes");
     let sample = Gltf25dRenderSample {
