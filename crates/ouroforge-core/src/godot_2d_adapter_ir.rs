@@ -241,6 +241,7 @@ pub fn write_godot_2d_adapter_demo_report(
     output_path: impl AsRef<Path>,
 ) -> Result<GodotAdapterDemoReport> {
     let report = godot_2d_adapter_demo_report(project_root)?;
+    validate_godot_2d_adapter_demo_report(&report)?;
     let output_path = output_path.as_ref();
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
@@ -248,6 +249,45 @@ pub fn write_godot_2d_adapter_demo_report(
     fs::write(output_path, serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("writing {}", output_path.display()))?;
     Ok(report)
+}
+
+pub fn validate_godot_2d_adapter_demo_report(report: &GodotAdapterDemoReport) -> Result<()> {
+    if report.schema_version != "godot-2d-adapter-demo-report-v1" {
+        return Err(anyhow!(
+            "unsupported Godot adapter demo report schema {}",
+            report.schema_version
+        ));
+    }
+    if !report.claimed_ported_units.is_empty() {
+        return Err(anyhow!(
+            "Godot adapter report cannot claim ported units without a later passing oracle"
+        ));
+    }
+    if !report.ir_state_hash.starts_with("sha256:") || report.ir_state_hash.len() != 71 {
+        return Err(anyhow!(
+            "Godot adapter report requires a sha256-prefixed deterministic state hash"
+        ));
+    }
+    if report.boundary != GODOT_2D_ADAPTER_BOUNDARY {
+        return Err(anyhow!("Godot adapter report boundary drifted"));
+    }
+    if !report
+        .oracle_gate
+        .to_ascii_lowercase()
+        .contains("no unit is claimed ported")
+    {
+        return Err(anyhow!(
+            "Godot adapter report must state that no unit is claimed ported"
+        ));
+    }
+    if (report.unsupported_count > 0 || report.logic_touchpoint_count > 0)
+        && report.fidelity_summary.red == 0
+    {
+        return Err(anyhow!(
+            "Godot adapter report cannot grade lossy or logic-touchpoint imports clean"
+        ));
+    }
+    Ok(())
 }
 
 pub fn parse_godot_2d_project(root: impl AsRef<Path>) -> Result<GodotMigrationIr> {
