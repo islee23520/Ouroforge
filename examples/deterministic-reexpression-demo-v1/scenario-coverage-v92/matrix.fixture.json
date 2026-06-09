@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "scenario-coverage-v92-deterministic-reexpression-v1",
+  "coverageVersion": 92,
+  "issueRef": "#2231",
+  "milestone": "Era R M110",
+  "contractRef": "docs/deterministic-re-expression-engine-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/deterministic_reexpression.rs",
+  "demoRef": "docs/deterministic-reexpression-demo-v1.md",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeClean": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "perceptualRenderSecondaryOnly": true,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "decompiledSourceAllowed": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v92.captured-oracle-reexpresses-gated-draft-not-port",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v92_deterministic_reexpression.rs",
+      "locks": "A captured oracle can produce a deterministic behavior_runtime draft and M111 handoff only behind source-apply/review gates; every portedClaimAllowed flag remains false."
+    },
+    {
+      "id": "v92.lossy-import-not-graded-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v92_deterministic_reexpression.rs",
+      "locks": "Lossy or oracle-less imported logic remains Yellow with explicit gaps and re-derivation tasks, never Green/clean."
+    },
+    {
+      "id": "v92.ungated-auto-translation-port-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v92_deterministic_reexpression.rs",
+      "locks": "Any upstream auto-port/translation claim is Red and emits no behavior draft even when an oracle-like record is present."
+    },
+    {
+      "id": "v92.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v92_deterministic_reexpression.rs",
+      "locks": "Identical state-hash inputs reproduce the same deterministic digest; state-hash drift changes the digest and must be treated as a regression."
+    },
+    {
+      "id": "v92.3d-state-hash-primary-render-secondary",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v92_deterministic_reexpression.rs",
+      "locks": "2.5D/3D verification records deterministic state-hash as primary and perceptual SSIM/pixel-diff render evidence only as secondary corroboration."
+    },
+    {
+      "id": "v92.clean-room-source-only-and-no-studio-trusted-write",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v92-deterministic-reexpression.md",
+      "locks": "Coverage records source-project/open-text clean-room boundaries, blocked decompiled/runtime refs, Rust data-plane ownership, and no Studio trusted writes."
+    }
+  ]
+}
