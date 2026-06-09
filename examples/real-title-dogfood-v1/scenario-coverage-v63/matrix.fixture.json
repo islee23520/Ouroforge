@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "scenario-coverage-v63-self-improvement-loop-v1",
+  "coverageVersion": 63,
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "issueRef": "#2041",
+  "milestone": "Era L M71",
+  "rows": [
+    {
+      "id": "reverify-gates-design-integrity",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-improvement-loop-v1/contract.fixture.json",
+      "locks": "Re-verify requires openchrome, scenario verdicts, the four gates plus design-integrity, rollback, kill-switch, source-apply, and trust-gradient evidence before routing."
+    },
+    {
+      "id": "low-risk-auto-apply-improves-evidence",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_improvement_reverify_apply_loop.rs",
+      "locks": "Low-risk reversible proposals auto-apply only after re-verify passes, trust-gradient returns auto-applied, no human input is required, and after evidence improves the attributed milestone."
+    },
+    {
+      "id": "regression-rolls-back",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_improvement_reverify_apply_loop.rs",
+      "locks": "A regressing post-apply re-verify is rejected and records the existing rollback handle rather than promoting the fix."
+    },
+    {
+      "id": "high-risk-queues-thin-human-gate",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/self_improvement_human_go_no_go_queue.rs",
+      "locks": "Verified reversible high-risk/source-affecting proposals queue for one-click human go/no-go provenance and never auto-apply source mutation."
+    },
+    {
+      "id": "unverified-or-irreversible-auto-apply-blocked",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v63_self_improvement_loop.rs",
+      "locks": "Failed gates, hidden human input, new data plane drift, and irreversible proposals fail closed before any autonomous auto-apply route."
+    },
+    {
+      "id": "full-loop-demo-two-risk-paths",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-improvement-loop-demo-v1/demo.fixture.json",
+      "locks": "The demo chain covers detect, explain, trace, attribute, propose, re-verify, low-risk auto-apply, and high-risk queueing on the existing deckbuilder title."
+    },
+    {
+      "id": "coverage-v63-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v63-self-improvement-loop.md",
+      "locks": "Coverage v63 is test-only and preserves openchrome, scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, and trust-gradient boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v63 is test-only Rust regression coverage for the Era L M71 self-improvement loop over the existing openchrome/evidence pipeline: scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, trust-gradient, rollback, and kill-switch. It introduces no new verification engine, no new data plane, and no new persistent store. The autonomous low-risk path completes with zero human input; unverified, irreversible, regressing, high-risk, or source-affecting fixes are never auto-applied. High-risk/source-affecting fixes remain queued for thin one-click human go/no-go provenance while unrelated autonomous work continues. Fun/taste and release go/no-go remain human Ring 2. #1 and #23 remain open."
+}
