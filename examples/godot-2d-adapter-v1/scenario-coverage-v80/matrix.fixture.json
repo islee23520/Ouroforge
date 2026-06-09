@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "scenario-coverage-v80-logic-touchpoint-handoff-v1",
+  "coverageVersion": 80,
+  "issueRef": "#2178",
+  "milestone": "Era O M91",
+  "contractRef": "docs/scenario-coverage-v80-logic-touchpoint-handoff.md",
+  "implementationRef": "crates/ouroforge-core/src/logic_touchpoint_handoff.rs",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "deterministicStateHashRequired": true,
+    "staleStateHashAllowed": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "decompiledSourceCopied": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v80.logic-touchpoint-handoff-report",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v80_logic_touchpoint_handoff.rs",
+      "locks": "Godot adapter IR becomes a deterministic logic touchpoint hand-off artifact with coupling classifications, oracle requirements, Era R tasks, and an honest fidelity report without claiming any behavior-bearing unit is ported."
+    },
+    {
+      "id": "v80.lossy-import-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v80_logic_touchpoint_handoff.rs",
+      "locks": "Lossy imports, unsupported features, script refs, input signals, physics/collision signals, rendering/VFX gaps, and behavior-bearing units remain visible Red gaps and cannot be laundered into a clean Green report."
+    },
+    {
+      "id": "v80.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/logic_touchpoint_handoff.rs",
+      "locks": "The logic hand-off validator rejects claimed_ported_units and oracle-missing records with port permission, so ungated or auto-translated port claims fail until later Ouroforge-native oracle evidence passes."
+    },
+    {
+      "id": "v80.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v80_logic_touchpoint_handoff.rs",
+      "locks": "The hand-off artifact state-hash is stable for identical canonical logic inventories, changes when source data changes, and validation rejects stale hashes after artifact tampering."
+    },
+    {
+      "id": "v80.coverage-ledger-and-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v80-logic-touchpoint-handoff.md",
+      "locks": "Coverage v80 records the one-way on-ramp, source-project/open-text legal boundary, clean-room Era R re-derivation hand-off, Rust data-plane ownership, no Studio trusted writes, no decompiled source copying, and #1/#23 open governance anchors."
+    }
+  ],
+  "boundary": "Scenario Coverage v80 is a Rust data-plane regression suite for Era O M91 logic touchpoint detection and re-derivation hand-off. It locks source-project/open-text adapter IR inventory into clean-room Era R tasks, no foreign runtime bridge, no auto-port or ported claim without a passing oracle, honest Red fidelity gaps for lossy imports, deterministic state-hash behavior including stale-hash rejection, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
