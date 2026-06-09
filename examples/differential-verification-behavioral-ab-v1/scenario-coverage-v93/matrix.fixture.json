@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "scenario-coverage-v93-differential-verification-v1",
+  "coverageVersion": 93,
+  "issueRef": "#2234",
+  "milestone": "Era R M111",
+  "contractRef": "docs/differential-verification-behavioral-ab-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/differential_verification.rs",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeClean": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "perceptualRenderSecondaryOnly": true,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "decompiledSourceAllowed": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v93.oracle-and-native-observation-pass-without-port-claim",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "A captured oracle plus matching Ouroforge-native outcome yields Green behavioral A/B verification and an M112 handoff while every ported-claim flag stays false."
+    },
+    {
+      "id": "v93.lossy-outcome-mismatch-not-graded-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "Event/output mismatches are Yellow repair work with gaps and rollback evidence, never a silent clean/ported result."
+    },
+    {
+      "id": "v93.no-auto-port-without-oracle-fails-preflight",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "Missing or port-claiming oracles fail preflight before differential verification can emit a handoff."
+    },
+    {
+      "id": "v93.ungated-auto-translated-port-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "Trusted writes, missing source-apply/review/rollback gates, decompiled refs, or foreign-runtime refs are rejected as ungated translation/bridge drift."
+    },
+    {
+      "id": "v93.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "Primary state-hash drift is Red, changes the deterministic report digest, and blocks the semantic-port handoff."
+    },
+    {
+      "id": "v93.3d-state-hash-primary-render-secondary",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v93_differential_verification.rs",
+      "locks": "2.5D/3D verification requires deterministic state-hash primary and uses perceptual render evidence only as secondary corroboration."
+    },
+    {
+      "id": "v93.clean-room-source-only-and-no-studio-trusted-write",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v93-differential-verification.md",
+      "locks": "Coverage records source-project/open-text clean-room boundaries, no decompiled source, no foreign runtime bridge, Rust data-plane ownership, and no Studio trusted writes."
+    }
+  ]
+}
