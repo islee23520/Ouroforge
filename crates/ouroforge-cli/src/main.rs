@@ -139,6 +139,10 @@ enum Commands {
         #[command(subcommand)]
         command: PatchPreviewCommand,
     },
+    ProposalAmendment {
+        #[command(subcommand)]
+        command: ProposalAmendmentCommand,
+    },
     Behavior {
         #[command(subcommand)]
         command: BehaviorCommand,
@@ -202,6 +206,11 @@ enum BehaviorApplyCommand {
 #[derive(Debug, Subcommand)]
 enum BehaviorApplyTransactionCommand {
     Validate { transaction_path: PathBuf },
+}
+
+#[derive(Debug, Subcommand)]
+enum ProposalAmendmentCommand {
+    Validate { amendment_path: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -706,6 +715,27 @@ fn main() -> Result<()> {
             );
             let read_model = source_patch_preview_read_model(&validation);
             println!("{}", serde_json::to_string_pretty(&read_model)?);
+        }
+        Commands::ProposalAmendment {
+            command: ProposalAmendmentCommand::Validate { amendment_path },
+        } => {
+            let text = std::fs::read_to_string(&amendment_path).with_context(|| {
+                format!(
+                    "failed to read proposal amendment {}",
+                    amendment_path.display()
+                )
+            })?;
+            let read_model =
+                ouroforge_core::validate_proposal_amendment_json(&text).with_context(|| {
+                    format!(
+                        "failed to validate proposal amendment {}",
+                        amendment_path.display()
+                    )
+                })?;
+            println!("{}", serde_json::to_string_pretty(&read_model)?);
+            if !read_model.ready_for_review_apply {
+                return Err(anyhow!("proposal amendment is not ready for review/apply"));
+            }
         }
         Commands::Loop {
             command: LoopCommand::DryRun { plan_path },

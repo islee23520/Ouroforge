@@ -3801,3 +3801,56 @@ fn behavior_apply_transaction_cli_surfaces_missing_rejected_and_self_approval_bl
 
     fs::remove_dir_all(temp).ok();
 }
+
+#[test]
+fn proposal_amendment_cli_validates_green_gate_artifact() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = unique_temp_dir("ouroforge-proposal-amendment-cli-test");
+    fs::create_dir_all(&temp).expect("temp exists");
+    let artifact_path = temp.join("amendment.json");
+    let artifact = serde_json::json!({
+        "schemaVersion": "ouroforge.proposal-amendment.v1",
+        "amendmentId": "amendment-m75-cli-001",
+        "proposalId": "proposal-agent-001",
+        "baseProposalRef": "runs/m75/proposals/proposal-agent-001.before.json",
+        "amendedProposalRef": "runs/m75/proposals/proposal-agent-001.amended.json",
+        "humanActor": "local-human",
+        "editSummary": "Adjust proposed config before approval.",
+        "capturedVia": "cli",
+        "interventionAsEvidence": true,
+        "beforeEvidenceRefs": ["runs/m75/evidence/before-verdict.json"],
+        "afterEvidenceRefs": ["runs/m75/evidence/after-verdict.json"],
+        "provenanceRefs": ["runs/m75/evidence/human-amendment-provenance.json"],
+        "gateResults": [
+            {"kind":"review-apply","status":"passed","evidenceRef":"runs/m75/evidence/review-apply.json","beforeRef":"runs/m75/before/review.json","afterRef":"runs/m75/after/review.json"},
+            {"kind":"scene-source-apply","status":"passed","evidenceRef":"runs/m75/evidence/scene-source-apply.json","beforeRef":"runs/m75/before/source.json","afterRef":"runs/m75/after/source.json"},
+            {"kind":"evaluator","status":"passed","evidenceRef":"runs/m75/evidence/evaluator.json","beforeRef":"runs/m75/before/evaluator.json","afterRef":"runs/m75/after/evaluator.json"},
+            {"kind":"design-integrity","status":"passed","evidenceRef":"runs/m75/evidence/design-integrity.json","beforeRef":"runs/m75/before/design.json","afterRef":"runs/m75/after/design.json"}
+        ],
+        "status": "ready-for-review-apply",
+        "reviewApplyRef": "runs/m75/review-apply/amendment-m75-cli-001.decision.json",
+        "autoApplyPerformed": false,
+        "rawBypassRequested": false,
+        "studioTrustedWriteAuthority": false,
+        "humanRequiredForAutonomousLoop": false,
+        "cliFallbackSupported": true,
+        "boundary": "intervention-as-evidence; read + gated-write; Rust data plane validates and records; Elixir/Phoenix control + presentation only; review/apply, scene/source-apply, evaluator, evidence/provenance gates required; no raw bypass; local-first CLI fallback; #1 and #23 remain open"
+    });
+    fs::write(
+        &artifact_path,
+        serde_json::to_string_pretty(&artifact).unwrap(),
+    )
+    .expect("write fixture");
+
+    let output = run_cli(
+        &repo_root,
+        &[
+            "proposal-amendment",
+            "validate",
+            artifact_path.to_str().unwrap(),
+        ],
+    );
+    assert!(output.contains(r#""readyForReviewApply": true"#));
+    assert!(output.contains(r#""passedGateCount": 4"#));
+    assert!(output.contains("intervention-as-evidence"));
+}
