@@ -1,6 +1,8 @@
 use ouroforge_core::gltf_25d_import::{
-    example_report_from_fixture, normalize_gltf_25d_import_from_str, write_report_json,
-    Gltf25dImportOptions, GLTF_25D_IMPORT_REPORT_SCHEMA_VERSION,
+    example_report_from_fixture, gltf_25d_verification_data_shapes,
+    normalize_gltf_25d_import_from_str, verify_gltf_25d_import_report, write_report_json,
+    Gltf25dImportOptions, Gltf25dRenderSample, GLTF_25D_IMPORT_REPORT_SCHEMA_VERSION,
+    GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION,
 };
 use serde_json::Value;
 
@@ -238,6 +240,130 @@ fn demo_summary_matches_live_gltf_report_shape() {
     assert!(report
         .oracle_rule
         .contains("Nothing is claimed ported without captured acceptance evidence"));
+}
+
+#[test]
+fn m99_verification_report_passes_state_hash_primary_and_render_secondary() {
+    let import_report = example_report_from_fixture().expect("fixture glTF normalizes");
+    let sample = Gltf25dRenderSample {
+        sample_id: "fixture-render-smoke".to_string(),
+        expected_state_hash: import_report.state_hash_primary.clone(),
+        observed_state_hash: import_report.state_hash_primary.clone(),
+        ssim: 0.997,
+        min_ssim: 0.985,
+        pixel_diff: 0.004,
+        max_pixel_diff: 0.010,
+        render_evidence_ref: "examples/2-5d-gltf-import-v1/render-smoke.test.cjs".to_string(),
+    };
+    let verification =
+        verify_gltf_25d_import_report(&import_report, sample).expect("verification passes");
+    verification.validate().expect("verification validates");
+
+    assert_eq!(
+        verification.schema_version,
+        GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION
+    );
+    assert_eq!(verification.verdict, "pass");
+    assert_eq!(verification.state_hash_gate.status, "pass");
+    assert!(verification.state_hash_gate.primary);
+    assert_eq!(verification.perceptual_render_gate.status, "pass");
+    assert!(!verification.perceptual_render_gate.primary);
+    assert!(verification.perceptual_render_secondary_only);
+    assert!(verification.claimed_ported_units.is_empty());
+    assert!(verification
+        .gap_attribution
+        .iter()
+        .any(|gap| gap.attribution.contains("not graded clean")));
+    assert!(verification.report_hash.starts_with("sha256:"));
+}
+
+#[test]
+fn m99_verification_fails_state_hash_or_render_tolerance_without_port_claims() {
+    let import_report = example_report_from_fixture().expect("fixture glTF normalizes");
+    let stale_hash = Gltf25dRenderSample {
+        sample_id: "stale-state".to_string(),
+        expected_state_hash: import_report.state_hash_primary.clone(),
+        observed_state_hash:
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        ssim: 0.999,
+        min_ssim: 0.985,
+        pixel_diff: 0.001,
+        max_pixel_diff: 0.010,
+        render_evidence_ref: "examples/2-5d-gltf-import-v1/render-smoke.test.cjs".to_string(),
+    };
+    let failed =
+        verify_gltf_25d_import_report(&import_report, stale_hash).expect("failed report emits");
+    assert_eq!(failed.verdict, "fail");
+    assert_eq!(failed.state_hash_gate.status, "fail");
+    assert_eq!(failed.perceptual_render_gate.status, "pass");
+    assert!(failed.claimed_ported_units.is_empty());
+
+    let render_diff = Gltf25dRenderSample {
+        sample_id: "render-diff".to_string(),
+        expected_state_hash: import_report.state_hash_primary.clone(),
+        observed_state_hash: import_report.state_hash_primary.clone(),
+        ssim: 0.900,
+        min_ssim: 0.985,
+        pixel_diff: 0.050,
+        max_pixel_diff: 0.010,
+        render_evidence_ref: "examples/2-5d-gltf-import-v1/render-smoke.test.cjs".to_string(),
+    };
+    let failed =
+        verify_gltf_25d_import_report(&import_report, render_diff).expect("failed report emits");
+    assert_eq!(failed.verdict, "fail");
+    assert_eq!(failed.state_hash_gate.status, "pass");
+    assert_eq!(failed.perceptual_render_gate.status, "fail");
+    assert!(!failed.perceptual_render_gate.primary);
+}
+
+#[test]
+fn m99_data_shapes_define_ir_mapping_behavior_oracle_records() {
+    let shapes = gltf_25d_verification_data_shapes();
+    for (shape, code_location) in [
+        (
+            "IR nodes",
+            "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dNativeNode",
+        ),
+        (
+            "Mapping records",
+            "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dNativeScene",
+        ),
+        (
+            "Behavioral-unit records",
+            "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dReDerivationTask",
+        ),
+        (
+            "Oracle records",
+            "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dFidelityRow::oracle_required",
+        ),
+    ] {
+        assert!(
+            shapes
+                .iter()
+                .any(|record| record.shape == shape && record.code_location == code_location),
+            "missing {shape}"
+        );
+    }
+}
+
+#[test]
+fn m99_verification_docs_record_data_shapes_and_guardrails() {
+    let doc = read_repo_text("docs/2-5d-import-verification-fidelity-report-v1.md");
+    for required in [
+        "deterministic state-hash primary gate",
+        "perceptual SSIM/pixel-diff render evidence as secondary corroboration only",
+        "Gltf25dNativeNode",
+        "Gltf25dNativeScene",
+        "Gltf25dReDerivationTask",
+        "Gltf25dFidelityRow::oracle_required",
+        "Gltf25dVerificationReport",
+        "No unit is claimed ported",
+        "Rust owns artifact truth",
+        "no trusted-write authority",
+        "#1 and #23 remain open",
+    ] {
+        assert!(doc.contains(required), "doc missing {required}");
+    }
 }
 
 #[test]

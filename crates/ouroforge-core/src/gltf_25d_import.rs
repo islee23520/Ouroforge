@@ -5,6 +5,8 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const GLTF_25D_IMPORT_REPORT_SCHEMA_VERSION: &str = "ouroforge.gltf-25d-import-report.v1";
+pub const GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION: &str =
+    "ouroforge.gltf-25d-verification-report.v1";
 pub const GLTF_25D_BOUNDARY: &str = "one-way source-project glTF presentation import only; no live engine bridge, no embedded runtime, no decompiled source, no gameplay logic translation, no trusted Studio write path";
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -221,6 +223,89 @@ pub struct Gltf25dPerceptualRenderSecondary {
     pub role: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dRenderSample {
+    #[serde(rename = "sampleId")]
+    pub sample_id: String,
+    #[serde(rename = "expectedStateHash")]
+    pub expected_state_hash: String,
+    #[serde(rename = "observedStateHash")]
+    pub observed_state_hash: String,
+    #[serde(rename = "ssim")]
+    pub ssim: f64,
+    #[serde(rename = "minSsim")]
+    pub min_ssim: f64,
+    #[serde(rename = "pixelDiff")]
+    pub pixel_diff: f64,
+    #[serde(rename = "maxPixelDiff")]
+    pub max_pixel_diff: f64,
+    #[serde(rename = "renderEvidenceRef")]
+    pub render_evidence_ref: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dVerificationGate {
+    pub name: String,
+    pub status: String,
+    pub detail: String,
+    #[serde(rename = "primary")]
+    pub primary: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dGapAttribution {
+    pub unit: String,
+    pub grade: String,
+    pub attribution: String,
+    #[serde(rename = "oracleRequired")]
+    pub oracle_required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dDataShapeRecord {
+    pub shape: String,
+    #[serde(rename = "codeLocation")]
+    pub code_location: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Gltf25dVerificationReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    pub verdict: String,
+    pub boundary: String,
+    #[serde(rename = "sourceProjectRef")]
+    pub source_project_ref: String,
+    #[serde(rename = "sourcePath")]
+    pub source_path: String,
+    #[serde(rename = "stateHashPrimary")]
+    pub state_hash_primary: String,
+    #[serde(rename = "stateHashGate")]
+    pub state_hash_gate: Gltf25dVerificationGate,
+    #[serde(rename = "perceptualRenderGate")]
+    pub perceptual_render_gate: Gltf25dVerificationGate,
+    #[serde(rename = "perceptualRenderSecondaryOnly")]
+    pub perceptual_render_secondary_only: bool,
+    #[serde(rename = "fidelityRows")]
+    pub fidelity_rows: Vec<Gltf25dFidelityRow>,
+    #[serde(rename = "gapAttribution")]
+    pub gap_attribution: Vec<Gltf25dGapAttribution>,
+    #[serde(rename = "reDerivationTasks")]
+    pub re_derivation_tasks: Vec<Gltf25dReDerivationTask>,
+    #[serde(rename = "dataShapes")]
+    pub data_shapes: Vec<Gltf25dDataShapeRecord>,
+    #[serde(rename = "claimedPortedUnits")]
+    pub claimed_ported_units: Vec<String>,
+    #[serde(rename = "reportHash")]
+    pub report_hash: String,
+}
+
 pub fn normalize_gltf_25d_import_from_str(
     input: &str,
     options: Gltf25dImportOptions,
@@ -321,6 +406,124 @@ pub fn normalize_gltf_25d_import_from_str(
     })
 }
 
+pub fn verify_gltf_25d_import_report(
+    import_report: &Gltf25dImportReport,
+    render_sample: Gltf25dRenderSample,
+) -> Result<Gltf25dVerificationReport> {
+    import_report.validate()?;
+    validate_render_sample(&render_sample)?;
+
+    let state_hash_passed = render_sample.expected_state_hash == import_report.state_hash_primary
+        && render_sample.observed_state_hash == import_report.state_hash_primary;
+    let perceptual_passed = render_sample.ssim >= render_sample.min_ssim
+        && render_sample.pixel_diff <= render_sample.max_pixel_diff;
+
+    let state_hash_gate = Gltf25dVerificationGate {
+        name: "deterministic-state-hash-primary".to_string(),
+        status: if state_hash_passed { "pass" } else { "fail" }.to_string(),
+        detail: format!(
+            "expected {}, observed {}; state-hash is the primary 2.5D verification gate",
+            render_sample.expected_state_hash, render_sample.observed_state_hash
+        ),
+        primary: true,
+    };
+    let perceptual_render_gate = Gltf25dVerificationGate {
+        name: "perceptual-render-secondary".to_string(),
+        status: if perceptual_passed { "pass" } else { "fail" }.to_string(),
+        detail: format!(
+            "SSIM {:.3} >= {:.3}; pixel-diff {:.3} <= {:.3}; evidence {} is corroboration only",
+            render_sample.ssim,
+            render_sample.min_ssim,
+            render_sample.pixel_diff,
+            render_sample.max_pixel_diff,
+            render_sample.render_evidence_ref
+        ),
+        primary: false,
+    };
+
+    let gap_attribution = import_report
+        .fidelity_rows
+        .iter()
+        .filter(|row| row.grade != "green")
+        .map(|row| Gltf25dGapAttribution {
+            unit: row.unit.clone(),
+            grade: row.grade.clone(),
+            attribution: if row.oracle_required {
+                "explicit re-derivation/oracle task; never silently auto-translated".to_string()
+            } else {
+                "presentation fidelity gap recorded honestly; not graded clean".to_string()
+            },
+            oracle_required: row.oracle_required,
+        })
+        .collect::<Vec<_>>();
+
+    let mut report = Gltf25dVerificationReport {
+        schema_version: GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION.to_string(),
+        verdict: if state_hash_passed && perceptual_passed {
+            "pass"
+        } else {
+            "fail"
+        }
+        .to_string(),
+        boundary: "M99 2.5D verification report: one-way source-project/open-text import, Rust-owned artifact truth, deterministic state-hash primary, perceptual SSIM/pixel-diff secondary, no auto-port, no trusted Studio write, no decompiled source copying".to_string(),
+        source_project_ref: import_report.source_project_ref.clone(),
+        source_path: import_report.source_path.clone(),
+        state_hash_primary: import_report.state_hash_primary.clone(),
+        state_hash_gate,
+        perceptual_render_gate,
+        perceptual_render_secondary_only: true,
+        fidelity_rows: import_report.fidelity_rows.clone(),
+        gap_attribution,
+        re_derivation_tasks: import_report.re_derivation_tasks.clone(),
+        data_shapes: gltf_25d_verification_data_shapes(),
+        claimed_ported_units: Vec::new(),
+        report_hash: String::new(),
+    };
+    report.report_hash = report.verification_digest()?;
+    report.validate()?;
+    Ok(report)
+}
+
+pub fn gltf_25d_verification_data_shapes() -> Vec<Gltf25dDataShapeRecord> {
+    vec![
+        Gltf25dDataShapeRecord {
+            shape: "IR nodes".to_string(),
+            code_location: "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dNativeNode"
+                .to_string(),
+            role: "normalized source-project glTF node skeleton with transform and presentation role"
+                .to_string(),
+        },
+        Gltf25dDataShapeRecord {
+            shape: "Mapping records".to_string(),
+            code_location:
+                "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dNativeScene".to_string(),
+            role: "Ouroforge-native 2.5D presentation scene, meshes, materials, cameras, and layers"
+                .to_string(),
+        },
+        Gltf25dDataShapeRecord {
+            shape: "Behavioral-unit records".to_string(),
+            code_location:
+                "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dReDerivationTask"
+                    .to_string(),
+            role: "logic, physics, shader, VFX, or behavior-bearing source facts routed to Era R"
+                .to_string(),
+        },
+        Gltf25dDataShapeRecord {
+            shape: "Oracle records".to_string(),
+            code_location: "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dFidelityRow::oracle_required".to_string(),
+            role: "per-unit oracle requirement that blocks port claims until captured acceptance evidence passes".to_string(),
+        },
+        Gltf25dDataShapeRecord {
+            shape: "Verification report".to_string(),
+            code_location:
+                "crates/ouroforge-core/src/gltf_25d_import.rs::Gltf25dVerificationReport"
+                    .to_string(),
+            role: "M99 state-hash primary plus perceptual secondary gate and honest gap attribution"
+                .to_string(),
+        },
+    ]
+}
+
 impl Gltf25dImportReport {
     pub fn validate(&self) -> Result<()> {
         if self.schema_version != GLTF_25D_IMPORT_REPORT_SCHEMA_VERSION {
@@ -402,6 +605,142 @@ impl Gltf25dImportReport {
         }
         Ok(())
     }
+}
+
+impl Gltf25dVerificationReport {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "gltf 2.5d verification report schemaVersion must be {GLTF_25D_VERIFICATION_REPORT_SCHEMA_VERSION}"
+            ));
+        }
+        if !matches!(self.verdict.as_str(), "pass" | "fail") {
+            return Err(anyhow!("verification verdict must be pass or fail"));
+        }
+        if !self.state_hash_primary.starts_with("sha256:") {
+            return Err(anyhow!(
+                "verification stateHashPrimary must be sha256-prefixed"
+            ));
+        }
+        if self.state_hash_gate.name != "deterministic-state-hash-primary"
+            || !self.state_hash_gate.primary
+        {
+            return Err(anyhow!(
+                "stateHashGate must remain the primary deterministic gate"
+            ));
+        }
+        if self.perceptual_render_gate.name != "perceptual-render-secondary"
+            || self.perceptual_render_gate.primary
+            || !self.perceptual_render_secondary_only
+        {
+            return Err(anyhow!("perceptual render gate must remain secondary-only"));
+        }
+        if self.verdict == "pass"
+            && (self.state_hash_gate.status != "pass"
+                || self.perceptual_render_gate.status != "pass")
+        {
+            return Err(anyhow!("passing verification requires both M99 gates"));
+        }
+        if !self.claimed_ported_units.is_empty() {
+            return Err(anyhow!(
+                "M99 verification report must not claim ported units"
+            ));
+        }
+        if self.fidelity_rows.is_empty() {
+            return Err(anyhow!("verification fidelityRows must not be empty"));
+        }
+        if self.fidelity_rows.iter().any(|row| row.grade != "green")
+            && self.gap_attribution.is_empty()
+        {
+            return Err(anyhow!(
+                "non-green fidelity rows require explicit gap attribution"
+            ));
+        }
+        if self
+            .fidelity_rows
+            .iter()
+            .any(|row| contains_forbidden_port_claim_token(&row.reason))
+        {
+            return Err(anyhow!(
+                "verification fidelity rows must not claim units were ported"
+            ));
+        }
+        for required in [
+            "IR nodes",
+            "Mapping records",
+            "Behavioral-unit records",
+            "Oracle records",
+            "Verification report",
+        ] {
+            if !self.data_shapes.iter().any(|shape| shape.shape == required) {
+                return Err(anyhow!("missing M99 data shape record: {required}"));
+            }
+        }
+        if !self.boundary.contains("source-project/open-text")
+            || !self.boundary.contains("Rust-owned artifact truth")
+            || !self.boundary.contains("no auto-port")
+            || !self.boundary.contains("no trusted Studio write")
+        {
+            return Err(anyhow!(
+                "M99 verification boundary must preserve on-ramp guardrails"
+            ));
+        }
+        let expected = self.verification_digest()?;
+        if self.report_hash != expected {
+            return Err(anyhow!("verification reportHash must match content"));
+        }
+        Ok(())
+    }
+
+    fn verification_digest(&self) -> Result<String> {
+        let mut clone = self.clone();
+        clone.report_hash.clear();
+        Ok(format!(
+            "sha256:{}",
+            sha256_hex(&serde_json::to_vec(&clone)?)
+        ))
+    }
+}
+
+fn validate_render_sample(sample: &Gltf25dRenderSample) -> Result<()> {
+    if sample.sample_id.trim().is_empty() || sample.render_evidence_ref.trim().is_empty() {
+        return Err(anyhow!("render sample id and evidence ref are required"));
+    }
+    if !sample.expected_state_hash.starts_with("sha256:")
+        || !sample.observed_state_hash.starts_with("sha256:")
+    {
+        return Err(anyhow!(
+            "render sample state hashes must be sha256-prefixed"
+        ));
+    }
+    for (name, value) in [
+        ("ssim", sample.ssim),
+        ("minSsim", sample.min_ssim),
+        ("pixelDiff", sample.pixel_diff),
+        ("maxPixelDiff", sample.max_pixel_diff),
+    ] {
+        if !value.is_finite() || value < 0.0 {
+            return Err(anyhow!(
+                "render sample {name} must be finite and non-negative"
+            ));
+        }
+    }
+    if sample.ssim > 1.0 || sample.min_ssim > 1.0 {
+        return Err(anyhow!("render sample SSIM values must be <= 1.0"));
+    }
+    Ok(())
+}
+
+fn contains_forbidden_port_claim_token(input: &str) -> bool {
+    input
+        .to_lowercase()
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+        .any(|token| {
+            matches!(
+                token,
+                "ported" | "auto-port" | "auto-ported" | "auto-translated"
+            )
+        })
 }
 
 fn normalize_materials(document: &Value) -> BTreeMap<usize, Gltf25dNativeMaterial> {
@@ -962,6 +1301,11 @@ fn default_viewport_height() -> i64 {
 pub fn write_report_json(report: &Gltf25dImportReport) -> Result<String> {
     report.validate()?;
     serde_json::to_string_pretty(report).context("gltf 2.5d report serializes")
+}
+
+pub fn write_verification_report_json(report: &Gltf25dVerificationReport) -> Result<String> {
+    report.validate()?;
+    serde_json::to_string_pretty(report).context("gltf 2.5d verification report serializes")
 }
 
 pub fn example_report_from_fixture() -> Result<Gltf25dImportReport> {
