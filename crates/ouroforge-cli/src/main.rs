@@ -155,6 +155,24 @@ enum Commands {
         #[command(subcommand)]
         command: PluginCommand,
     },
+    Migration {
+        #[command(subcommand)]
+        command: MigrationCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum MigrationCommand {
+    /// Run the Godot 2D source-text adapter demo and write an honest fidelity report.
+    GodotDemo {
+        #[arg(long, default_value = "examples/godot-2d-adapter-v1/sample-project")]
+        project: PathBuf,
+        #[arg(
+            long,
+            default_value = "examples/godot-2d-adapter-v1/generated/fidelity-report.json"
+        )]
+        output: PathBuf,
+    },
 }
 
 /// Read-only local plugin registry inspection (#752). No install, update, run,
@@ -1456,6 +1474,26 @@ fn main() -> Result<()> {
                 &transaction_output,
             )?;
             println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        Commands::Migration {
+            command: MigrationCommand::GodotDemo { project, output },
+        } => {
+            let report = ouroforge_core::godot_2d_adapter_ir::write_godot_2d_adapter_demo_report(
+                &project, &output,
+            )?;
+            println!("Godot migration demo report: {}", output.display());
+            println!("IR state hash: {}", report.ir_state_hash);
+            println!(
+                "Fidelity: green={} yellow={} red={}",
+                report.fidelity_summary.green,
+                report.fidelity_summary.yellow,
+                report.fidelity_summary.red
+            );
+            println!(
+                "Claimed ported units: {}",
+                report.claimed_ported_units.len()
+            );
+            println!("{}", report.oracle_gate);
         }
         Commands::Plugin { command } => {
             handle_plugin_command(command)?;

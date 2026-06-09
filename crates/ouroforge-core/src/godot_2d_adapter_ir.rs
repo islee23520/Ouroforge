@@ -187,6 +187,20 @@ pub struct GodotFidelityRecord {
     pub source_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GodotAdapterDemoReport {
+    pub schema_version: String,
+    pub source_project: String,
+    pub ir_state_hash: String,
+    pub fidelity_summary: GodotFidelitySummary,
+    pub unsupported_count: usize,
+    pub logic_touchpoint_count: usize,
+    pub claimed_ported_units: Vec<String>,
+    pub oracle_gate: String,
+    pub determinism: String,
+    pub boundary: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct GodotSourceFile {
     pub path: String,
@@ -199,6 +213,41 @@ struct Section {
     attrs: BTreeMap<String, String>,
     props: BTreeMap<String, String>,
     line: usize,
+}
+
+pub fn godot_2d_adapter_demo_report(
+    project_root: impl AsRef<Path>,
+) -> Result<GodotAdapterDemoReport> {
+    let project_root = project_root.as_ref();
+    let ir = parse_godot_2d_project(project_root)?;
+    let canonical =
+        serde_json::to_vec(&ir).context("serializing Godot migration IR for deterministic hash")?;
+    Ok(GodotAdapterDemoReport {
+        schema_version: "godot-2d-adapter-demo-report-v1".to_string(),
+        source_project: project_root.display().to_string(),
+        ir_state_hash: crate::export_hash::sha256_prefixed(&canonical),
+        fidelity_summary: ir.fidelity_report.summary.clone(),
+        unsupported_count: ir.unsupported.len(),
+        logic_touchpoint_count: ir.logic_touchpoints.len(),
+        claimed_ported_units: Vec::new(),
+        oracle_gate: "No unit is claimed ported; later Ouroforge-native acceptance evidence must pass before equivalence wording is allowed.".to_string(),
+        determinism: "The demo hashes canonical Godot migration IR bytes with sha256; repeated runs over the same source text produce the same state hash.".to_string(),
+        boundary: GODOT_2D_ADAPTER_BOUNDARY.to_string(),
+    })
+}
+
+pub fn write_godot_2d_adapter_demo_report(
+    project_root: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+) -> Result<GodotAdapterDemoReport> {
+    let report = godot_2d_adapter_demo_report(project_root)?;
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    fs::write(output_path, serde_json::to_vec_pretty(&report)?)
+        .with_context(|| format!("writing {}", output_path.display()))?;
+    Ok(report)
 }
 
 pub fn parse_godot_2d_project(root: impl AsRef<Path>) -> Result<GodotMigrationIr> {

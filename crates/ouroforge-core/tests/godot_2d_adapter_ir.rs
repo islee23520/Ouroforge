@@ -101,3 +101,24 @@ fn godot_2d_adapter_rejects_shipped_build_artifacts() {
 
     assert!(err.to_string().contains("source-project text only"));
 }
+
+#[test]
+fn godot_2d_adapter_demo_report_is_honest_and_state_hashed() {
+    let root = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/godot-2d-adapter-v1/sample-project"
+    );
+
+    let first = ouroforge_core::godot_2d_adapter_ir::godot_2d_adapter_demo_report(root)
+        .expect("demo report builds");
+    let second = ouroforge_core::godot_2d_adapter_ir::godot_2d_adapter_demo_report(root)
+        .expect("demo report builds deterministically");
+
+    assert_eq!(first, second);
+    assert!(first.ir_state_hash.starts_with("sha256:"));
+    assert_eq!(first.claimed_ported_units.len(), 0);
+    assert_eq!(first.unsupported_count, 1);
+    assert_eq!(first.logic_touchpoint_count, 2);
+    assert!(first.oracle_gate.contains("No unit is claimed ported"));
+    assert!(first.determinism.contains("same state hash"));
+}

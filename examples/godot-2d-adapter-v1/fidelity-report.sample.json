@@ -1,0 +1,16 @@
+{
+  "schema_version": "godot-2d-adapter-demo-report-v1",
+  "source_project": "examples/godot-2d-adapter-v1/sample-project",
+  "ir_state_hash": "sha256:dd3ee0d4deddd18a95c628d062d9f30f9c57c48c0df0fac7f99e499beb7101c5",
+  "fidelity_summary": {
+    "green": 8,
+    "yellow": 1,
+    "red": 3
+  },
+  "unsupported_count": 1,
+  "logic_touchpoint_count": 2,
+  "claimed_ported_units": [],
+  "oracle_gate": "No unit is claimed ported; later Ouroforge-native acceptance evidence must pass before equivalence wording is allowed.",
+  "determinism": "The demo hashes canonical Godot migration IR bytes with sha256; repeated runs over the same source text produce the same state hash.",
+  "boundary": "one-way source-project text import; clean-room re-derivation; no Godot runtime bridge"
+}
