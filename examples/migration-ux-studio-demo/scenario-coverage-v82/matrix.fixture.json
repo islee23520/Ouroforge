@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "scenario-coverage-v82-migration-ux-studio-v1",
+  "coverageVersion": 82,
+  "issueRef": "#2189",
+  "milestone": "Era O M94",
+  "contractRef": "docs/migration-ux-studio-contract-v1.md",
+  "demoRef": "examples/migration-ux-studio-demo/run-demo.sh",
+  "demoSummaryRef": "examples/migration-ux-studio-demo/demo-summary.fixture.json",
+  "studioImplementationRefs": [
+    "studio/executor/lib/ouroforge_executor/migration_ux.ex",
+    "studio/executor/lib/ouroforge_executor/migration_import_session.ex",
+    "studio/executor/lib/ouroforge_executor/migration_ux_demo.ex"
+  ],
+  "studioTestRefs": [
+    "studio/executor/test/ouroforge_executor/migration_ux_test.exs",
+    "studio/executor/test/ouroforge_executor/migration_ux_demo_test.exs"
+  ],
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "stateHashBreakMustFail": true,
+    "runtimeBridgeAllowed": false,
+    "embeddedEngineRuntimeAllowed": false,
+    "decompiledSourceCopied": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "newStudioDataStore": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v82.studio-import-wizard-source-only",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/migration_ux_test.exs",
+      "locks": "The Studio wizard accepts only Godot/Unity source-project paths, rejects shipped-build/decompiled-style paths before CLI routing, and routes imports through existing Rust migration CLI families."
+    },
+    {
+      "id": "v82.studio-fidelity-report-lossy-not-clean",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/migration_ux_test.exs",
+      "locks": "The fidelity report view preserves Green/Yellow/Red rows, requires rationale/evidence, rejects Red rows without Era R tasks, and prevents lossy or behavior-bearing gaps from being laundered into clean status."
+    },
+    {
+      "id": "v82.studio-no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/migration_ux_demo_test.exs",
+      "locks": "The demo and report validators reject claimed_ported_units and portClaimAllowed rows unless later oracle evidence exists; M94 keeps all behavior rows oracle-missing and port-claim forbidden."
+    },
+    {
+      "id": "v82.studio-deterministic-hash-evidence-required",
+      "status": "pass",
+      "evidenceRef": "examples/migration-ux-studio-demo/demo-summary.fixture.json",
+      "locks": "The Studio demo summary records deterministic sha256 state-hash evidence from Rust-owned import reports, and the report validator fails when no IR/mapping/verification hash is present."
+    },
+    {
+      "id": "v82.studio-no-trusted-elixir-write",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/migration_ux.ex",
+      "locks": "Studio Migration UX modules are control/presentation only: no File.write or :file.write/open calls in the lib surface, no new store, no artifact semantics ownership, and every write-affecting action routes through existing CLI/gates."
+    },
+    {
+      "id": "v82.coverage-ledger-and-demo-script",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v82-migration-ux-studio.md",
+      "locks": "Coverage v82 records the migration UX contract, scripted demo, Rust-owned evidence boundaries, open #1/#23 governance anchors, and the exact verification command shape from #2189."
+    }
+  ],
+  "boundary": "Scenario Coverage v82 is a Rust + Studio control-plane regression suite for Era O M94 Migration UX. It locks source-project-only import wizard routing, honest fidelity report rendering, Yellow/Red gap preservation, no auto-port or ported claim without passing oracle evidence, deterministic state-hash evidence, no trusted Elixir writes or artifact semantics, no new data store, no live bridge, no embedded engine runtime, no decompiled source copying, and #1/#23 open governance anchors."
+}
