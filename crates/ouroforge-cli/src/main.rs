@@ -173,6 +173,16 @@ enum MigrationCommand {
         )]
         output: PathBuf,
     },
+    /// Run the Unity 2D Force-Text source adapter demo and write an honest fidelity report.
+    UnityDemo {
+        #[arg(long, default_value = "examples/unity-2d-adapter-v1/sample-project")]
+        project: PathBuf,
+        #[arg(
+            long,
+            default_value = "examples/unity-2d-adapter-v1/generated/fidelity-report.json"
+        )]
+        output: PathBuf,
+    },
     /// Run the IR-to-Ouroforge mapping demo and write an honest fidelity report.
     MappingDemo {
         #[arg(long, default_value = "examples/godot-2d-adapter-v1/sample-project")]
@@ -1502,6 +1512,26 @@ fn main() -> Result<()> {
                 &project, &output,
             )?;
             println!("Godot migration demo report: {}", output.display());
+            println!("IR state hash: {}", report.ir_state_hash);
+            println!(
+                "Fidelity: green={} yellow={} red={}",
+                report.fidelity_summary.green,
+                report.fidelity_summary.yellow,
+                report.fidelity_summary.red
+            );
+            println!(
+                "Claimed ported units: {}",
+                report.claimed_ported_units.len()
+            );
+            println!("{}", report.oracle_gate);
+        }
+        Commands::Migration {
+            command: MigrationCommand::UnityDemo { project, output },
+        } => {
+            let report = ouroforge_core::unity_2d_adapter_ir::write_unity_2d_adapter_demo_report(
+                &project, &output,
+            )?;
+            println!("Unity migration demo report: {}", output.display());
             println!("IR state hash: {}", report.ir_state_hash);
             println!(
                 "Fidelity: green={} yellow={} red={}",

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "unity-2d-adapter-demo-v1",
+  "issueRef": "#2184",
+  "scriptRef": "examples/unity-2d-adapter-v1/demo/run-demo.sh",
+  "sourceProject": "examples/unity-2d-adapter-v1/sample-project",
+  "reportCommand": "cargo run -p ouroforge-cli -- migration unity-demo --project examples/unity-2d-adapter-v1/sample-project --output examples/unity-2d-adapter-v1/generated/fidelity-report.json",
+  "loopCommand": "cargo run -p ouroforge-cli -- run seeds/migration-demo.yaml --workers 2 || true",
+  "expectedSummary": {
+    "sourceEngine": "unity",
+    "minGreen": 1,
+    "minYellow": 1,
+    "minRed": 1,
+    "claimedPortedUnits": 0,
+    "deterministicStateHash": true,
+    "decompiledSourceCopied": false,
+    "elixirOwnsArtifactSemantics": false
+  },
+  "boundary": "Unity Force-Text source-project skeleton import demo only; no Unity runtime bridge, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority."
+}

@@ -228,6 +228,41 @@ pub struct UnityFidelityRecord {
     pub source_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnityAdapterDemoReport {
+    pub schema_version: String,
+    pub source_engine: String,
+    pub source_project: String,
+    pub ir_state_hash: String,
+    pub fidelity_summary: UnityFidelitySummary,
+    pub unsupported_count: usize,
+    pub logic_touchpoint_count: usize,
+    pub oracle_record_count: usize,
+    pub claimed_ported_units: Vec<String>,
+    pub oracle_gate: String,
+    pub determinism: String,
+    pub provenance: UnityDemoProvenance,
+    pub data_shapes: UnityDemoDataShapes,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnityDemoProvenance {
+    pub origin: String,
+    pub clean_room_source_only: bool,
+    pub decompiled_source_copied: bool,
+    pub accepted_formats: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnityDemoDataShapes {
+    pub ir_nodes: String,
+    pub mapping_records: String,
+    pub behavioral_unit_records: String,
+    pub oracle_records: String,
+    pub no_elixir_artifact_semantics: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct UnitySourceFile {
     pub path: String,
@@ -375,6 +410,115 @@ pub fn parse_unity_2d_source_files(
     ir.state_hash = unity_ir_state_hash(&ir)?;
     validate_unity_2d_ir(&ir)?;
     Ok(ir)
+}
+
+pub fn unity_2d_adapter_demo_report(
+    project_root: impl AsRef<Path>,
+) -> Result<UnityAdapterDemoReport> {
+    let project_root = project_root.as_ref();
+    let ir = parse_unity_2d_project(project_root)?;
+    let canonical =
+        serde_json::to_vec(&ir).context("serializing Unity migration IR for deterministic hash")?;
+    Ok(UnityAdapterDemoReport {
+        schema_version: "unity-2d-adapter-demo-report-v1".to_string(),
+        source_engine: "unity".to_string(),
+        source_project: project_root.display().to_string(),
+        ir_state_hash: crate::export_hash::sha256_prefixed(&canonical),
+        fidelity_summary: ir.fidelity_report.summary.clone(),
+        unsupported_count: ir.unsupported.len(),
+        logic_touchpoint_count: ir.logic_touchpoints.len(),
+        oracle_record_count: ir.oracle_records.len(),
+        claimed_ported_units: Vec::new(),
+        oracle_gate: "No Unity unit is claimed ported; later Ouroforge-native acceptance evidence and a passing oracle are required before equivalence wording is allowed.".to_string(),
+        determinism: "The demo hashes canonical Unity migration IR bytes with sha256; repeated runs over the same Force-Text source project produce the same state hash.".to_string(),
+        provenance: UnityDemoProvenance {
+            origin: "unity".to_string(),
+            clean_room_source_only: true,
+            decompiled_source_copied: false,
+            accepted_formats: ir.source.accepted_formats.clone(),
+        },
+        data_shapes: UnityDemoDataShapes {
+            ir_nodes: "UnityIrNode records in crates/ouroforge-core/src/unity_2d_adapter_ir.rs"
+                .to_string(),
+            mapping_records: "UnityComponentRecord and UnityAssetLink records preserve resolved source references without creating a write path.".to_string(),
+            behavioral_unit_records: "UnityIrLogicTouchpoint records are Era R clean-room re-derivation tasks, not translated source.".to_string(),
+            oracle_records: "UnityOracleRecord entries are missing until captured acceptance evidence passes.".to_string(),
+            no_elixir_artifact_semantics: true,
+        },
+        boundary: UNITY_2D_ADAPTER_BOUNDARY.to_string(),
+    })
+}
+
+pub fn write_unity_2d_adapter_demo_report(
+    project_root: impl AsRef<Path>,
+    output_path: impl AsRef<Path>,
+) -> Result<UnityAdapterDemoReport> {
+    let report = unity_2d_adapter_demo_report(project_root)?;
+    validate_unity_2d_adapter_demo_report(&report)?;
+    let output_path = output_path.as_ref();
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    fs::write(output_path, serde_json::to_vec_pretty(&report)?)
+        .with_context(|| format!("writing {}", output_path.display()))?;
+    Ok(report)
+}
+
+pub fn validate_unity_2d_adapter_demo_report(report: &UnityAdapterDemoReport) -> Result<()> {
+    if report.schema_version != "unity-2d-adapter-demo-report-v1" {
+        return Err(anyhow!(
+            "unsupported Unity adapter demo report schema {}",
+            report.schema_version
+        ));
+    }
+    if report.source_engine != "unity" || report.provenance.origin != "unity" {
+        return Err(anyhow!("Unity adapter demo report source engine drifted"));
+    }
+    if !report.claimed_ported_units.is_empty() {
+        return Err(anyhow!(
+            "Unity adapter report cannot claim ported units without a later passing oracle"
+        ));
+    }
+    if !report.ir_state_hash.starts_with("sha256:") || report.ir_state_hash.len() != 71 {
+        return Err(anyhow!(
+            "Unity adapter report requires a sha256-prefixed deterministic state hash"
+        ));
+    }
+    if report.boundary != UNITY_2D_ADAPTER_BOUNDARY {
+        return Err(anyhow!("Unity adapter report boundary drifted"));
+    }
+    if !report.provenance.clean_room_source_only || report.provenance.decompiled_source_copied {
+        return Err(anyhow!(
+            "Unity adapter report must remain clean-room source-project/open-text only"
+        ));
+    }
+    if !report.data_shapes.no_elixir_artifact_semantics {
+        return Err(anyhow!(
+            "Unity adapter report cannot grant Elixir/Phoenix artifact semantics"
+        ));
+    }
+    if !report
+        .oracle_gate
+        .to_ascii_lowercase()
+        .contains("no unity unit is claimed ported")
+    {
+        return Err(anyhow!(
+            "Unity adapter report must state that no Unity unit is claimed ported"
+        ));
+    }
+    if (report.unsupported_count > 0 || report.logic_touchpoint_count > 0)
+        && report.fidelity_summary.red == 0
+    {
+        return Err(anyhow!(
+            "Unity adapter report must keep unsupported/logic gaps Red"
+        ));
+    }
+    if report.logic_touchpoint_count > 0 && report.oracle_record_count == 0 {
+        return Err(anyhow!(
+            "Unity adapter report must expose oracle records for logic touchpoints"
+        ));
+    }
+    Ok(())
 }
 
 pub fn validate_unity_2d_ir(ir: &UnityMigrationIr) -> Result<()> {

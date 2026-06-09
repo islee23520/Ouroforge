@@ -1,0 +1,10 @@
+%YAML 1.1
+InputManager:
+  m_Axes:
+  - serializedVersion: 3
+    m_Name: Horizontal
+    positiveButton: d
+    negativeButton: a
+  - serializedVersion: 3
+    m_Name: Fire
+    positiveButton: space

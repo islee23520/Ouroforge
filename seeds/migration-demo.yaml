@@ -1,16 +1,24 @@
 id: migration-demo.v1
-title: Godot 2D Migration On-Ramp Demo Seed
-goal: Demonstrate the Godot source-text skeleton import as an honest, oracle-gated migration report.
+title: Engine Migration On-Ramp Demo Seed
+goal: Demonstrate source-text skeleton imports as honest, oracle-gated migration reports for Godot and Unity 2D fixtures.
 constraints:
   target: migration-on-ramp
 acceptance:
   - The Godot 2D source fixture parses into neutral migration IR deterministically.
-  - The fidelity report includes green, yellow, and red units with unsupported nodes and logic touchpoints visible.
+  - The Unity 2D Force-Text source fixture parses into neutral migration IR deterministically.
+  - Fidelity reports include green, yellow, and red units with unsupported nodes and logic touchpoints visible.
   - No unit is claimed ported without later Ouroforge-native oracle evidence.
   - The on-ramp remains one-way, source-project text only, and clean-room.
 scenarios:
   - id: godot-skeleton-import-report
     description: Validate the Godot migration demo report contract; runtime execution is not required for source-text parsing.
+    steps: []
+    assertions:
+      - world_state:
+          path: object.x
+          exists: true
+  - id: unity-skeleton-import-report
+    description: Validate the Unity Force-Text migration demo report contract; runtime execution is not required for source-text parsing.
     steps: []
     assertions:
       - world_state:
