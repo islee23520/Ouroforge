@@ -2,6 +2,10 @@
 
 ## Current status
 
+## Era R semantic re-derivation governance
+
+Era R starts with `docs/semantic-re-derivation-methodology-adr-v1.md` as its M107 design gate. The contract fixes the one-way on-ramp, re-derivation-not-translation boundary, behavioral-unit model, no-oracle-not-ported rule, outcome-level differential verification, deterministic 2D and 2.5D/3D state-hash requirements, source-project/open-text clean-room legal boundary, O/P/Q hand-off, and the Rust data-plane / Elixir-Phoenix control-plane split. #1 and #23 remain open.
+
 Ouroforge is a local, evidence-native MVP. It now supports a small project
 workspace loop in addition to the original run-centered demo, with hardened
 run evidence fidelity, a completed Agentic Review & Regression Promotion v1

@@ -119,6 +119,10 @@ Use these for source-like models and fixture-backed engine capability references
 - [`safe-script-sandbox-trust-boundary-v1.md`](safe-script-sandbox-trust-boundary-v1.md) — design-only sandbox/trust-boundary policy for future script proposals, covering allowed/blocked operations, deterministic limits, failure evidence, restrictions, review/rollback/dry-run gates, and generated evidence path; no runtime execution, command bridge, plugin loader, dynamic import, or browser trusted writes.
 - [`3d-capability-gate-v1.md`](3d-capability-gate-v1.md), [`3d-scene-graph-v1.md`](3d-scene-graph-v1.md), [`3d-camera-projection-v1.md`](3d-camera-projection-v1.md), [`3d-mesh-material-refs-v1.md`](3d-mesh-material-refs-v1.md), [`3d-render-smoke-v1.md`](3d-render-smoke-v1.md), [`3d-collision-physics-v1.md`](3d-collision-physics-v1.md), [`3d-animation-playback-v1.md`](3d-animation-playback-v1.md)
 
+## Migration and semantic re-derivation
+
+- [`semantic-re-derivation-methodology-adr-v1.md`](semantic-re-derivation-methodology-adr-v1.md) — Era R M107 design-gate ADR defining the one-way on-ramp, re-derivation-not-translation contract, behavioral-unit model, oracle-gated fidelity grades, outcome-level differential verification, O/P/Q hand-off, source-project/open-text legal boundary, Rust data plane, and Elixir/Phoenix control/presentation-only boundary.
+
 ## Authoring, Studio, and review surfaces
 
 These docs describe local authoring flows and read-only/review-gated inspection
