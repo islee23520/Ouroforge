@@ -3,14 +3,66 @@
   "titleId": "era-i-engine-builder-deckbuilder",
   "coverageVersion": 60,
   "rows": [
-    { "id": "substrate", "evidenceRef": "examples/card-roguelite-substrate-v1/engine-builder/deckbuilder.config.golden.json", "status": "pass" },
-    { "id": "scoring", "evidenceRef": "examples/game-runtime/score-cascade-feedback-v1.json", "status": "pass" },
-    { "id": "run-shop", "evidenceRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json", "status": "pass" },
-    { "id": "balance", "evidenceRef": "docs/engine-builder-balance-v1.md", "status": "pass" },
-    { "id": "juice", "evidenceRef": "examples/game-feel-juice-v1/demo/game-feel-juice-demo-v1.json", "status": "pass" },
-    { "id": "ui", "evidenceRef": "examples/deckbuilder-ui-v1/demo/demo-manifest.json", "status": "pass" },
-    { "id": "localization", "evidenceRef": "docs/localization-v1-demo.md", "status": "pass" },
-    { "id": "steam-export", "evidenceRef": "docs/steam-desktop-export-v1-demo.md", "status": "pass" }
+    {
+      "id": "substrate",
+      "evidenceRef": "examples/card-roguelite-substrate-v1/engine-builder/deckbuilder.config.golden.json",
+      "status": "pass"
+    },
+    {
+      "id": "scoring",
+      "evidenceRef": "examples/game-runtime/score-cascade-feedback-v1.json",
+      "status": "pass"
+    },
+    {
+      "id": "run-shop",
+      "evidenceRef": "examples/game-runtime/deckbuilder-ui-scene-v1.json",
+      "status": "pass"
+    },
+    {
+      "id": "balance",
+      "evidenceRef": "docs/engine-builder-balance-v1.md",
+      "status": "pass"
+    },
+    {
+      "id": "juice",
+      "evidenceRef": "examples/game-feel-juice-v1/demo/game-feel-juice-demo-v1.json",
+      "status": "pass"
+    },
+    {
+      "id": "ui",
+      "evidenceRef": "examples/deckbuilder-ui-v1/demo/demo-manifest.json",
+      "status": "pass"
+    },
+    {
+      "id": "localization",
+      "evidenceRef": "docs/localization-v1-demo.md",
+      "status": "pass"
+    },
+    {
+      "id": "steam-export",
+      "evidenceRef": "docs/steam-desktop-export-v1-demo.md",
+      "status": "pass"
+    },
+    {
+      "id": "harness-stage-attribution",
+      "evidenceRef": "crates/ouroforge-core/src/dogfood_campaign_harness.rs",
+      "status": "pass"
+    },
+    {
+      "id": "harness-friction-logging",
+      "evidenceRef": "crates/ouroforge-core/src/dogfood_campaign_harness.rs",
+      "status": "pass"
+    },
+    {
+      "id": "harness-resumability",
+      "evidenceRef": "crates/ouroforge-core/src/dogfood_campaign_harness.rs",
+      "status": "pass"
+    },
+    {
+      "id": "harness-autonomy-invariants",
+      "evidenceRef": "crates/ouroforge-evaluator/src/dogfood_contract.rs",
+      "status": "pass"
+    }
   ],
-  "boundary": "Coverage v60 records real-title dogfood evidence using existing fixtures/docs and gates; it is not a new verifier or data plane."
+  "boundary": "Coverage v60 records real-title dogfood and harness regression evidence using existing fixtures/docs, ledger.jsonl, journal.md, verdicts, openchrome, loop-coverage attribution, source-apply, and trust-gradient; it is not a new verifier or data plane."
 }
