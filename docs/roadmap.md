@@ -8,6 +8,7 @@ Era R starts with `docs/semantic-re-derivation-methodology-adr-v1.md` as its M10
 
 M108 is scoped by `docs/legacy-logic-ingestion-behavioral-unit-contract-v1.md`, which defines the source-only ingestion subset, exact Rust-owned reports/IR/candidate-unit outputs, conservative fidelity grades, and the hand-off states for interrogation, oracle capture, re-expression, verification, or reject/defer.
 The first M108 Rust data-plane implementation lives in `crates/ouroforge-core::legacy_logic_ingestion` and performs read-only C# / degraded IL2CPP-signature analysis into IR nodes, engine touchpoints, behavioral-unit candidates, fidelity reports, and re-derivation tasks.
+Scenario Coverage v90 (`docs/scenario-coverage-v90-legacy-logic-ingestion.md`) locks the M108 regression ledger for false-clean lossy imports, no auto-port without oracle, deterministic digest/state-hash drift, and decompiled-source rejection.
 
 Ouroforge is a local, evidence-native MVP. It now supports a small project
 workspace loop in addition to the original run-centered demo, with hardened

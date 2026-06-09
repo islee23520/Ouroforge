@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "scenario-coverage-v90-legacy-logic-ingestion-v1",
+  "coverageVersion": 90,
+  "issueRef": "#2223",
+  "milestone": "Era R M108",
+  "contractRef": "docs/legacy-logic-ingestion-behavioral-unit-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/legacy_logic_ingestion.rs",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "deterministicDigestRequired": true,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "decompiledSourceAllowed": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v90.accepted-source-catalogs-units-and-couplings",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v90_legacy_logic_ingestion.rs",
+      "locks": "Eligible source-owned C# is analyzed read-only into deterministic IR nodes, engine API touchpoints, behavioral-unit candidates, fidelity gaps, and Era R hand-off tasks without translating source."
+    },
+    {
+      "id": "v90.lossy-import-not-green",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v90_legacy_logic_ingestion.rs",
+      "locks": "Missing or unsupported source evidence is Yellow/Red with explicit gaps; a lossy import must never be graded clean/Green."
+    },
+    {
+      "id": "v90.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v90_legacy_logic_ingestion.rs",
+      "locks": "Every extracted unit starts oracle-missing and ported_claim_allowed=false, so ungated or auto-translated port claims fail the coverage invariant."
+    },
+    {
+      "id": "v90.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v90_legacy_logic_ingestion.rs",
+      "locks": "The deterministic digest/state-hash is stable for identical input order and changes when source behavior text changes, catching stale or nondeterministic analysis regressions."
+    },
+    {
+      "id": "v90.decompiled-source-rejected",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/legacy_logic_ingestion.rs",
+      "locks": "Decompiler/ripped-source markers and missing source-only attestation are rejected and recorded Red; no decompiled code is copied into native behavior."
+    },
+    {
+      "id": "v90.coverage-ledger-and-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v90-legacy-logic-ingestion.md",
+      "locks": "Coverage v90 records the one-way on-ramp, source-only clean-room legal boundary, Rust data-plane ownership, no Studio trusted writes, and #1/#23 open governance anchors."
+    }
+  ],
+  "boundary": "Scenario Coverage v90 is a Rust data-plane regression suite for Era R M108 legacy logic ingestion and behavioral-unit extraction. It locks source-project/open-text only analysis, one-way import to Ouroforge-native evidence/IR, clean-room re-derivation candidates, no decompiled-source copying, no Unity/Unreal/Godot runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity gaps for lossy or degraded imports, deterministic digest/state-hash behavior, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
