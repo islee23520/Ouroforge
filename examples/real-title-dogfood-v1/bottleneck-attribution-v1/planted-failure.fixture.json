@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "self-audit-bottleneck-attribution-v1",
+  "contractSchemaVersion": "self-audit-attribution-contract-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "evidenceRefs": [
+    "examples/real-title-dogfood-v1/run/ledger.jsonl",
+    "examples/real-title-dogfood-v1/run/journal.md",
+    "examples/real-title-dogfood-v1/run/verdict.json",
+    "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"
+  ],
+  "signals": [
+    {
+      "signalId": "planted-four-gates-fail",
+      "signalKind": "gate-fail",
+      "sourceRef": "examples/real-title-dogfood-v1/run/verdict.json",
+      "loopStage": "attribute",
+      "gateKind": "four-gates",
+      "status": "fail",
+      "elapsedMs": 1200,
+      "summary": "Planted real-build four-gates failure in verdict evidence."
+    },
+    {
+      "signalId": "planted-provenance-incomplete",
+      "signalKind": "provenance-incomplete",
+      "sourceRef": "examples/real-title-dogfood-v1/release-provenance.complete.json",
+      "loopStage": "attribute",
+      "gateKind": "four-gates",
+      "status": "fail",
+      "elapsedMs": 600,
+      "summary": "Planted incomplete provenance signal on the verified RC acceptance path."
+    },
+    {
+      "signalId": "demo-friction-slow",
+      "signalKind": "hidden-friction",
+      "sourceRef": "examples/real-title-dogfood-v1/demo/friction-summary.fixture.json",
+      "loopStage": "trace",
+      "gateKind": "openchrome-demo",
+      "status": "slow",
+      "elapsedMs": 900,
+      "summary": "Slow demo trace is lower impact than the planted gate failure."
+    },
+    {
+      "signalId": "coverage-v60-pass",
+      "signalKind": "harness-regression",
+      "sourceRef": "examples/real-title-dogfood-v1/scenario-coverage-v60/matrix.fixture.json",
+      "loopStage": "re-verify",
+      "gateKind": "regression-coverage",
+      "status": "pass",
+      "elapsedMs": 100,
+      "summary": "Passing coverage row is ignored for bottleneck ranking."
+    }
+  ],
+  "boundary": "Read-only bottleneck attribution over ledger.jsonl, journal.md, verdict, and loop-coverage evidence; no new verification engine and no new data plane; autonomous path has no human input; source-apply and trust-gradient keep high-risk/source-affecting changes never auto-applied; human Ring 2 fun/taste and release go/no-go remain outside automation."
+}

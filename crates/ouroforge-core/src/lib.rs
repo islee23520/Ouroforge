@@ -36,11 +36,13 @@ pub use ouroforge_source_apply::source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod safe_source_apply_demo;
 pub mod self_audit_attribution_contract;
+pub mod self_audit_bottleneck_attribution;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
 pub use ouroforge_source_apply::source_apply_sandbox_promotion;
 pub use self_audit_attribution_contract::*;
+pub use self_audit_bottleneck_attribution::*;
 pub use source_apply_sandbox_promotion::*;
 pub mod behavior_draft;
 pub use ouroforge_source_apply::source_apply_rollback_snapshot;
