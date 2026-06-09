@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "self-improvement-loop-contract-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "reverifyContract": {
+    "openchromeRunCommand": "cargo run -p ouroforge-cli -- run seeds/dogfood-deckbuilder.yaml --workers 2",
+    "requiredGates": [
+      "mechanical",
+      "runtime",
+      "visual",
+      "semantic",
+      "design-integrity"
+    ],
+    "requiredEvidenceRefs": [
+      "openchrome:seeds/dogfood-deckbuilder.yaml",
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1:auto-apply-v1",
+      "source-apply:rollback-snapshot-v1",
+      "trust-gradient:kill-switch-v1"
+    ],
+    "designIntegrityRequired": true,
+    "rollbackRequiredBeforeApply": true,
+    "killSwitchRequired": true
+  },
+  "routingRules": [
+    {
+      "route": "auto-apply-eligible",
+      "whenAll": [
+        "low-risk proposal",
+        "reversible through existing rollback handle",
+        "trust-gradient auto-apply eligible",
+        "all four gates plus design-integrity pass on openchrome re-run",
+        "source-apply transaction records rollback and audit refs"
+      ],
+      "forbiddenActions": [
+        "auto_merge",
+        "bypass_gates",
+        "new_verifier",
+        "new_data_plane"
+      ]
+    },
+    {
+      "route": "human-go-no-go",
+      "whenAll": [
+        "high-risk or source-affecting proposal",
+        "thin human go/no-go required after source-apply and trust-gradient evidence",
+        "proposal stays queued and unapplied until the high-risk tail is approved"
+      ],
+      "forbiddenActions": [
+        "auto_merge",
+        "bypass_gates",
+        "new_verifier",
+        "new_data_plane"
+      ]
+    },
+    {
+      "route": "blocked",
+      "whenAll": [
+        "failed or missing four-gate/design-integrity re-verify evidence",
+        "kill-switch engaged",
+        "missing rollback or stale source-apply evidence"
+      ],
+      "forbiddenActions": [
+        "auto_merge",
+        "bypass_gates",
+        "new_verifier",
+        "new_data_plane"
+      ]
+    }
+  ],
+  "requiredPipelineRefs": [
+    "openchrome:seeds/dogfood-deckbuilder.yaml",
+    "examples/real-title-dogfood-v1/run/verdict.json",
+    "examples/real-title-dogfood-v1/run/journal.md",
+    "examples/real-title-dogfood-v1/run/ledger.jsonl",
+    "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+    "source-apply:patch-preview.v1",
+    "trust-gradient:risk-tier-v1:auto-apply-v1",
+    "source-apply:rollback-snapshot-v1",
+    "trust-gradient:kill-switch-v1"
+  ],
+  "boundary": "M71 self-improvement routing contract reuses openchrome, scenario verdicts, the four gates plus design-integrity, verdict.json, journal.md, ledger.jsonl, loop-coverage attribution, source-apply, trust-gradient, rollback, and kill-switch artifacts; no new verification engine and no new data plane; low-risk reversible fixes can route to bounded auto-apply through existing source-apply/trust-gradient, while high-risk/source-affecting changes remain queued for a thin human go/no-go; fun/taste and release go/no-go remain human Ring 2; #1 and #23 remain open.",
+  "guardrails": [
+    "The contract specifies routing only; it does not execute openchrome, mutate source, merge branches, or create a verifier.",
+    "Source-affecting/high-risk changes never auto-apply and remain queued for thin human go/no-go.",
+    "Rollback and kill-switch are required existing artifacts for any apply route."
+  ]
+}
