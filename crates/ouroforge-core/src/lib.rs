@@ -35,12 +35,14 @@ pub use ouroforge_gdd::gdd_scene_level_plan;
 pub use ouroforge_source_apply::source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod safe_source_apply_demo;
+pub mod self_audit_acceptance_evaluator;
 pub mod self_audit_attribution_contract;
 pub mod self_audit_bottleneck_attribution;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
 pub use ouroforge_source_apply::source_apply_sandbox_promotion;
+pub use self_audit_acceptance_evaluator::*;
 pub use self_audit_attribution_contract::*;
 pub use self_audit_bottleneck_attribution::*;
 pub use source_apply_sandbox_promotion::*;
