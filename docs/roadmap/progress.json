@@ -1,141 +1,33 @@
 {
   "updated": "2026-06-10",
-  "source": "Extracted from #1 body restructuring",
+  "source": "Synced with #1 body update",
   "eras": {
-    "A": {
-      "title": "Evidence-Native Foundation",
-      "status": "complete",
-      "milestones": "M0-M7",
-      "coverage": "v0-v26"
-    },
-    "B": {
-      "title": "Godot-Class Engine Core",
-      "status": "complete"
-    },
-    "C": {
-      "title": "Agentic Game Builder",
-      "status": "complete"
-    },
-    "D": {
-      "title": "Real Game Shipping",
-      "status": "complete"
-    },
-    "E": {
-      "title": "Loop Generalization & Trustworthy Autonomy",
-      "status": "complete",
-      "milestones": "M8-M26",
-      "coverage": "v8-v26"
-    },
-    "F": {
-      "title": "Accessible Authoring & Genre Verticalization",
-      "status": "complete",
-      "milestones": "M27-M35",
-      "coverage": "v27-v33",
-      "issues": "#1573-#1619"
-    },
-    "G": {
-      "title": "Specialized Production Functions",
-      "status": "complete",
-      "milestones": "M36-M41",
-      "coverage": "v34-v38",
-      "issues": "#1634-#1673"
-    },
-    "H": {
-      "title": "Autonomous Production & Shipping",
-      "status": "active",
-      "milestones": "M42-M46",
-      "coverage": "v39-v41",
-      "issues": "#1674-#1698",
-      "notes": "M42 done; M43-M46 open"
-    },
-    "I": {
-      "title": "Genre Verticalization to Shippable Title",
-      "status": "planned",
-      "milestones": "M47-M56",
-      "coverage": "v42-v50",
-      "issues": "#1791-#1850"
-    },
-    "J": {
-      "title": "Creative Co-Pilot & Release Decision",
-      "status": "planned",
-      "milestones": "M57-M61",
-      "coverage": "v51-v54",
-      "issues": "#1851-#1875"
-    },
-    "K": {
-      "title": "Production Orchestration Executor",
-      "status": "complete",
-      "milestones": "M62-M66",
-      "coverage": "v55-v58",
-      "issues": "#1933-#1951"
-    },
-    "L": {
-      "title": "Autonomous Self-Validation & Improvement",
-      "status": "complete",
-      "milestones": "M68-M73",
-      "coverage": "v60-v65",
-      "issues": "#2023-#2048"
-    },
-    "M": {
-      "title": "Active Human Intervention",
-      "status": "complete",
-      "milestones": "M74-M81",
-      "coverage": "v66-v71",
-      "issues": "#2052-#2077"
-    },
-    "N": {
-      "title": "Human-Grade Studio & Adoption UX",
-      "status": "complete",
-      "milestones": "M82-M87",
-      "coverage": "v72-v77",
-      "issues": "#2078-#2099"
-    },
-    "O": {
-      "title": "External-Engine 2D Migration On-Ramp",
-      "status": "complete",
-      "milestones": "M88-M95",
-      "coverage": "v78-v82",
-      "issues": "#2167-#2190"
-    },
-    "P": {
-      "title": "2.5D Migration On-Ramp",
-      "status": "active",
-      "milestones": "M96-M100",
-      "coverage": "v83-v85",
-      "issues": "#2191-#2203",
-      "notes": "M96-M98 contracts/early impl merged; M98 demo/coverage + M99-M100 open"
-    },
-    "Q": {
-      "title": "Full-3D On-Ramp Re-evaluation",
-      "status": "planned",
-      "milestones": "M101-M106",
-      "coverage": "v86-v89",
-      "issues": "#2204-#2219",
-      "notes": "gate #2204 open; DEFER default"
-    },
-    "R": {
-      "title": "Interrogated Semantic Re-Derivation",
-      "status": "complete",
-      "milestones": "M107-M114",
-      "coverage": "v90-v95",
-      "issues": "#2220-#2241"
-    }
+    "A": {"title": "Evidence-Native Foundation", "status": "complete", "milestones": "M0-M7", "coverage": "v0-v26"},
+    "B": {"title": "Godot-Class Engine Core", "status": "complete"},
+    "C": {"title": "Agentic Game Builder", "status": "complete"},
+    "D": {"title": "Real Game Shipping", "status": "complete"},
+    "E": {"title": "Loop Generalization & Trustworthy Autonomy", "status": "complete", "milestones": "M8-M26", "coverage": "v8-v26"},
+    "F": {"title": "Accessible Authoring & Genre Verticalization", "status": "complete", "milestones": "M27-M35", "coverage": "v27-v33", "issues": "#1573-#1619"},
+    "G": {"title": "Specialized Production Functions", "status": "complete", "milestones": "M36-M41", "coverage": "v34-v38", "issues": "#1634-#1673"},
+    "H": {"title": "Autonomous Production & Shipping", "status": "complete", "milestones": "M42-M46", "coverage": "v39-v41", "issues": "#1674-#1698", "completed": "2026-06-08"},
+    "I": {"title": "Genre Verticalization to Shippable Title", "status": "planned", "milestones": "M47-M56", "coverage": "v42-v50", "issues": "#1791-#1850"},
+    "J": {"title": "Creative Co-Pilot & Release Decision", "status": "planned", "milestones": "M57-M61", "coverage": "v51-v54", "issues": "#1851-#1875"},
+    "K": {"title": "Production Orchestration Executor", "status": "complete", "milestones": "M62-M66", "coverage": "v55-v58", "issues": "#1933-#1951"},
+    "L": {"title": "Autonomous Self-Validation & Improvement", "status": "complete", "milestones": "M68-M73", "coverage": "v60-v65", "issues": "#2023-#2048"},
+    "M": {"title": "Active Human Intervention", "status": "complete", "milestones": "M74-M81", "coverage": "v66-v71", "issues": "#2052-#2077"},
+    "N": {"title": "Human-Grade Studio & Adoption UX", "status": "complete", "milestones": "M82-M87", "coverage": "v72-v77", "issues": "#2078-#2099"},
+    "O": {"title": "External-Engine 2D Migration On-Ramp", "status": "complete", "milestones": "M88-M95", "coverage": "v78-v82", "issues": "#2167-#2190"},
+    "P": {"title": "2.5D Migration On-Ramp", "status": "complete", "milestones": "M96-M100", "coverage": "v83-v85", "issues": "#2191-#2203", "completed": "2026-06-09"},
+    "Q": {"title": "Full-3D On-Ramp Re-evaluation", "status": "gate", "milestones": "M101-M106", "coverage": "v86-v89", "issues": "#2204-#2219", "notes": "Gate #2204 OPEN; DEFER default; no active implementation"},
+    "R": {"title": "Interrogated Semantic Re-Derivation", "status": "complete", "milestones": "M107-M114", "coverage": "v90-v95", "issues": "#2220-#2241"}
   },
   "active_focus": [
-    {
-      "era": "P",
-      "priority": 1,
-      "description": "M98 implementation/demo/coverage + M99-M100"
-    },
-    {
-      "era": "Q",
-      "priority": 2,
-      "description": "Gate #2204 evaluation; DEFER default"
-    },
-    {
-      "era": "H",
-      "priority": 3,
-      "description": "M43-M46 remaining open"
-    }
-  ]
+    {"era": "Q", "priority": 1, "description": "Gate #2204 evaluation; DEFER default until gate passes"}
+  ],
+  "summary": {
+    "total_eras": 18,
+    "complete": 15,
+    "gate_pending": 1,
+    "planned": 2
+  }
 }
