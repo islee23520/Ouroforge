@@ -138,6 +138,16 @@ Required legal posture:
 5. **Human-owned fun/feel/release:** Ring 2 human review decides whether the
    re-derived result feels acceptable and whether release is appropriate.
 
+## M91 logic touchpoint contract
+
+Milestone 91 narrows this hand-off in
+[`docs/logic-touchpoint-rederivation-handoff-contract-v1.md`](logic-touchpoint-rederivation-handoff-contract-v1.md).
+Downstream M91 implementation, demo, and coverage issues (#2177 and #2178) must
+cite that contract before adding Rust behavior extraction or scenario coverage.
+It preserves this ADR's one-way on-ramp, source-project/open-text, clean-room,
+fidelity report, oracle-gated, deterministic state-hash, and two-plane
+boundaries.
+
 ## Era R hand-off contract
 
 Era O hands off **logic touchpoints**, not translated logic. Each hand-off item
