@@ -2,6 +2,21 @@ use ouroforge_core::gltf_25d_import::{
     example_report_from_fixture, normalize_gltf_25d_import_from_str, write_report_json,
     Gltf25dImportOptions, GLTF_25D_IMPORT_REPORT_SCHEMA_VERSION,
 };
+use serde_json::Value;
+
+fn repo_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn read_repo_text(path: &str) -> String {
+    std::fs::read_to_string(repo_root().join(path))
+        .unwrap_or_else(|error| panic!("read {path}: {error:#}"))
+}
+
+fn read_repo_json(path: &str) -> Value {
+    serde_json::from_str(&read_repo_text(path))
+        .unwrap_or_else(|error| panic!("parse {path}: {error:#}"))
+}
 
 #[test]
 fn fixture_import_normalizes_geometry_camera_and_fidelity() {
@@ -33,11 +48,101 @@ fn fixture_import_normalizes_geometry_camera_and_fidelity() {
 fn fixture_report_matches_committed_render_smoke_input() {
     let report = example_report_from_fixture().expect("fixture glTF normalizes");
     let actual = write_report_json(&report).expect("report json serializes");
-    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("examples/2-5d-gltf-import-v1/fidelity-report.fixture.json");
-    let expected = std::fs::read_to_string(fixture_path).expect("committed fixture report exists");
+    let expected = read_repo_text("examples/2-5d-gltf-import-v1/fidelity-report.fixture.json");
     assert_eq!(actual.trim(), expected.trim());
+}
+
+#[test]
+fn demo_summary_and_script_prove_honest_end_to_end_boundary() {
+    let fixture = read_repo_json("examples/2-5d-gltf-import-v1/demo-summary.fixture.json");
+    assert_eq!(fixture["schemaVersion"], "gltf-25d-import-demo-v1");
+    assert_eq!(fixture["issueRef"], "#2194");
+    let script_ref = fixture["scriptRef"].as_str().unwrap();
+    assert!(
+        repo_root().join(script_ref).exists(),
+        "missing script {script_ref}"
+    );
+    assert!(fixture["reportCommand"]
+        .as_str()
+        .unwrap()
+        .contains("migration gltf25d-demo"));
+    assert!(fixture["renderCommand"]
+        .as_str()
+        .unwrap()
+        .contains("render-smoke.test.cjs"));
+    assert!(fixture["loopCommand"]
+        .as_str()
+        .unwrap()
+        .contains("seeds/migration-demo.yaml"));
+    assert!(fixture["boundary"]
+        .as_str()
+        .unwrap()
+        .contains("no auto-port claim"));
+    assert!(fixture["boundary"]
+        .as_str()
+        .unwrap()
+        .contains("no Elixir/Phoenix trusted write authority"));
+
+    let script = read_repo_text(script_ref);
+    for required in [
+        "migration gltf25d-demo",
+        "render-smoke.test.cjs",
+        "seeds/migration-demo.yaml",
+        "stateHashPrimary",
+        "perceptualRenderSecondary",
+        "reDerivationTasks",
+        "no auto-port claim",
+    ] {
+        assert!(script.contains(required), "script missing {required}");
+    }
+}
+
+#[test]
+fn demo_summary_matches_live_gltf_report_shape() {
+    let fixture = read_repo_json("examples/2-5d-gltf-import-v1/demo-summary.fixture.json");
+    let expected = &fixture["expectedSummary"];
+    let report = example_report_from_fixture().expect("fixture glTF normalizes");
+    report.validate().expect("report validates");
+
+    assert_eq!(report.native_scene.scene_kind, expected["sceneKind"]);
+    assert_eq!(
+        report.native_scene.cameras[0].projection,
+        expected["cameraProjection"]
+    );
+    assert!(
+        report
+            .fidelity_rows
+            .iter()
+            .filter(|row| row.grade == "green")
+            .count()
+            >= expected["minGreenRows"].as_u64().unwrap() as usize
+    );
+    assert!(
+        report
+            .fidelity_rows
+            .iter()
+            .filter(|row| row.grade == "yellow")
+            .count()
+            >= expected["minYellowRows"].as_u64().unwrap() as usize
+    );
+    assert_eq!(expected["claimedPortedUnits"], 0);
+    assert_eq!(
+        !report.re_derivation_tasks.is_empty(),
+        expected["hasReDerivationTasks"]
+    );
+    assert_eq!(
+        report.state_hash_primary.starts_with("sha256:"),
+        expected["deterministicStateHashPrimary"]
+    );
+    assert_eq!(
+        report.perceptual_render_secondary.role == "secondary corroboration only",
+        expected["perceptualRenderSecondaryOnly"]
+    );
+    assert_eq!(expected["decompiledSourceCopied"], false);
+    assert_eq!(expected["elixirOwnsArtifactSemantics"], false);
+    assert!(report
+        .oracle_rule
+        .contains("Nothing is claimed ported without captured acceptance evidence"));
 }
 
 #[test]

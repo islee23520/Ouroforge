@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "gltf-25d-import-demo-v1",
+  "issueRef": "#2194",
+  "scriptRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
+  "sourceProject": "examples/2-5d-gltf-import-v1/source-project",
+  "sourcePath": "examples/2-5d-gltf-import-v1/source/ortho-demo.gltf",
+  "reportCommand": "cargo run -p ouroforge-cli -- migration gltf25d-demo --source examples/2-5d-gltf-import-v1/source/ortho-demo.gltf --output runs/gltf-25d-import-demo/fidelity-report.json",
+  "renderCommand": "node examples/2-5d-gltf-import-v1/render-smoke.test.cjs",
+  "loopCommand": "cargo run -p ouroforge-cli -- run seeds/migration-demo.yaml --workers 2 || true",
+  "expectedSummary": {
+    "sceneKind": "2.5d-presentation",
+    "cameraProjection": "orthographic",
+    "minGreenRows": 1,
+    "minYellowRows": 1,
+    "claimedPortedUnits": 0,
+    "hasReDerivationTasks": true,
+    "deterministicStateHashPrimary": true,
+    "perceptualRenderSecondaryOnly": true,
+    "decompiledSourceCopied": false,
+    "elixirOwnsArtifactSemantics": false
+  },
+  "boundary": "glTF 2.5D source-project presentation import demo only; no live engine bridge, no embedded runtime, no decompiled source, no auto-port claim, and no Elixir/Phoenix trusted write authority."
+}

@@ -183,6 +183,16 @@ enum MigrationCommand {
         )]
         output: PathBuf,
     },
+    /// Run the 2.5D glTF presentation import demo and write an honest fidelity report.
+    Gltf25dDemo {
+        #[arg(
+            long,
+            default_value = "examples/2-5d-gltf-import-v1/source/ortho-demo.gltf"
+        )]
+        source: PathBuf,
+        #[arg(long, default_value = "runs/gltf-25d-import-demo/fidelity-report.json")]
+        output: PathBuf,
+    },
     /// Run the IR-to-Ouroforge mapping demo and write an honest fidelity report.
     MappingDemo {
         #[arg(long, default_value = "examples/godot-2d-adapter-v1/sample-project")]
@@ -1544,6 +1554,53 @@ fn main() -> Result<()> {
                 report.claimed_ported_units.len()
             );
             println!("{}", report.oracle_gate);
+        }
+        Commands::Migration {
+            command: MigrationCommand::Gltf25dDemo { source, output },
+        } => {
+            let input = std::fs::read_to_string(&source)?;
+            let source_path = source.to_string_lossy().to_string();
+            let report = ouroforge_core::gltf_25d_import::normalize_gltf_25d_import_from_str(
+                &input,
+                ouroforge_core::gltf_25d_import::Gltf25dImportOptions {
+                    source_project_ref: "examples/2-5d-gltf-import-v1/source-project".to_string(),
+                    source_path,
+                    unit_scale: 1.0,
+                    axis_convention: "gltf-y-up-right-handed-to-ouroforge-presentation".to_string(),
+                    color_space: "srgb-textures-linear-lighting".to_string(),
+                    viewport_width: 640,
+                    viewport_height: 360,
+                },
+            )?;
+            report.validate()?;
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(
+                &output,
+                ouroforge_core::gltf_25d_import::write_report_json(&report)?,
+            )?;
+            let green = report
+                .fidelity_rows
+                .iter()
+                .filter(|row| row.grade == "green")
+                .count();
+            let yellow = report
+                .fidelity_rows
+                .iter()
+                .filter(|row| row.grade == "yellow")
+                .count();
+            let red = report
+                .fidelity_rows
+                .iter()
+                .filter(|row| row.grade == "red")
+                .count();
+            println!("glTF 2.5D migration demo report: {}", output.display());
+            println!("State hash primary: {}", report.state_hash_primary);
+            println!("Fidelity rows: green={green} yellow={yellow} red={red}");
+            println!("Re-derivation tasks: {}", report.re_derivation_tasks.len());
+            println!("Claimed ported units: 0");
+            println!("{}", report.oracle_rule);
         }
         Commands::Migration {
             command: MigrationCommand::MappingDemo { project, output },
