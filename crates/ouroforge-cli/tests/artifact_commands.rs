@@ -3854,3 +3854,61 @@ fn proposal_amendment_cli_validates_green_gate_artifact() {
     assert!(output.contains(r#""passedGateCount": 4"#));
     assert!(output.contains("intervention-as-evidence"));
 }
+
+#[test]
+fn human_artifact_intake_cli_validates_human_provenance_gate_artifact() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = unique_temp_dir("ouroforge-human-artifact-intake-cli-test");
+    fs::create_dir_all(&temp).expect("temp exists");
+    let artifact_path = temp.join("intake.json");
+    let artifact = serde_json::json!({
+        "schemaVersion": "ouroforge.human-artifact-intake.v1",
+        "intakeId": "human-intake-m76-cli-001",
+        "artifactId": "card-spark-human-001",
+        "artifactKind": "card",
+        "capturedVia": "cli",
+        "author": "human:local-author",
+        "authorProvenanceRef": "runs/m76/provenance/human-author.json",
+        "humanProvenance": true,
+        "originalArtifactRef": "runs/m76/intake/original-card.json",
+        "normalizedCandidateRef": "runs/m76/intake/normalized-card.json",
+        "targetRef": "projects/demo/cards/card-spark.json",
+        "targetBaseRef": "hash:card-base-before",
+        "validationReportRef": "runs/m76/validation/card-spark.report.json",
+        "reviewApplyRef": "runs/m76/review/card-spark.decision.json",
+        "gateResults": [
+            {"kind":"review-apply","status":"passed","evidenceRef":"runs/m76/evidence/review-apply.json","beforeRef":"runs/m76/before/review.json","afterRef":"runs/m76/after/review.json"},
+            {"kind":"scene-source-apply","status":"passed","evidenceRef":"runs/m76/evidence/scene-source-apply.json","beforeRef":"runs/m76/before/source.json","afterRef":"runs/m76/after/source.json"},
+            {"kind":"evaluator","status":"passed","evidenceRef":"runs/m76/evidence/evaluator.json","beforeRef":"runs/m76/before/evaluator.json","afterRef":"runs/m76/after/evaluator.json"},
+            {"kind":"evidence-provenance","status":"passed","evidenceRef":"runs/m76/evidence/provenance.json","beforeRef":"runs/m76/before/provenance.json","afterRef":"runs/m76/after/provenance.json"}
+        ],
+        "status": "ready-for-review-apply",
+        "interventionAsEvidence": true,
+        "readGatedWrite": true,
+        "rawBypassRequested": false,
+        "directArtifactWrite": false,
+        "studioTrustedWriteAuthority": false,
+        "humanRequiredForAutonomousLoop": false,
+        "cliFallbackSupported": true,
+        "boundary": "human-authored artifact intake; intervention-as-evidence; read + gated-write; Rust = data plane; Elixir/OTP + Phoenix LiveView = control + presentation; review/apply, scene/source-apply, evaluator, evidence/provenance gates reused; author=human provenance; no raw bypass; local-first CLI fallback; loop completes without human; #1 and #23 remain open"
+    });
+    fs::write(
+        &artifact_path,
+        serde_json::to_string_pretty(&artifact).unwrap(),
+    )
+    .expect("write fixture");
+
+    let output = run_cli(
+        &repo_root,
+        &[
+            "human-artifact-intake",
+            "validate",
+            artifact_path.to_str().unwrap(),
+        ],
+    );
+    assert!(output.contains(r#""readyForReviewApply": true"#));
+    assert!(output.contains(r#""passedGateCount": 4"#));
+    assert!(output.contains("author=human provenance"));
+
+    fs::remove_dir_all(temp).ok();
+}

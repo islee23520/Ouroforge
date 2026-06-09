@@ -60,7 +60,8 @@ defmodule OuroforgeExecutor.Contract do
     ["loop", "resume"],
     ["loop", "step"],
     ["loop", "handoff"],
-    ["proposal-amendment", "validate"]
+    ["proposal-amendment", "validate"],
+    ["human-artifact-intake", "validate"]
   ]
 
   @forbidden_cli_surface [

@@ -143,6 +143,10 @@ enum Commands {
         #[command(subcommand)]
         command: ProposalAmendmentCommand,
     },
+    HumanArtifactIntake {
+        #[command(subcommand)]
+        command: HumanArtifactIntakeCommand,
+    },
     Behavior {
         #[command(subcommand)]
         command: BehaviorCommand,
@@ -211,6 +215,11 @@ enum BehaviorApplyTransactionCommand {
 #[derive(Debug, Subcommand)]
 enum ProposalAmendmentCommand {
     Validate { amendment_path: PathBuf },
+}
+
+#[derive(Debug, Subcommand)]
+enum HumanArtifactIntakeCommand {
+    Validate { intake_path: PathBuf },
 }
 
 #[derive(Debug, Subcommand)]
@@ -735,6 +744,29 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&read_model)?);
             if !read_model.ready_for_review_apply {
                 return Err(anyhow!("proposal amendment is not ready for review/apply"));
+            }
+        }
+        Commands::HumanArtifactIntake {
+            command: HumanArtifactIntakeCommand::Validate { intake_path },
+        } => {
+            let text = std::fs::read_to_string(&intake_path).with_context(|| {
+                format!(
+                    "failed to read human artifact intake {}",
+                    intake_path.display()
+                )
+            })?;
+            let read_model = ouroforge_core::validate_human_artifact_intake_json(&text)
+                .with_context(|| {
+                    format!(
+                        "failed to validate human artifact intake {}",
+                        intake_path.display()
+                    )
+                })?;
+            println!("{}", serde_json::to_string_pretty(&read_model)?);
+            if !read_model.ready_for_review_apply {
+                return Err(anyhow!(
+                    "human artifact intake is not ready for review/apply"
+                ));
             }
         }
         Commands::Loop {
