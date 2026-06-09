@@ -127,6 +127,7 @@ pub mod evolve_campaign;
 pub mod generative_accessibility;
 pub mod generative_intake;
 pub mod generative_promotion_guard;
+pub mod gltf_25d_import;
 pub mod godot_2d_adapter_ir;
 pub mod import_verification_report;
 pub mod ir_mapping_fidelity_classifier;
@@ -13884,7 +13885,6 @@ fn copy_replay_references_to_run(seed: &Seed, seed_base_dir: &Path, run_dir: &Pa
 fn initial_journal() -> &'static str {
     "# Ouroforge Run Journal\n\n## Seed\n\n## Hypothesis\n\n## Observations\n\n## Evidence\n\n## Verdict\n\n## Next Mutation\n"
 }
-
 
 #[cfg(test)]
 #[path = "lib_tests.rs"]

@@ -1,0 +1,20 @@
+{
+  "asset": { "version": "2.0", "generator": "Ouroforge M97 fixture" },
+  "extensionsUsed": ["KHR_materials_unlit", "VENDOR_custom_shader_note"],
+  "scenes": [{ "name": "Ortho Demo Scene", "nodes": [0] }],
+  "scene": 0,
+  "nodes": [
+    { "name": "Scene Root", "children": [1, 2] },
+    { "name": "Ortho Camera", "camera": 0, "translation": [0, 8, 12] },
+    { "name": "Ground Tile", "mesh": 0, "translation": [2, 0, -1], "extras": { "logicHint": "collision/physics intent must be re-derived by Era R" } }
+  ],
+  "cameras": [
+    { "name": "Main Ortho", "type": "orthographic", "orthographic": { "xmag": 10, "ymag": 6, "znear": 0.1, "zfar": 100 } }
+  ],
+  "materials": [
+    { "name": "Tile Unlit", "extensions": { "KHR_materials_unlit": {}, "VENDOR_custom_shader_note": { "note": "bake or re-author" } }, "pbrMetallicRoughness": { "baseColorFactor": [0.2, 0.7, 1.0, 1.0], "metallicFactor": 0, "roughnessFactor": 1 } }
+  ],
+  "meshes": [
+    { "name": "Tile Mesh", "primitives": [{ "attributes": { "POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2 }, "indices": 3, "material": 0, "mode": 4 }] }
+  ]
+}

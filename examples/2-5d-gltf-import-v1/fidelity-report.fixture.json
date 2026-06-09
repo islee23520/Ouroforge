@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "ouroforge.gltf-25d-import-report.v1",
+  "sourceProjectRef": "examples/2-5d-gltf-import-v1/source-project",
+  "sourcePath": "examples/2-5d-gltf-import-v1/source/ortho-demo.gltf",
+  "boundary": "one-way source-project glTF presentation import only; no live engine bridge, no embedded runtime, no decompiled source, no gameplay logic translation, no trusted Studio write path",
+  "normalization": {
+    "axisConvention": "gltf-y-up-right-handed-to-ouroforge-presentation",
+    "unitScale": 1.0,
+    "colorSpace": "srgb-textures-linear-lighting",
+    "cameraProjection": "orthographic/isometric presentation only",
+    "deterministicStateOwner": "Rust data plane state-hash primary; perceptual render secondary"
+  },
+  "nativeScene": {
+    "id": "ortho-demo",
+    "sceneKind": "2.5d-presentation",
+    "logicAuthority": "2D deterministic Ouroforge state; glTF presentation cannot mutate gameplay truth",
+    "nodes": [
+      {
+        "id": "scene-root",
+        "localTransform": {
+          "translation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-group"
+      },
+      {
+        "id": "ortho-camera",
+        "parent": "scene-root",
+        "cameraRef": "main-ortho",
+        "localTransform": {
+          "translation": {
+            "x": 0.0,
+            "y": 8.0,
+            "z": 12.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-camera"
+      },
+      {
+        "id": "ground-tile",
+        "parent": "scene-root",
+        "meshRef": "tile-mesh",
+        "localTransform": {
+          "translation": {
+            "x": 2.0,
+            "y": 0.0,
+            "z": -1.0
+          },
+          "rotation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "scale": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+          }
+        },
+        "role": "presentation-geometry"
+      }
+    ],
+    "meshes": [
+      {
+        "id": "tile-mesh",
+        "sourceMeshIndex": 0,
+        "primitiveCount": 1,
+        "materialRefs": [
+          "tile-unlit"
+        ],
+        "fidelityGrade": "green"
+      }
+    ],
+    "materials": [
+      {
+        "id": "tile-unlit",
+        "kind": "unlit",
+        "baseColor": "#33b3ff",
+        "fidelityGrade": "yellow"
+      }
+    ],
+    "cameras": [
+      {
+        "id": "main-ortho",
+        "projection": "orthographic",
+        "orthographicHeight": 6.0,
+        "near": 0.1,
+        "far": 100.0,
+        "viewport": {
+          "width": 640,
+          "height": 360
+        },
+        "fidelityGrade": "green"
+      }
+    ],
+    "activeCameraId": "main-ortho"
+  },
+  "fidelityRows": [
+    {
+      "unit": "mesh:tile-mesh",
+      "grade": "green",
+      "reason": "geometry primitive data imported as presentation skeleton",
+      "oracleRequired": false
+    },
+    {
+      "unit": "material:tile-unlit",
+      "grade": "yellow",
+      "reason": "custom shader/extension must be baked or re-authored; not translated",
+      "oracleRequired": false
+    },
+    {
+      "unit": "camera:main-ortho",
+      "grade": "green",
+      "reason": "orthographic/isometric camera imported for presentation",
+      "oracleRequired": false
+    },
+    {
+      "unit": "extension:VENDOR_custom_shader_note",
+      "grade": "yellow",
+      "reason": "unsupported glTF extension is recorded as a fidelity gap, not silently dropped",
+      "oracleRequired": false
+    }
+  ],
+  "reDerivationTasks": [
+    {
+      "taskId": "era-r-logic-handoff",
+      "unit": "logic",
+      "reason": "logic is behavior-bearing or source-engine-specific; M97 does not translate it",
+      "eraRInput": "observed behavior + interrogated intent + captured oracle + deterministic state expectations"
+    },
+    {
+      "taskId": "era-r-physics-handoff",
+      "unit": "physics",
+      "reason": "physics is behavior-bearing or source-engine-specific; M97 does not translate it",
+      "eraRInput": "observed behavior + interrogated intent + captured oracle + deterministic state expectations"
+    },
+    {
+      "taskId": "era-r-shader-handoff",
+      "unit": "shader",
+      "reason": "shader is behavior-bearing or source-engine-specific; M97 does not translate it",
+      "eraRInput": "observed behavior + interrogated intent + captured oracle + deterministic state expectations"
+    }
+  ],
+  "stateHashPrimary": "sha256:8f55986c49b158a183735be4637fdea5616d23cb8e4e6ed649a5a5ac69e5058e",
+  "perceptualRenderSecondary": {
+    "method": "SSIM/pixel-diff tolerance over normalized presentation render",
+    "threshold": "fixture-defined tolerance; never cross-machine bit hash",
+    "role": "secondary corroboration only"
+  },
+  "oracleRule": "Nothing is claimed ported without captured acceptance evidence and a passing oracle; presentation imports are best-effort with honest fidelity rows."
+}
