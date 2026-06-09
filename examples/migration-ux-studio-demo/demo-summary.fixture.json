@@ -1,0 +1,18 @@
+{
+  "version": "migration-ux-studio-demo-v1",
+  "boundary": "one-way source-project on-ramp; source-only; clean-room re-derivation; Rust-owned fidelity/oracle evidence; Studio read + gated-write only; no trusted Elixir writes; no auto-port claim",
+  "scriptedCommands": [
+    ["cargo", "run", "-p", "ouroforge-cli", "--", "migration", "verify-demo", "--project", "examples/godot-2d-adapter-v1/sample-project", "--output", "/tmp/ouroforge-migration-ux-demo/godot-import-verification-report.json"],
+    ["cargo", "run", "-p", "ouroforge-cli", "--", "migration", "unity-demo", "--project", "examples/unity-2d-adapter-v1/sample-project", "--output", "/tmp/ouroforge-migration-ux-demo/unity-fidelity-report.json"],
+    ["cargo", "run", "-p", "ouroforge-cli", "--", "run", "seeds/migration-demo.yaml", "--workers", "2"]
+  ],
+  "fidelitySummary": {"green": 1, "yellow": 1, "red": 1},
+  "claimedPortedUnits": [],
+  "noAutoPortClaim": true,
+  "oracleGated": true,
+  "cleanRoom": true,
+  "studioTrustedWriteAuthority": false,
+  "directArtifactWrite": false,
+  "determinism": "2D state-hash evidence is primary; 2.5D/3D would require deterministic state-hash primary plus perceptual secondary.",
+  "fixForwardTargets": ["Era M", "Era R"]
+}
