@@ -2,6 +2,15 @@
 
 ## Current status
 
+
+## Era O 2D migration on-ramp governance
+
+Era O — External-Engine 2D Migration On-Ramp (Godot/Unity) — is recorded as **complete on merged evidence** for Milestones 88-94 plus the M95 governance refresh. The completed evidence chain covers the M88 scope/IR/legal gate (#2167), M89 Godot source-text adapter to IR (#2168-#2171 / Scenario Coverage v78), M90 IR-to-Ouroforge mapping and fidelity classifier (#2172-#2175 / Scenario Coverage v79), M91 logic touchpoint detection and clean-room Era R hand-off (#2176-#2178 / Scenario Coverage v80), M92 import verification and fidelity report (#2179-#2181 / Scenario Coverage v81), M93 Unity Force-Text adapter to IR (#2182-#2185 / Unity Scenario Coverage v81), M94 local Studio Migration UX (#2186-#2189 / Scenario Coverage v82), and this M95 governance refresh (#2190). The governance contract is recorded in [`docs/era-o-migration-on-ramp-governance-refresh.md`](era-o-migration-on-ramp-governance-refresh.md).
+
+The on-ramp invariant is reaffirmed. Era O imports declarative skeleton evidence from source-project/open-text Godot and Unity projects, maps it into Ouroforge-native candidate artifacts, reports fidelity honestly, and emits clean-room re-derivation hand-offs for behavior. It is one-way import only: no finished-game auto-port, no live engine bridge, no embedded Godot/Unity runtime, no shipped-build ripping, no decompiled-code copying, and no claim that behavior is `ported` without captured passing oracle evidence. Green is limited to clean declarative skeleton import; lossy content, missing oracle evidence, or behavior-bearing gaps stay Yellow/Red with explicit tasks.
+
+Determinism and ownership remain fixed. 2D verification uses bit-exact state hashes; any later 2.5D/3D path must keep deterministic state-hash evidence primary and perceptual render comparison secondary. Rust remains the data plane for adapter IR, mapping, extraction, validation, fidelity reports, state hashes, evidence, and gated writes. Elixir/Phoenix Studio remains local control + presentation only and routes every write-affecting action through existing `ouroforge` CLI/gates; it owns no artifact semantics and adds no data store. Fun/feel, creative acceptance, and release go/no-go stay human Ring 2. #1 and #23 remain open governance anchors.
+
 ## Era R semantic re-derivation governance
 
 Era R starts with `docs/semantic-re-derivation-methodology-adr-v1.md` as its M107 design gate. The contract fixes the one-way on-ramp, re-derivation-not-translation boundary, behavioral-unit model, no-oracle-not-ported rule, outcome-level differential verification, deterministic 2D and 2.5D/3D state-hash requirements, source-project/open-text clean-room legal boundary, O/P/Q hand-off, and the Rust data-plane / Elixir-Phoenix control-plane split. #1 and #23 remain open.
