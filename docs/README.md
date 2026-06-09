@@ -137,6 +137,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`rederivation-ux-human-intent-feel-escalation-contract-v1.md`](rederivation-ux-human-intent-feel-escalation-contract-v1.md) — Era R M113 contract for Studio-facing re-derivation UX, human intent/feel escalation, gated review evidence, fidelity/oracle display rules, and the Rust data-plane / Studio presentation-only split.
 - [`rederivation-ux-demo-v1.md`](rederivation-ux-demo-v1.md) — Era R M113 scripted Studio demo for re-derivation UX and human intent/feel escalation, with an honest fidelity summary, oracle-gated no-port claim, deterministic state-hash evidence, and no Studio trusted writes.
 - [`scenario-coverage-v95-rederivation-ux.md`](scenario-coverage-v95-rederivation-ux.md) — Scenario Coverage v95 regression suite for M113 re-derivation UX and human intent/feel escalation, locking no auto-port without oracle, lossy imports not clean, ungated translation/write failures, deterministic state-hash evidence, and Ring 2 human ownership.
+- [`era-r-semantic-rederivation-governance-refresh.md`](era-r-semantic-rederivation-governance-refresh.md) — Era R M114 governance refresh recording M107-M113 complete on merged evidence, reaffirming one-way/source-only/clean-room/no-auto-port/determinism boundaries, and summarizing port tractability.
 
 ## Authoring, Studio, and review surfaces
 
