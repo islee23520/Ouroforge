@@ -15,7 +15,8 @@ defmodule OuroforgeExecutor.Contract do
     :retry,
     :backpressure,
     :telemetry,
-    :live_steering
+    :live_steering,
+    :guided_generative_intake
   ]
 
   @data_plane_owner :rust_kernel
@@ -61,7 +62,8 @@ defmodule OuroforgeExecutor.Contract do
     ["loop", "step"],
     ["loop", "handoff"],
     ["proposal-amendment", "validate"],
-    ["human-artifact-intake", "validate"]
+    ["human-artifact-intake", "validate"],
+    ["generative-front-door", "validate"]
   ]
 
   @forbidden_cli_surface [

@@ -13,7 +13,8 @@ defmodule OuroforgeExecutor.ContractTest do
              :retry,
              :backpressure,
              :telemetry,
-             :live_steering
+             :live_steering,
+             :guided_generative_intake
            ]
   end
 
@@ -25,6 +26,7 @@ defmodule OuroforgeExecutor.ContractTest do
     assert Contract.allowed_cli?(["ledger", "list"])
     assert Contract.allowed_cli?(["evidence", "list"])
     assert Contract.allowed_cli?(["loop", "step"])
+    assert Contract.allowed_cli?(["generative-front-door", "validate"])
 
     refute Contract.allowed_cli?(["ledger", "append"])
     refute Contract.allowed_cli?(["evidence", "add"])
