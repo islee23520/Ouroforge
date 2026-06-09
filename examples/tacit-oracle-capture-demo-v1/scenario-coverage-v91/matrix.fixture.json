@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "scenario-coverage-v91-tacit-oracle-capture-v1",
+  "coverageVersion": 91,
+  "issueRef": "#2227",
+  "milestone": "Era R M109",
+  "contractRef": "docs/tacit-knowledge-interrogation-oracle-capture-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/tacit_oracle_capture.rs",
+  "demoRef": "docs/tacit-oracle-capture-demo-v1.md",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyOrIncompleteOracleMayGradeGreen": false,
+    "deterministicStateHashRequired": true,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "decompiledSourceAllowed": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v91.captured-oracle-is-reexpress-ready-not-ported",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v91_tacit_oracle_capture.rs",
+      "locks": "A unit with answered intent and a replayable state-hash trace becomes oracle-captured/reexpress-ready while every portedClaimAllowed flag remains false."
+    },
+    {
+      "id": "v91.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v91_tacit_oracle_capture.rs",
+      "locks": "Oracle-less and partially answered units stay Yellow/Missing with explicit gaps and follow-up tasks; they are never clean/Green or ported."
+    },
+    {
+      "id": "v91.blocked-provenance-not-green",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v91_tacit_oracle_capture.rs",
+      "locks": "Decompiler/ripped/foreign-runtime provenance blocks oracle capture and records Red fidelity rather than laundering evidence."
+    },
+    {
+      "id": "v91.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v91_tacit_oracle_capture.rs",
+      "locks": "The deterministic report digest is stable for identical oracle inputs and changes when the oracle state hash changes."
+    },
+    {
+      "id": "v91.rust-owned-no-studio-trusted-write",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v91-tacit-oracle-capture.md",
+      "locks": "Coverage records the Rust data-plane boundary and that Studio/Elixir has presentation and gated-input only, no trusted writes or artifact semantics."
+    }
+  ]
+}
