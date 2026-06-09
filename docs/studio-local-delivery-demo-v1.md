@@ -21,6 +21,8 @@ STU=$(git ls-files '**/mix.exs' | head -1)
 
 ## Invariants Demonstrated
 
+- Studio delivery remains read + gated-write: presentation may capture intent, but trusted effects stay behind existing Rust gates.
+
 - Agent-first default: the CLI fallback completes without the human surface.
 - Read + gated-write: the human packaging constraint is queued for Rust gates, never applied directly.
 - Two-plane: Rust owns data-plane truth; Elixir/Phoenix renders, captures, and routes only.
