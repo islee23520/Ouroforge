@@ -90,6 +90,7 @@ pub mod export_verification;
 pub use ouroforge_source_apply::source_apply_post_apply_rerun;
 pub use source_apply_post_apply_rerun::*;
 pub mod internal_sprite_audit;
+pub mod legacy_logic_ingestion;
 pub mod loop_coverage_attribution;
 pub mod trust_gradient_auto_apply;
 pub use loop_coverage_attribution::*;
