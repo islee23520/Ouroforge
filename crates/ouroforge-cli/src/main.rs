@@ -173,6 +173,16 @@ enum MigrationCommand {
         )]
         output: PathBuf,
     },
+    /// Run the IR-to-Ouroforge mapping demo and write an honest fidelity report.
+    MappingDemo {
+        #[arg(long, default_value = "examples/godot-2d-adapter-v1/sample-project")]
+        project: PathBuf,
+        #[arg(
+            long,
+            default_value = "examples/godot-2d-adapter-v1/generated/mapping-fidelity-report.json"
+        )]
+        output: PathBuf,
+    },
 }
 
 /// Read-only local plugin registry inspection (#752). No install, update, run,
@@ -1494,6 +1504,30 @@ fn main() -> Result<()> {
                 report.claimed_ported_units.len()
             );
             println!("{}", report.oracle_gate);
+        }
+        Commands::Migration {
+            command: MigrationCommand::MappingDemo { project, output },
+        } => {
+            let ir = ouroforge_core::godot_2d_adapter_ir::parse_godot_2d_project(&project)?;
+            let artifact =
+                ouroforge_core::ir_mapping_fidelity_classifier::map_godot_ir_to_ouroforge(&ir)?;
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&output, serde_json::to_vec_pretty(&artifact)?)?;
+            println!("IR mapping demo report: {}", output.display());
+            println!("Mapping state hash: {}", artifact.state_hash);
+            println!(
+                "Fidelity: green={} yellow={} red={}",
+                artifact.fidelity_report.green,
+                artifact.fidelity_report.yellow,
+                artifact.fidelity_report.red
+            );
+            println!(
+                "Claimed ported units: {}",
+                artifact.claimed_ported_units.len()
+            );
+            println!("{}", artifact.fidelity_report.oracle_rule);
         }
         Commands::Plugin { command } => {
             handle_plugin_command(command)?;

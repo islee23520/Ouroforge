@@ -1,0 +1,320 @@
+{
+  "schema_version": "ir-to-ouroforge-mapping-v1",
+  "boundary": "one-way IR to Ouroforge-native candidate skeleton; oracle-gated; clean-room",
+  "source_project": "examples/godot-2d-adapter-v1/sample-project",
+  "coordinate_space": {
+    "source_units": "godot-canvas-pixels",
+    "target_units": "ouroforge-world-units",
+    "pixels_per_unit": 1,
+    "origin": "2d-top-left-preserved-for-skeleton",
+    "rotation_unit": "radians",
+    "color_space": "srgb"
+  },
+  "scenes": [
+    {
+      "id": "native:scene:scenes/main.tscn",
+      "source_scene": "scenes/main.tscn",
+      "entities": [
+        {
+          "id": "entity:scenes/main.tscn::World",
+          "source_node_id": "scenes/main.tscn::World",
+          "name": "World",
+          "parent_id": null,
+          "transform": {
+            "position_units": [
+              0.0,
+              0.0
+            ],
+            "rotation_radians": null,
+            "scale": null,
+            "z_index": null
+          },
+          "presentation": null,
+          "collider": null,
+          "fidelity_grade": "green"
+        },
+        {
+          "id": "entity:scenes/main.tscn::Player",
+          "source_node_id": "scenes/main.tscn::Player",
+          "name": "Player",
+          "parent_id": null,
+          "transform": {
+            "position_units": [
+              10.0,
+              20.0
+            ],
+            "rotation_radians": null,
+            "scale": [
+              2.0,
+              2.0
+            ],
+            "z_index": 3
+          },
+          "presentation": {
+            "kind": "sprite",
+            "asset_ref": "player_tex",
+            "color_space": "srgb"
+          },
+          "collider": null,
+          "fidelity_grade": "green"
+        },
+        {
+          "id": "entity:scenes/main.tscn::Camera",
+          "source_node_id": "scenes/main.tscn::Camera",
+          "name": "Camera",
+          "parent_id": null,
+          "transform": {
+            "position_units": [
+              10.0,
+              20.0
+            ],
+            "rotation_radians": null,
+            "scale": null,
+            "z_index": null
+          },
+          "presentation": null,
+          "collider": null,
+          "fidelity_grade": "green"
+        },
+        {
+          "id": "entity:scenes/main.tscn::Hitbox",
+          "source_node_id": "scenes/main.tscn::Hitbox",
+          "name": "Hitbox",
+          "parent_id": "entity:scenes/main.tscn::Player",
+          "transform": {
+            "position_units": null,
+            "rotation_radians": null,
+            "scale": null,
+            "z_index": null
+          },
+          "presentation": null,
+          "collider": {
+            "shape_ref": "player_shape",
+            "sensor": true,
+            "collision_layer": 2,
+            "collision_mask": 4,
+            "physics_policy": "re-simulated-in-ouroforge-not-reproduced"
+          },
+          "fidelity_grade": "yellow"
+        },
+        {
+          "id": "entity:scenes/main.tscn::NameLabel",
+          "source_node_id": "scenes/main.tscn::NameLabel",
+          "name": "NameLabel",
+          "parent_id": "entity:scenes/main.tscn::Player",
+          "transform": {
+            "position_units": null,
+            "rotation_radians": null,
+            "scale": null,
+            "z_index": null
+          },
+          "presentation": {
+            "kind": "label",
+            "text": "Hero"
+          },
+          "collider": null,
+          "fidelity_grade": "green"
+        },
+        {
+          "id": "entity:scenes/main.tscn::Sparkles",
+          "source_node_id": "scenes/main.tscn::Sparkles",
+          "name": "Sparkles",
+          "parent_id": "entity:scenes/main.tscn::Player",
+          "transform": {
+            "position_units": null,
+            "rotation_radians": null,
+            "scale": null,
+            "z_index": null
+          },
+          "presentation": null,
+          "collider": null,
+          "fidelity_grade": "red"
+        }
+      ]
+    }
+  ],
+  "asset_mappings": [
+    {
+      "source_asset_id": "player_script",
+      "source_path": "res://scripts/player.gd",
+      "native_asset_id": "asset:player_script",
+      "kind": "Script",
+      "fidelity_grade": "green"
+    },
+    {
+      "source_asset_id": "player_tex",
+      "source_path": "res://assets/player.png",
+      "native_asset_id": "asset:player_tex",
+      "kind": "Texture2D",
+      "fidelity_grade": "green"
+    }
+  ],
+  "input_mappings": [
+    {
+      "action": "jump",
+      "bindings": [
+        "keycode:32",
+        "physical_keycode:32"
+      ],
+      "fidelity_grade": "green"
+    },
+    {
+      "action": "move_left",
+      "bindings": [
+        "keycode:65",
+        "physical_keycode:65"
+      ],
+      "fidelity_grade": "green"
+    }
+  ],
+  "mapping_records": [
+    {
+      "source_id": "scenes/main.tscn::World",
+      "native_id": "entity:scenes/main.tscn::World",
+      "element_kind": "node:Node2D",
+      "fidelity_grade": "green",
+      "reason": "Declarative skeleton fact mapped to Ouroforge-native candidate.",
+      "provenance": "scenes/main.tscn:7:node:World"
+    },
+    {
+      "source_id": "scenes/main.tscn::Player",
+      "native_id": "entity:scenes/main.tscn::Player",
+      "element_kind": "node:Sprite2D",
+      "fidelity_grade": "green",
+      "reason": "Declarative skeleton fact mapped to Ouroforge-native candidate.",
+      "provenance": "scenes/main.tscn:10:node:Player"
+    },
+    {
+      "source_id": "scenes/main.tscn::Camera",
+      "native_id": "entity:scenes/main.tscn::Camera",
+      "element_kind": "node:Camera2D",
+      "fidelity_grade": "green",
+      "reason": "Declarative skeleton fact mapped to Ouroforge-native candidate.",
+      "provenance": "scenes/main.tscn:18:node:Camera"
+    },
+    {
+      "source_id": "scenes/main.tscn::Hitbox",
+      "native_id": "entity:scenes/main.tscn::Hitbox",
+      "element_kind": "node:Area2D",
+      "fidelity_grade": "yellow",
+      "reason": "Partial or metadata-only mapping; gap remains visible in fidelity report.",
+      "provenance": "scenes/main.tscn:23:node:Hitbox"
+    },
+    {
+      "source_id": "scenes/main.tscn::NameLabel",
+      "native_id": "entity:scenes/main.tscn::NameLabel",
+      "element_kind": "node:Label",
+      "fidelity_grade": "green",
+      "reason": "Declarative skeleton fact mapped to Ouroforge-native candidate.",
+      "provenance": "scenes/main.tscn:28:node:NameLabel"
+    },
+    {
+      "source_id": "scenes/main.tscn::Sparkles",
+      "native_id": "entity:scenes/main.tscn::Sparkles",
+      "element_kind": "node:GPUParticles2D",
+      "fidelity_grade": "red",
+      "reason": "Unsupported or behavioral unit routed to Era R; not ported.",
+      "provenance": "scenes/main.tscn:31:node:Sparkles"
+    },
+    {
+      "source_id": "player_script",
+      "native_id": "asset:player_script",
+      "element_kind": "asset:Script",
+      "fidelity_grade": "green",
+      "reason": "Project-local asset reference mapped to native asset candidate.",
+      "provenance": "res://scripts/player.gd"
+    },
+    {
+      "source_id": "player_tex",
+      "native_id": "asset:player_tex",
+      "element_kind": "asset:Texture2D",
+      "fidelity_grade": "green",
+      "reason": "Project-local asset reference mapped to native asset candidate.",
+      "provenance": "res://assets/player.png"
+    },
+    {
+      "source_id": "jump",
+      "native_id": "input:jump",
+      "element_kind": "input-action",
+      "fidelity_grade": "green",
+      "reason": "Declarative input binding mapped; gameplay reaction remains separate logic.",
+      "provenance": "project.godot"
+    },
+    {
+      "source_id": "move_left",
+      "native_id": "input:move_left",
+      "element_kind": "input-action",
+      "fidelity_grade": "green",
+      "reason": "Declarative input binding mapped; gameplay reaction remains separate logic.",
+      "provenance": "project.godot"
+    }
+  ],
+  "behavioral_units": [
+    {
+      "id": "behavioral-unit:logic:scenes/main.tscn::Player:script",
+      "source_id": "logic:scenes/main.tscn::Player:script",
+      "trigger_kind": "script-ref",
+      "era_r_status": "requires-clean-room-re-derivation",
+      "fidelity_grade": "red",
+      "clean_room_instruction": "Re-implement from observed behavior and interrogated intent; never copy or translate source code."
+    },
+    {
+      "id": "behavioral-unit:logic:scenes/main.tscn:connection:Hitbox:body_entered",
+      "source_id": "logic:scenes/main.tscn:connection:Hitbox:body_entered",
+      "trigger_kind": "signal-connection",
+      "era_r_status": "requires-clean-room-re-derivation",
+      "fidelity_grade": "red",
+      "clean_room_instruction": "Re-implement from observed behavior and interrogated intent; never copy or translate source code."
+    },
+    {
+      "id": "behavioral-unit:unsupported:scenes/main.tscn:GPUParticles2D",
+      "source_id": "scenes/main.tscn::Sparkles",
+      "trigger_kind": "GPUParticles2D",
+      "era_r_status": "unsupported-or-human-redesign",
+      "fidelity_grade": "red",
+      "clean_room_instruction": "Record as unsupported or redesign/re-derive in Era R if behavior matters."
+    }
+  ],
+  "oracle_records": [
+    {
+      "unit_id": "behavioral-unit:logic:scenes/main.tscn::Player:script",
+      "status": "missing",
+      "required_evidence": [
+        "captured acceptance oracle",
+        "2d bit-exact deterministic state hash"
+      ],
+      "ported_claim_allowed": false
+    },
+    {
+      "unit_id": "behavioral-unit:logic:scenes/main.tscn:connection:Hitbox:body_entered",
+      "status": "missing",
+      "required_evidence": [
+        "captured acceptance oracle",
+        "2d bit-exact deterministic state hash"
+      ],
+      "ported_claim_allowed": false
+    },
+    {
+      "unit_id": "behavioral-unit:unsupported:scenes/main.tscn:GPUParticles2D",
+      "status": "missing",
+      "required_evidence": [
+        "human redesign or clean-room re-derivation decision"
+      ],
+      "ported_claim_allowed": false
+    }
+  ],
+  "fidelity_report": {
+    "green": 8,
+    "yellow": 1,
+    "red": 4,
+    "oracle_rule": "No mapped unit is ported/equivalent until a later Ouroforge-native oracle passes; 2D requires bit-exact deterministic state hashes.",
+    "gap_summary": [
+      "logic:scenes/main.tscn::Player:script: Script reference is inventoried only; gameplay logic must be clean-room re-derived in Era R.",
+      "logic:scenes/main.tscn:connection:Hitbox:body_entered: Signal connection is a behavior touchpoint, not translated logic.",
+      "node:scenes/main.tscn::Hitbox: Supported Godot declarative node skeleton parsed into neutral IR.",
+      "node:scenes/main.tscn::Sparkles: Unsupported Godot node is explicitly flagged instead of dropped."
+    ]
+  },
+  "state_hash": "sha256:d439dd3c356959234bdb959d69779c5ac3e17ae391eb08113e3ea7d4e9518cea",
+  "claimed_ported_units": []
+}
