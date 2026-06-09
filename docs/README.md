@@ -127,6 +127,7 @@ Use these for source-like models and fixture-backed engine capability references
 - [`tacit-knowledge-interrogation-oracle-capture-contract-v1.md`](tacit-knowledge-interrogation-oracle-capture-contract-v1.md) — Era R M109 contract for tacit-knowledge interrogation and oracle capture, defining source-independent intent records, deterministic oracle specs, conservative fidelity/oracle grades, and the Rust data-plane / Studio presentation-only boundary.
 - [`tacit-oracle-capture-demo-v1.md`](tacit-oracle-capture-demo-v1.md) — Era R M109 fixture-backed demo showing a captured oracle, an explicitly oracle-less unit, deterministic state-hash evidence, no port claim, and no Studio trusted-write authority.
 - [`scenario-coverage-v91-tacit-oracle-capture.md`](scenario-coverage-v91-tacit-oracle-capture.md) — Scenario Coverage v91 regression suite for M109 tacit-knowledge interrogation and oracle capture, locking no auto-port without oracle, blocked provenance not Green, deterministic state-hash drift, and Rust/Studio boundaries.
+- [`deterministic-re-expression-engine-contract-v1.md`](deterministic-re-expression-engine-contract-v1.md) — Era R M110 contract for deterministic re-expression, defining clean-room inputs/outputs, the gated path, Green/Yellow/Red fidelity rules, no-port-without-oracle policy, and two-plane Rust/Studio boundaries.
 
 ## Authoring, Studio, and review surfaces
 
