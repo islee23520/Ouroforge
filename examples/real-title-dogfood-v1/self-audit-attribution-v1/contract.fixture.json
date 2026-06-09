@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "self-audit-attribution-contract-v1",
+  "extendsSchemaVersion": "loop-coverage-attribution-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "anchorIssueRefs": ["#1", "#23"],
+  "evidencePipeline": [
+    "openchrome",
+    "scenario-verdicts",
+    "four-gates",
+    "design-integrity",
+    "journal.md",
+    "ledger.jsonl",
+    "loop-coverage-attribution",
+    "evolve",
+    "source-apply",
+    "trust-gradient"
+  ],
+  "loopStages": ["detect", "explain", "trace", "attribute", "propose", "re-verify", "apply-or-queue"],
+  "milestoneMappings": [
+    {
+      "milestoneId": "m68-real-title-run",
+      "issueRef": "#2025",
+      "gateKind": "four-gates",
+      "loopStage": "attribute",
+      "evidenceRefs": [
+        "examples/real-title-dogfood-v1/run/verdict.json",
+        "examples/real-title-dogfood-v1/release-provenance.complete.json"
+      ],
+      "attributionRefs": ["examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"],
+      "failureSignalKinds": ["scenario-failed", "gate-fail", "provenance-incomplete"]
+    },
+    {
+      "milestoneId": "m68-demo",
+      "issueRef": "#2026",
+      "gateKind": "openchrome-demo",
+      "loopStage": "trace",
+      "evidenceRefs": [
+        "examples/real-title-dogfood-v1/demo/audit-trail.fixture.json",
+        "examples/real-title-dogfood-v1/demo/friction-summary.fixture.json"
+      ],
+      "attributionRefs": ["examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"],
+      "failureSignalKinds": ["hidden-friction", "demo-run-failed"]
+    },
+    {
+      "milestoneId": "m68-coverage-v60",
+      "issueRef": "#2027",
+      "gateKind": "regression-coverage",
+      "loopStage": "re-verify",
+      "evidenceRefs": ["examples/real-title-dogfood-v1/scenario-coverage-v60/matrix.fixture.json"],
+      "attributionRefs": ["examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"],
+      "failureSignalKinds": ["coverage-row-missing", "harness-regression"]
+    }
+  ],
+  "acceptanceAudits": [
+    {
+      "milestoneId": "m68-real-title-run",
+      "successCriterionRef": "#1:era-l:m68-real-title-run:verified-rc-evidence",
+      "evidencePredicates": [
+        { "sourceRef": "examples/real-title-dogfood-v1/run/verdict.json", "path": "status", "operator": "equals", "expectedValue": "pass" },
+        { "sourceRef": "examples/real-title-dogfood-v1/release-provenance.complete.json", "path": "status", "operator": "equals", "expectedValue": "complete" }
+      ],
+      "status": "satisfied",
+      "trendRef": "m68-verified-rc-regression"
+    },
+    {
+      "milestoneId": "m68-demo",
+      "successCriterionRef": "#1:era-l:m68-demo:autonomous-demo-evidence",
+      "evidencePredicates": [
+        { "sourceRef": "examples/real-title-dogfood-v1/demo/friction-summary.fixture.json", "path": "hiddenFriction", "operator": "equals", "expectedValue": "false" },
+        { "sourceRef": "examples/real-title-dogfood-v1/demo/audit-trail.fixture.json", "path": "newVerificationEngine", "operator": "equals", "expectedValue": "false" }
+      ],
+      "status": "satisfied",
+      "trendRef": "m68-demo-friction-regression"
+    },
+    {
+      "milestoneId": "m68-coverage-v60",
+      "successCriterionRef": "#1:era-l:m68-coverage-v60:harness-regression-coverage",
+      "evidencePredicates": [
+        { "sourceRef": "examples/real-title-dogfood-v1/scenario-coverage-v60/matrix.fixture.json", "path": "coverageVersion", "operator": "equals", "expectedValue": "60" }
+      ],
+      "status": "satisfied",
+      "trendRef": "m68-coverage-regression"
+    }
+  ],
+  "trendDefinitions": [
+    {
+      "trendId": "m68-verified-rc-regression",
+      "direction": "unchanged",
+      "baselineRef": "examples/real-title-dogfood-v1/run/verdict.json",
+      "currentRef": "examples/real-title-dogfood-v1/run/verdict.json",
+      "regressionWhen": ["regressed when current verdict status is not pass", "regressed when release provenance is incomplete"]
+    },
+    {
+      "trendId": "m68-demo-friction-regression",
+      "direction": "unchanged",
+      "baselineRef": "examples/real-title-dogfood-v1/demo/friction-summary.fixture.json",
+      "currentRef": "examples/real-title-dogfood-v1/demo/friction-summary.fixture.json",
+      "regressionWhen": ["regressed when hiddenFriction becomes true", "regressed when autonomousPathRequiresHumanInput becomes true"]
+    },
+    {
+      "trendId": "m68-coverage-regression",
+      "direction": "unchanged",
+      "baselineRef": "examples/real-title-dogfood-v1/scenario-coverage-v60/matrix.fixture.json",
+      "currentRef": "examples/real-title-dogfood-v1/scenario-coverage-v60/matrix.fixture.json",
+      "regressionWhen": ["regressed when a required v60 row is missing or not pass"]
+    }
+  ],
+  "boundary": "Extends loop-coverage attribution over ledger.jsonl, journal.md, verdict evidence, openchrome, source-apply, and trust-gradient; no new verification engine and no new data plane; human Ring 2 fun/taste and release go/no-go remain outside automation.",
+  "guardrails": [
+    "Autonomous detect-explain-trace-attribute-propose-re-verify-apply path requires no human input.",
+    "HIGH-RISK/source-affecting changes are never auto-applied.",
+    "Engine fixes route through source-apply and trust-gradient."
+  ]
+}
