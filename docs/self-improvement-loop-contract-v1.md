@@ -64,3 +64,23 @@ trust-gradient routing, rollback metadata, and kill-switch state.
 
 The loop records a report only; it does not create a new store, telemetry schema,
 verification engine, browser executor, or data plane.
+
+## High-risk go/no-go queue
+
+The M71 high-risk tail is a thin queue over the same evidence artifacts. A
+source-affecting or otherwise high-risk proposal can enter this queue only after
+it is verified by the four gates plus design-integrity, has rollback metadata,
+and is reversible through source-apply/trust-gradient routing.
+
+The human surface is intentionally one-click: `go` or `no-go`. The click records
+provenance in the existing `journal.md` / `ledger.jsonl` evidence trail; it is
+not a debugging session, review app, or second verifier. While an item is
+awaiting the click, the autonomous loop continues unrelated autonomous work from
+existing verdict, journal, ledger, loop-coverage attribution, source-apply,
+trust-gradient, rollback, and kill-switch refs without waiting.
+
+The queue also records a broadening hook for M44: when verification strength
+crosses the recorded threshold, future trust-gradient policy can narrow the human
+tail. The current queue still preserves the human go/no-go for high-risk or
+source-affecting fixes, and it does not create a new store, telemetry schema,
+verification engine, browser executor, or data plane.

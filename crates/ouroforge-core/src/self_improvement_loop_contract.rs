@@ -20,6 +20,12 @@ pub const SELF_IMPROVEMENT_APPLY_LOOP_INPUT_SCHEMA_VERSION: &str =
     "self-improvement-apply-loop-input-v1";
 pub const SELF_IMPROVEMENT_APPLY_LOOP_REPORT_SCHEMA_VERSION: &str =
     "self-improvement-apply-loop-report-v1";
+pub const SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_INPUT_SCHEMA_VERSION: &str =
+    "self-improvement-human-go-no-go-queue-input-v1";
+pub const SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_ITEM_SCHEMA_VERSION: &str =
+    "self-improvement-human-go-no-go-queue-item-v1";
+pub const SELF_IMPROVEMENT_HUMAN_GO_NO_GO_DECISION_SCHEMA_VERSION: &str =
+    "self-improvement-human-go-no-go-decision-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -208,6 +214,104 @@ pub struct SelfImprovementApplyLoopReport {
     #[serde(rename = "humanInputRequired")]
     pub human_input_required: bool,
     pub reasons: Vec<String>,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfImprovementHumanGoNoGoQueueInput {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "applyLoopInput")]
+    pub apply_loop_input: SelfImprovementApplyLoopInput,
+    #[serde(rename = "queueProvenanceRef")]
+    pub queue_provenance_ref: String,
+    #[serde(rename = "unrelatedLoopWorkRefs")]
+    pub unrelated_loop_work_refs: Vec<String>,
+    #[serde(rename = "verificationStrengthScore")]
+    pub verification_strength_score: u32,
+    #[serde(rename = "broadeningThresholdScore")]
+    pub broadening_threshold_score: u32,
+    #[serde(rename = "oneClickOnly")]
+    pub one_click_only: bool,
+    #[serde(rename = "noDebuggingSession")]
+    pub no_debugging_session: bool,
+    #[serde(rename = "noNewDataPlane")]
+    pub no_new_data_plane: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SelfImprovementHumanGoNoGoQueueStatus {
+    AwaitingDecision,
+    Accepted,
+    Rejected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SelfImprovementHumanGoNoGoDecision {
+    Go,
+    NoGo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfImprovementHumanGoNoGoQueueItem {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: String,
+    #[serde(rename = "attributedMilestoneId")]
+    pub attributed_milestone_id: String,
+    pub status: SelfImprovementHumanGoNoGoQueueStatus,
+    #[serde(rename = "verifiedReversibleHighRisk")]
+    pub verified_reversible_high_risk: bool,
+    #[serde(rename = "oneClickActions")]
+    pub one_click_actions: Vec<String>,
+    #[serde(rename = "queueProvenanceRef")]
+    pub queue_provenance_ref: String,
+    #[serde(rename = "decisionProvenanceRef")]
+    pub decision_provenance_ref: Option<String>,
+    #[serde(rename = "blocksUnrelatedLoopWork")]
+    pub blocks_unrelated_loop_work: bool,
+    #[serde(rename = "unrelatedLoopWorkRefs")]
+    pub unrelated_loop_work_refs: Vec<String>,
+    #[serde(rename = "broadeningHook")]
+    pub broadening_hook: SelfImprovementHumanGateBroadeningHook,
+    pub boundary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfImprovementHumanGateBroadeningHook {
+    #[serde(rename = "verificationStrengthScore")]
+    pub verification_strength_score: u32,
+    #[serde(rename = "broadeningThresholdScore")]
+    pub broadening_threshold_score: u32,
+    #[serde(rename = "eligibleToNarrowHumanGate")]
+    pub eligible_to_narrow_human_gate: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfImprovementHumanGoNoGoDecisionRecord {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: String,
+    pub decision: SelfImprovementHumanGoNoGoDecision,
+    #[serde(rename = "queueStatus")]
+    pub queue_status: SelfImprovementHumanGoNoGoQueueStatus,
+    #[serde(rename = "decisionProvenanceRef")]
+    pub decision_provenance_ref: String,
+    #[serde(rename = "oneClickOnly")]
+    pub one_click_only: bool,
+    #[serde(rename = "noDebuggingSession")]
+    pub no_debugging_session: bool,
+    #[serde(rename = "blocksUnrelatedLoopWork")]
+    pub blocks_unrelated_loop_work: bool,
     pub boundary: String,
 }
 
@@ -601,6 +705,176 @@ pub fn run_self_improvement_reverify_apply_loop(
     };
     validate_apply_loop_report(&report)?;
     Ok(report)
+}
+
+impl SelfImprovementHumanGoNoGoQueueInput {
+    pub fn validate(&self) -> Result<()> {
+        if self.schema_version != SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_INPUT_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "human go/no-go queue input schemaVersion must be {SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_INPUT_SCHEMA_VERSION}"
+            ));
+        }
+        require_ref("queueProvenanceRef", &self.queue_provenance_ref)?;
+        validate_pipeline_refs(&self.unrelated_loop_work_refs)?;
+        if !(self.one_click_only && self.no_debugging_session && self.no_new_data_plane) {
+            return Err(anyhow!(
+                "human go/no-go queue must be one-click provenance only, not a debugging session or new data plane"
+            ));
+        }
+        self.apply_loop_input.validate()?;
+        Ok(())
+    }
+}
+
+pub fn queue_self_improvement_human_go_no_go(
+    input: &SelfImprovementHumanGoNoGoQueueInput,
+) -> Result<SelfImprovementHumanGoNoGoQueueItem> {
+    input.validate()?;
+    let apply_report = run_self_improvement_reverify_apply_loop(&input.apply_loop_input)?;
+    let routing = &input.apply_loop_input.routing_input;
+    let verified_reversible_high_risk = apply_report.outcome
+        == SelfImprovementApplyLoopOutcome::HumanGoNoGoQueued
+        && routing.reversible
+        && routing.reverify_evidence.all_gates_pass()
+        && (routing.source_affecting
+            || matches!(
+                routing.risk_level,
+                SourcePatchPreviewRiskLevel::High | SourcePatchPreviewRiskLevel::Critical
+            ));
+    if !verified_reversible_high_risk {
+        return Err(anyhow!(
+            "human go/no-go queue accepts only verified, reversible high-risk/source-affecting proposals"
+        ));
+    }
+
+    let item = SelfImprovementHumanGoNoGoQueueItem {
+        schema_version: SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_ITEM_SCHEMA_VERSION.to_string(),
+        proposal_ref: apply_report.proposal_ref,
+        attributed_milestone_id: apply_report.attributed_milestone_id,
+        status: SelfImprovementHumanGoNoGoQueueStatus::AwaitingDecision,
+        verified_reversible_high_risk,
+        one_click_actions: vec!["go".to_string(), "no-go".to_string()],
+        queue_provenance_ref: input.queue_provenance_ref.clone(),
+        decision_provenance_ref: None,
+        blocks_unrelated_loop_work: false,
+        unrelated_loop_work_refs: input.unrelated_loop_work_refs.clone(),
+        broadening_hook: SelfImprovementHumanGateBroadeningHook {
+            verification_strength_score: input.verification_strength_score,
+            broadening_threshold_score: input.broadening_threshold_score,
+            eligible_to_narrow_human_gate: input.verification_strength_score
+                >= input.broadening_threshold_score,
+            note: "M44 broadening hook: as recorded verification strength rises, future trust-gradient policy can narrow the thin human tail without changing the evidence pipeline".to_string(),
+        },
+        boundary: "Thin Era L M71 human go/no-go queue item over existing verdict/journal.md/ledger.jsonl evidence, loop-coverage attribution, source-apply, trust-gradient, rollback, and kill-switch artifacts; one-click go/no-go provenance only, no debugging session, autonomous loop continues unrelated work without waiting, no new verification engine, no new data plane, no new store, #1 and #23 remain open.".to_string(),
+    };
+    validate_human_go_no_go_queue_item(&item)?;
+    Ok(item)
+}
+
+pub fn record_self_improvement_human_go_no_go_decision(
+    item: &SelfImprovementHumanGoNoGoQueueItem,
+    decision: SelfImprovementHumanGoNoGoDecision,
+    decision_provenance_ref: &str,
+) -> Result<SelfImprovementHumanGoNoGoDecisionRecord> {
+    validate_human_go_no_go_queue_item(item)?;
+    require_ref("decisionProvenanceRef", decision_provenance_ref)?;
+    if item.status != SelfImprovementHumanGoNoGoQueueStatus::AwaitingDecision {
+        return Err(anyhow!(
+            "human go/no-go decision can only record against an awaiting queue item"
+        ));
+    }
+    let queue_status = match decision {
+        SelfImprovementHumanGoNoGoDecision::Go => SelfImprovementHumanGoNoGoQueueStatus::Accepted,
+        SelfImprovementHumanGoNoGoDecision::NoGo => SelfImprovementHumanGoNoGoQueueStatus::Rejected,
+    };
+    let record = SelfImprovementHumanGoNoGoDecisionRecord {
+        schema_version: SELF_IMPROVEMENT_HUMAN_GO_NO_GO_DECISION_SCHEMA_VERSION.to_string(),
+        proposal_ref: item.proposal_ref.clone(),
+        decision,
+        queue_status,
+        decision_provenance_ref: decision_provenance_ref.to_string(),
+        one_click_only: true,
+        no_debugging_session: true,
+        blocks_unrelated_loop_work: false,
+        boundary: "One-click human go/no-go decision provenance over the existing source-apply/trust-gradient queue; records go/no-go only, does not become debugging, does not block unrelated autonomous loop work, and introduces no new verification engine or data plane.".to_string(),
+    };
+    validate_human_go_no_go_decision_record(&record)?;
+    Ok(record)
+}
+
+fn validate_human_go_no_go_queue_item(item: &SelfImprovementHumanGoNoGoQueueItem) -> Result<()> {
+    if item.schema_version != SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_ITEM_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "human go/no-go queue item schemaVersion must be {SELF_IMPROVEMENT_HUMAN_GO_NO_GO_QUEUE_ITEM_SCHEMA_VERSION}"
+        ));
+    }
+    require_ref("proposalRef", &item.proposal_ref)?;
+    require_id("attributedMilestoneId", &item.attributed_milestone_id)?;
+    require_ref("queueProvenanceRef", &item.queue_provenance_ref)?;
+    validate_pipeline_refs(&item.unrelated_loop_work_refs)?;
+    if !item.verified_reversible_high_risk {
+        return Err(anyhow!(
+            "queue item must be verified, reversible, and high risk/source-affecting"
+        ));
+    }
+    if item.one_click_actions != ["go".to_string(), "no-go".to_string()] {
+        return Err(anyhow!(
+            "queue item must expose exactly one-click go/no-go actions"
+        ));
+    }
+    if item.blocks_unrelated_loop_work {
+        return Err(anyhow!(
+            "human queue must not block unrelated autonomous loop work"
+        ));
+    }
+    let boundary = item.boundary.to_ascii_lowercase();
+    for required in [
+        "one-click",
+        "go/no-go",
+        "provenance",
+        "no debugging session",
+        "continues unrelated work",
+        "verdict",
+        "journal.md",
+        "ledger.jsonl",
+        "loop-coverage",
+        "source-apply",
+        "trust-gradient",
+        "rollback",
+        "kill-switch",
+        "no new verification engine",
+        "no new data plane",
+        "no new store",
+        "#1 and #23 remain open",
+    ] {
+        if !boundary.contains(required) {
+            return Err(anyhow!("human queue boundary must mention {required}"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_human_go_no_go_decision_record(
+    record: &SelfImprovementHumanGoNoGoDecisionRecord,
+) -> Result<()> {
+    if record.schema_version != SELF_IMPROVEMENT_HUMAN_GO_NO_GO_DECISION_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "human go/no-go decision schemaVersion must be {SELF_IMPROVEMENT_HUMAN_GO_NO_GO_DECISION_SCHEMA_VERSION}"
+        ));
+    }
+    require_ref("proposalRef", &record.proposal_ref)?;
+    require_ref("decisionProvenanceRef", &record.decision_provenance_ref)?;
+    if !(record.one_click_only && record.no_debugging_session) {
+        return Err(anyhow!(
+            "decision record must be one-click provenance, not debugging"
+        ));
+    }
+    if record.blocks_unrelated_loop_work {
+        return Err(anyhow!(
+            "decision record must not block unrelated autonomous loop work"
+        ));
+    }
+    Ok(())
 }
 
 fn validate_apply_loop_report(report: &SelfImprovementApplyLoopReport) -> Result<()> {
