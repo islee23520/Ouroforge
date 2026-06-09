@@ -38,6 +38,7 @@ pub mod safe_source_apply_demo;
 pub mod self_audit_acceptance_evaluator;
 pub mod self_audit_attribution_contract;
 pub mod self_audit_bottleneck_attribution;
+pub mod self_audit_demo;
 use behavior_runtime::{
     BehaviorRuntimeEvidenceBundle, BehaviorScenarioAssertionStatus, BehaviorScenarioAssertionSuite,
 };
@@ -45,6 +46,7 @@ pub use ouroforge_source_apply::source_apply_sandbox_promotion;
 pub use self_audit_acceptance_evaluator::*;
 pub use self_audit_attribution_contract::*;
 pub use self_audit_bottleneck_attribution::*;
+pub use self_audit_demo::*;
 pub use source_apply_sandbox_promotion::*;
 pub mod behavior_draft;
 pub use ouroforge_source_apply::source_apply_rollback_snapshot;
