@@ -3001,6 +3001,43 @@ servers/databases, and live-ops remain Layer-3 DEFER under ADR #92 / Milestone
 45 / #1508. Era K completion does not change those boundaries. #1 and #23 remain
 open governance anchors.
 
+### Era L Autonomous Self-Validation and Improvement Loop governance refresh
+
+Era L — Autonomous Self-Validation and Improvement Loop (Real-Title
+Dogfooding) — is recorded as **complete on merged evidence** for Milestones
+68-72 plus the M73 coverage lock. The completed evidence chain is the M68
+real-title dogfood run and Scenario Coverage v60 (#2023-#2027), M69
+self-audit/attribution and acceptance audit (#2028-#2032), M70 autonomous
+diagnosis and source-apply fix proposal (#2033-#2036 and fix-proposal issue
+#2048), M71 re-verify/auto-apply routing with high-risk go/no-go queue
+(#2037-#2041), M72 optional human channel and Scenario Coverage v64
+(#2042-#2045), and M73 Scenario Coverage v65 plus this governance refresh
+(#2046-#2047).
+
+The autonomous-loop maturity assessment is recorded in
+[`docs/era-l-autonomous-loop-maturity-assessment.md`](era-l-autonomous-loop-maturity-assessment.md).
+For the covered low-risk reversible self-improvement cycle, the autonomous
+eligible-cycle completion fraction is `1 / 1 = 100%`: the loop completes
+`detect -> explain -> trace -> attribute -> propose -> re-verify -> apply`
+with zero human action. Across covered fix candidates, safe terminal routing is
+`2 / 2 = 100%`: the low-risk candidate auto-applies only after independent
+re-verification, while the high-risk/source-affecting candidate is verified and
+queued for thin human go/no-go provenance instead of being auto-applied. The
+high-risk auto-apply rate remains `0 / 1 = 0%` by design.
+
+The autonomy-first invariant is reaffirmed. The default self-loop runs to
+completion without a human, optional oversight/taste surfaces are read-only or
+provenance-only and non-blocking, fun/taste and public release go/no-go stay
+human Ring 2, and high-risk/source-affecting engine changes never auto-apply.
+Engine fixes route through the existing source-apply path, the four gates plus
+design-integrity, openchrome re-run evidence, rollback/kill-switch, and
+trust-gradient; no parallel verification engine, telemetry store, persistent
+store, or data plane was introduced. The Rust kernel/evaluator/source-apply
+chain remains the data plane; the Elixir executor remains an unchanged control
+plane. Era L improves the engine harness/pipeline, not game taste. Layer-3
+distributed/hosted/live-ops scope remains DEFER. #1 and #23 remain open
+governance anchors.
+
 ## Active anchors
 
 - #1 remains the broad vision and implementation-roadmap anchor until a separate
