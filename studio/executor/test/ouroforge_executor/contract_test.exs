@@ -12,7 +12,8 @@ defmodule OuroforgeExecutor.ContractTest do
              :budget,
              :retry,
              :backpressure,
-             :telemetry
+             :telemetry,
+             :live_steering
            ]
   end
 
@@ -23,6 +24,7 @@ defmodule OuroforgeExecutor.ContractTest do
     assert Contract.allowed_cli?(["mutation", "apply-scene"])
     assert Contract.allowed_cli?(["ledger", "list"])
     assert Contract.allowed_cli?(["evidence", "list"])
+    assert Contract.allowed_cli?(["loop", "step"])
 
     refute Contract.allowed_cli?(["ledger", "append"])
     refute Contract.allowed_cli?(["evidence", "add"])

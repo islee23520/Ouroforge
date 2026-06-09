@@ -14,7 +14,8 @@ defmodule OuroforgeExecutor.Contract do
     :budget,
     :retry,
     :backpressure,
-    :telemetry
+    :telemetry,
+    :live_steering
   ]
 
   @data_plane_owner :rust_kernel

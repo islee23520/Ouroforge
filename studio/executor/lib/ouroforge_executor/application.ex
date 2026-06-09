@@ -11,7 +11,7 @@ defmodule OuroforgeExecutor.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [OuroforgeExecutor.WorkerSupervisor]
+    children = [OuroforgeExecutor.LocalPubSub, OuroforgeExecutor.WorkerSupervisor]
     Supervisor.start_link(children, strategy: :one_for_one, name: OuroforgeExecutor.Supervisor)
   end
 end
