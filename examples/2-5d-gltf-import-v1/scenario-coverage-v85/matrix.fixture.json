@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "scenario-coverage-v85-m99-verification-v1",
+  "coverageVersion": 85,
+  "issueRef": "#2202",
+  "milestone": "Era P M99",
+  "contractRef": "docs/2-5d-import-verification-fidelity-report-v1.md",
+  "parentContractRef": "docs/2-5d-migration-on-ramp-scope-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+  "demoRef": "examples/2-5d-gltf-import-v1/run-demo.sh",
+  "demoSummaryRef": "examples/2-5d-gltf-import-v1/m99-verification-demo-summary.fixture.json",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeGreen": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "stateHashBreakMustFail": true,
+    "perceptualRenderSecondaryOnly": true,
+    "stateHashPrimaryGateCovered": true,
+    "perceptualToleranceGateCovered": true,
+    "gapAttributionRequired": true,
+    "claimedPortedUnitsEmpty": true,
+    "runtimeBridgeAllowed": false,
+    "embeddedEngineRuntimeAllowed": false,
+    "decompiledSourceCopied": false,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v85.m99-verification-report-pass",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v85_m99_verification.rs",
+      "locks": "The M99 verification report passes only when the imported 2.5D report validates, the observed state hash matches stateHashPrimary, and perceptual SSIM/pixel-diff evidence stays secondary corroboration."
+    },
+    {
+      "id": "v85.lossy-import-not-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v85_m99_verification.rs",
+      "locks": "Yellow fidelity rows and gap attribution remain visible for unsupported presentation/import gaps; lossy import facts cannot be silently graded clean."
+    },
+    {
+      "id": "v85.no-auto-port-without-oracle",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "M99 verification reports keep claimedPortedUnits empty and reject fidelity rows that claim ported, auto-ported, or auto-translated units without captured passing oracle evidence."
+    },
+    {
+      "id": "v85.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/src/gltf_25d_import.rs",
+      "locks": "A stale or divergent observed state hash fails the primary gate, and tampering with the verification reportHash fails validation."
+    },
+    {
+      "id": "v85.perceptual-render-secondary-fails-on-tolerance",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v85_m99_verification.rs",
+      "locks": "Perceptual render evidence must satisfy fixture SSIM/pixel-diff tolerance, but the report still records it as secondary-only and never as authoritative state truth."
+    },
+    {
+      "id": "v85.coverage-ledger-and-demo-script",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v85-m99-verification.md",
+      "locks": "Coverage v85 records the M99 verification report suite, scripted demo summary, open #1/#23 governance anchors, and exact verification command shape from #2202."
+    }
+  ],
+  "boundary": "Scenario Coverage v85 is a Rust data-plane regression suite for Era P M99 2.5D import verification and fidelity reporting. It locks source-project/open-text glTF verification, one-way import to Ouroforge-native skeleton evidence, no foreign runtime bridge, no auto-port or ported claim without a passing oracle, honest Yellow/Red fidelity gap attribution for lossy imports, deterministic state-hash primary behavior including stale-hash rejection, perceptual SSIM/pixel-diff render secondary-only corroboration with tolerance checks, and Rust-owned artifact truth. Elixir/Phoenix Studio is not touched and has no trusted write or artifact semantics authority. #1 and #23 remain open."
+}
