@@ -4,14 +4,15 @@ use std::path::{Path, PathBuf};
 
 use ouroforge_core::{
     attribute_self_audit_bottlenecks, generate_self_diagnosis_record,
-    generate_source_apply_fix_proposal, self_audit_bottleneck_input_from_json_str,
-    source_patch_sandbox_sha256_hex, validate_source_patch_preview_artifact,
-    PatchDiffIntegrityLimits, SelfAuditAttributionContract, SelfDiagnosisFixProposalContract,
+    generate_source_apply_fix_proposal, run_self_diagnosis_fix_proposal_demo,
+    self_audit_bottleneck_input_from_json_str, source_patch_sandbox_sha256_hex,
+    validate_source_patch_preview_artifact, PatchDiffIntegrityLimits, SelfAuditAttributionContract,
+    SelfDiagnosisFixProposalContract, SelfDiagnosisFixProposalDemoInput,
     SelfDiagnosisGeneratorInput, SelfFixProposalGeneratorInput, SourcePatchPreviewApplyStatus,
     SourcePatchPreviewRiskLevel, SELF_AUDIT_ATTRIBUTION_CONTRACT_SCHEMA_VERSION,
     SELF_AUDIT_BOTTLENECK_ATTRIBUTION_SCHEMA_VERSION,
     SELF_DIAGNOSIS_FIX_PROPOSAL_CONTRACT_SCHEMA_VERSION,
-    SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION,
+    SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION, SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION,
     SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION, SOURCE_PATCH_PREVIEW_SCHEMA_VERSION,
 };
 
@@ -84,6 +85,20 @@ fn fix_proposal_input() -> SelfFixProposalGeneratorInput {
         ),
         expected_behavior_change: "Engine diagnosis proposals carry an explicit source-apply blocked preview for the attributed root cause without mutating sources.".to_string(),
         no_self_apply: true,
+    }
+}
+
+fn demo_input() -> SelfDiagnosisFixProposalDemoInput {
+    SelfDiagnosisFixProposalDemoInput {
+        title_id: "era-i-engine-builder-deckbuilder".to_string(),
+        attribution_contract_json: read_text(
+            "examples/real-title-dogfood-v1/self-audit-attribution-v1/contract.fixture.json",
+        ),
+        bottleneck_input_json: read_text(
+            "examples/real-title-dogfood-v1/bottleneck-attribution-v1/planted-failure.fixture.json",
+        ),
+        diagnosis_input: generator_input(),
+        fix_proposal_input: fix_proposal_input(),
     }
 }
 
@@ -341,4 +356,60 @@ fn fix_proposal_generator_fails_closed_on_apply_or_non_source_target_drift() {
     let error = generate_source_apply_fix_proposal(&diagnosis, &non_source)
         .expect_err("non-source engine target rejected");
     assert!(error.to_string().contains("crates/"));
+}
+
+#[test]
+fn demo_chains_planted_defect_to_diagnosis_and_unapplied_source_apply_proposal() {
+    let report = run_self_diagnosis_fix_proposal_demo(&demo_input())
+        .expect("demo chains attribution diagnosis and proposal");
+
+    assert_eq!(
+        report.schema_version,
+        SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION
+    );
+    assert_eq!(report.title_id, "era-i-engine-builder-deckbuilder");
+    assert!(report.autonomous_path_completed_without_human);
+    assert!(!report.source_mutation_applied);
+    assert!(!report.high_risk_auto_applied);
+    assert_eq!(
+        report.diagnosis.attributed_milestone_id,
+        "m68-real-title-run"
+    );
+    assert_eq!(report.diagnosis.attributed_issue_ref, "#2025");
+    assert_eq!(
+        report.source_apply_proposal.source_mutation_apply_status,
+        SourcePatchPreviewApplyStatus::Blocked
+    );
+    assert_eq!(
+        report.source_apply_proposal.risk_level,
+        SourcePatchPreviewRiskLevel::High
+    );
+
+    let evidence = report.evidence_refs.join("\n").to_ascii_lowercase();
+    for required in [
+        "verdict.json",
+        "journal.md",
+        "ledger.jsonl",
+        "loop-coverage",
+        "source-apply",
+        "trust-gradient",
+    ] {
+        assert!(
+            evidence.contains(required),
+            "missing demo evidence {required}"
+        );
+    }
+    let boundary = report.boundary.to_ascii_lowercase();
+    assert!(boundary.contains("no new verification engine"));
+    assert!(boundary.contains("no new data plane"));
+    assert!(boundary.contains("no self-apply"));
+}
+
+#[test]
+fn demo_fails_closed_if_any_stage_reintroduces_human_input() {
+    let mut input = demo_input();
+    input.diagnosis_input.no_human_input = false;
+    let error = run_self_diagnosis_fix_proposal_demo(&input)
+        .expect_err("hidden human input must fail closed");
+    assert!(error.to_string().contains("noHumanInput=true"));
 }

@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::{
-    classify_source_file_path_str, source_file_class_label_value, source_patch_sandbox_sha256_hex,
+    attribute_self_audit_bottlenecks, classify_source_file_path_str,
+    self_audit_bottleneck_input_from_json_str, source_file_class_label_value,
+    source_patch_sandbox_sha256_hex, SelfAuditAttributionContract, SelfAuditBottleneckInput,
     SelfAuditBottleneckReport, SourceFileClassDecision, SourcePatchPreviewApplyStatus,
     SourcePatchPreviewArtifact, SourcePatchPreviewBaseRef, SourcePatchPreviewDiffStats,
     SourcePatchPreviewDiffSummary, SourcePatchPreviewEvidenceRef, SourcePatchPreviewHunkSummary,
@@ -27,6 +29,97 @@ pub const SELF_DIAGNOSIS_GENERATOR_INPUT_SCHEMA_VERSION: &str = "self-diagnosis-
 
 pub const SELF_FIX_PROPOSAL_GENERATOR_INPUT_SCHEMA_VERSION: &str =
     "self-fix-proposal-generator-input-v1";
+
+pub const SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION: &str =
+    "self-diagnosis-fix-proposal-demo-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelfDiagnosisFixProposalDemoInput {
+    #[serde(rename = "titleId")]
+    pub title_id: String,
+    #[serde(rename = "attributionContractJson")]
+    pub attribution_contract_json: String,
+    #[serde(rename = "bottleneckInputJson")]
+    pub bottleneck_input_json: String,
+    #[serde(rename = "diagnosisInput")]
+    pub diagnosis_input: SelfDiagnosisGeneratorInput,
+    #[serde(rename = "fixProposalInput")]
+    pub fix_proposal_input: SelfFixProposalGeneratorInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfDiagnosisFixProposalDemoReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "titleId")]
+    pub title_id: String,
+    #[serde(rename = "attributionInputSchemaVersion")]
+    pub attribution_input_schema_version: String,
+    #[serde(rename = "diagnosis")]
+    pub diagnosis: SelfDiagnosisRecord,
+    #[serde(rename = "sourceApplyProposal")]
+    pub source_apply_proposal: SourcePatchPreviewArtifact,
+    #[serde(rename = "autonomousPathCompletedWithoutHuman")]
+    pub autonomous_path_completed_without_human: bool,
+    #[serde(rename = "sourceMutationApplied")]
+    pub source_mutation_applied: bool,
+    #[serde(rename = "highRiskAutoApplied")]
+    pub high_risk_auto_applied: bool,
+    #[serde(rename = "evidenceRefs")]
+    pub evidence_refs: Vec<String>,
+    pub boundary: String,
+}
+
+pub fn run_self_diagnosis_fix_proposal_demo(
+    input: &SelfDiagnosisFixProposalDemoInput,
+) -> Result<SelfDiagnosisFixProposalDemoReport> {
+    require_id("titleId", &input.title_id)?;
+    let attribution_contract =
+        SelfAuditAttributionContract::from_json_str(&input.attribution_contract_json)?;
+    let bottleneck_input: SelfAuditBottleneckInput =
+        self_audit_bottleneck_input_from_json_str(&input.bottleneck_input_json)?;
+    if attribution_contract.title_id != input.title_id
+        || bottleneck_input.title_id != input.title_id
+        || input.diagnosis_input.title_id != input.title_id
+    {
+        return Err(anyhow!(
+            "demo titleId must match attribution, bottleneck, and diagnosis inputs"
+        ));
+    }
+
+    let bottleneck_report =
+        attribute_self_audit_bottlenecks(&attribution_contract, &bottleneck_input)?;
+    let diagnosis = generate_self_diagnosis_record(&input.diagnosis_input, &bottleneck_report)?;
+    let source_apply_proposal =
+        generate_source_apply_fix_proposal(&diagnosis, &input.fix_proposal_input)?;
+
+    let mut evidence_refs = BTreeSet::new();
+    evidence_refs.extend(bottleneck_input.evidence_refs.iter().cloned());
+    evidence_refs.extend(diagnosis.based_on_refs.iter().cloned());
+    evidence_refs.extend(
+        source_apply_proposal
+            .linked_evidence
+            .iter()
+            .map(|evidence| evidence.path.clone()),
+    );
+
+    let report = SelfDiagnosisFixProposalDemoReport {
+        schema_version: SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION.to_string(),
+        title_id: input.title_id.clone(),
+        attribution_input_schema_version: bottleneck_input.schema_version.clone(),
+        diagnosis,
+        source_apply_proposal,
+        autonomous_path_completed_without_human: true,
+        source_mutation_applied: false,
+        high_risk_auto_applied: false,
+        evidence_refs: evidence_refs.into_iter().collect(),
+        boundary: "Demo chains planted defect attribution to diagnosis to source-apply patch-preview using verdict.json, journal.md, ledger.jsonl, loop-coverage attribution, source-apply, and trust-gradient; no human input, no new verification engine, no new data plane, no self-apply, high-risk/source-affecting changes remain blocked for thin human go/no-go; fun/taste and release go/no-go stay human Ring 2.".to_string(),
+    };
+    validate_demo_report(&report)?;
+    Ok(report)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -371,6 +464,58 @@ pub struct SelfRootCauseHypothesis {
     #[serde(rename = "proposedFixScope")]
     pub proposed_fix_scope: String,
     pub confidence: String,
+}
+
+fn validate_demo_report(report: &SelfDiagnosisFixProposalDemoReport) -> Result<()> {
+    if report.schema_version != SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "demo report schemaVersion must be {SELF_DIAGNOSIS_FIX_PROPOSAL_DEMO_SCHEMA_VERSION}"
+        ));
+    }
+    if !report.autonomous_path_completed_without_human {
+        return Err(anyhow!("demo must complete without human input"));
+    }
+    if report.source_mutation_applied || report.high_risk_auto_applied {
+        return Err(anyhow!(
+            "demo must not apply source mutations or auto-apply high-risk changes"
+        ));
+    }
+    if report.source_apply_proposal.source_mutation_apply_status
+        != SourcePatchPreviewApplyStatus::Blocked
+    {
+        return Err(anyhow!(
+            "demo source-apply proposal must remain blocked/unapplied"
+        ));
+    }
+    validate_refs("demo evidenceRefs", &report.evidence_refs, true)?;
+    let refs = report.evidence_refs.join("\n").to_ascii_lowercase();
+    for required in [
+        "verdict",
+        "journal.md",
+        "ledger.jsonl",
+        "loop-coverage",
+        "source-apply",
+        "trust-gradient",
+    ] {
+        if !refs.contains(required) {
+            return Err(anyhow!("demo evidenceRefs must include {required}"));
+        }
+    }
+    let boundary = report.boundary.to_ascii_lowercase();
+    for required in [
+        "no human input",
+        "no new verification engine",
+        "no new data plane",
+        "no self-apply",
+        "high-risk",
+        "human go/no-go",
+        "human ring 2",
+    ] {
+        if !boundary.contains(required) {
+            return Err(anyhow!("demo boundary must mention {required}"));
+        }
+    }
+    Ok(())
 }
 
 impl SelfFixProposalGeneratorInput {
