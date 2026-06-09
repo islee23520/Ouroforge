@@ -94,6 +94,7 @@ pub mod legacy_logic_ingestion;
 pub mod loop_coverage_attribution;
 pub mod tacit_oracle_capture;
 pub mod trust_gradient_auto_apply;
+pub mod unity_2d_adapter_ir;
 pub use loop_coverage_attribution::*;
 pub mod loop_coverage_metric;
 pub use loop_coverage_metric::*;
