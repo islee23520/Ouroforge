@@ -1,0 +1,162 @@
+{
+  "schemaVersion": "self-diagnosis-fix-proposal-contract-v1",
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "diagnosis": {
+    "diagnosisId": "m70-planted-four-gates-diagnosis",
+    "attributedMilestoneId": "m68-real-title-run",
+    "attributedIssueRef": "#2025",
+    "basedOnRefs": [
+      "examples/real-title-dogfood-v1/run/verdict.json",
+      "examples/real-title-dogfood-v1/run/journal.md",
+      "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+      "examples/real-title-dogfood-v1/bottleneck-attribution-v1/planted-failure.fixture.json#self-audit-bottleneck-attribution",
+      "source-apply:patch-preview.v1",
+      "trust-gradient:risk-tier-v1"
+    ],
+    "rootCauseHypotheses": [
+      {
+        "hypothesisId": "missing-release-provenance-chain",
+        "causalChain": [
+          "detect: verdict/four-gates failure appears in the real-title dogfood run",
+          "explain-trace: ledger.jsonl and journal.md point to an incomplete release provenance chain rather than game design behavior",
+          "attribute: loop-coverage/self-audit bottleneck attribution maps the failure to m68-real-title-run",
+          "propose: source-apply patch preview updates the Rust evaluator contract boundary only after review"
+        ],
+        "evidenceRefs": [
+          "examples/real-title-dogfood-v1/run/verdict.json",
+          "examples/real-title-dogfood-v1/run/journal.md",
+          "examples/real-title-dogfood-v1/run/ledger.jsonl",
+          "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json",
+          "examples/real-title-dogfood-v1/bottleneck-attribution-v1/planted-failure.fixture.json"
+        ],
+        "proposedFixScope": "Rust kernel/evaluator provenance classification only; no game content mutation and no Elixir executor change.",
+        "confidence": "medium"
+      }
+    ]
+  },
+  "sourceApplyProposal": {
+    "schemaVersion": "patch-preview.v1",
+    "patchPreviewId": "m70-self-diagnosis-preview-001",
+    "proposalId": "m70-fix-release-provenance-classification",
+    "createdAt": "2026-06-09T00:00:00Z",
+    "producer": {
+      "name": "self-diagnosis-fix-proposal-contract",
+      "version": "v1",
+      "trustedBoundary": "read-only diagnosis emits source-apply preview only"
+    },
+    "sourceMutationApplyStatus": "blocked",
+    "baseRef": {
+      "branch": "main",
+      "commit": "fixture-main-ref",
+      "targetFreshness": "fixture-not-live-regenerate-before-review"
+    },
+    "staleTargetPolicy": "regenerate_preview_before_any_review_if_target_hash_or_origin_main_changes",
+    "artifactHash": "sha256:m70fixturepreviewhash",
+    "targets": [
+      {
+        "path": "crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs",
+        "beforeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "afterHash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "fileClass": "rust_kernel_source",
+        "reviewLevel": "high_risk_source_review",
+        "classificationStatus": "review_held_high_risk",
+        "classificationRationale": "Rust evaluator/kernel source-affecting proposal; source-apply preview only, never self-applied.",
+        "blockedReasons": [
+          "high_risk_source_affecting_requires_thin_human_go_no_go",
+          "m70_contract_does_not_authorize_apply"
+        ]
+      }
+    ],
+    "diffSummary": {
+      "summary": "Fixture-only preview for a bounded evaluator provenance classification fix.",
+      "diffText": "diff --git a/crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs b/crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs\n--- a/crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs\n+++ b/crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs\n@@ -1 +1 @@\n-// placeholder old provenance classification\n+// placeholder reviewed provenance classification\n",
+      "diffStats": {
+        "filesChanged": 1,
+        "additions": 1,
+        "deletions": 1,
+        "binaryOrOpaque": false,
+        "generatedOrigin": false,
+        "truncated": false
+      },
+      "hunks": [
+        {
+          "path": "crates/ouroforge-core/src/self_audit_acceptance_evaluator.rs",
+          "summary": "Would narrow provenance classification handling after source-apply review; this fixture is not executable apply authority."
+        }
+      ],
+      "largeDiffWarning": null,
+      "binaryOrOpaqueWarning": null
+    },
+    "riskLevel": "high",
+    "riskIds": [
+      "source-affecting",
+      "self-certification-risk",
+      "requires-human-go-no-go"
+    ],
+    "linkedEvidence": [
+      {
+        "kind": "verdict",
+        "path": "examples/real-title-dogfood-v1/run/verdict.json"
+      },
+      {
+        "kind": "journal",
+        "path": "examples/real-title-dogfood-v1/run/journal.md"
+      },
+      {
+        "kind": "ledger",
+        "path": "examples/real-title-dogfood-v1/run/ledger.jsonl"
+      },
+      {
+        "kind": "loop-coverage-attribution",
+        "path": "examples/real-title-dogfood-v1/refs/loop-coverage-attribution.json"
+      }
+    ],
+    "expectedBehaviorChange": "After a later reviewed source-apply transaction, the evaluator would classify provenance-chain failures more precisely; this milestone only proposes.",
+    "requiredTests": [
+      {
+        "command": "cargo fmt --all",
+        "argv": ["cargo", "fmt", "--all"],
+        "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
+        "executionAuthority": "copyable_only_not_executed_by_preview"
+      },
+      {
+        "command": "cargo test -p ouroforge-core -p ouroforge-evaluator --jobs 2",
+        "argv": ["cargo", "test", "-p", "ouroforge-core", "-p", "ouroforge-evaluator", "--jobs", "2"],
+        "allowlistPolicyId": "source-patch-preview-safe-local-checks-v1",
+        "executionAuthority": "copyable_only_not_executed_by_preview"
+      }
+    ],
+    "reviewerChecklist": [
+      "Confirm sourceMutationApplyStatus remains blocked; no auto-apply is allowed at M70.",
+      "Confirm high-risk/source-affecting target requires the thin human go/no-go before any later trusted apply.",
+      "Confirm source-apply, four gates, design-integrity, openchrome re-run, and trust-gradient are listed for later verification.",
+      "Confirm target freshness and rollback expectations before any future review."
+    ],
+    "rollbackExpectations": {
+      "requiredBeforeApply": true,
+      "minimumFields": [
+        "pre_change_ref",
+        "target_before_hash",
+        "review_decision_ref",
+        "rollback_command_or_reverse_patch",
+        "trust_gradient_audit_ref"
+      ]
+    },
+    "readModelPrototype": {
+      "status": "blocked",
+      "displayLabel": "Blocked high-risk source-apply preview: human go/no-go required later",
+      "fileClassSummary": "1 Rust kernel source target; review-held high risk",
+      "riskSummary": "high risk; source-affecting; no self-application",
+      "primaryBlockedReason": "high_risk_source_affecting_requires_thin_human_go_no_go",
+      "allowedActions": ["inspect", "copy_test_commands", "queue_for_review"],
+      "forbiddenActions": ["apply_patch", "execute_apply", "merge", "auto_apply", "write_source_file"]
+    }
+  },
+  "boundary": "Read-only diagnosis/fix-proposal contract over verdict, journal.md, ledger.jsonl, loop-coverage attribution, source-apply preview, and trust-gradient evidence; no new verification engine and no new data plane; the autonomous detect-explain-trace-attribute-propose-re-verify-apply loop remains without a human on the normal path, but M70 grants no self-application; high-risk/source-affecting changes are never auto-applied and remain queued for thin human go/no-go; human Ring 2 fun/taste and release go/no-go remain outside automation.",
+  "guardrails": [
+    "Root-cause diagnosis reads existing verdict, journal.md, ledger.jsonl, and loop-coverage attribution only.",
+    "Fix proposals reuse source-apply patch-preview.v1 and trust-gradient; no new verification engine and no new data plane.",
+    "High-risk/source-affecting proposals require thin human go/no-go and no self-application or auto-apply."
+  ]
+}
