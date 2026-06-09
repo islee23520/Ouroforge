@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "scenario-coverage-v62-self-diagnosis-fix-proposal-v1",
+  "coverageVersion": 62,
+  "titleId": "era-i-engine-builder-deckbuilder",
+  "issueRef": "#2036",
+  "milestone": "Era L M70",
+  "rows": [
+    {
+      "id": "planted-defect-diagnosis-root-cause",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/bottleneck-attribution-v1/planted-failure.fixture.json",
+      "locks": "Planted four-gates failure attributes to m68-real-title-run/#2025 and produces evidence-linked root-cause hypotheses from verdict, journal.md, ledger.jsonl, and loop-coverage attribution."
+    },
+    {
+      "id": "diagnosis-existing-pipeline-only",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-diagnosis-fix-proposal-v1/contract.fixture.json",
+      "locks": "Diagnosis basedOnRefs include verdict.json, journal.md, ledger.jsonl, loop-coverage attribution, source-apply, and trust-gradient; no parallel verifier or store is introduced."
+    },
+    {
+      "id": "source-apply-proposal-scoping",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-diagnosis-fix-proposal-v1/contract.fixture.json",
+      "locks": "Fix proposals are patch-preview.v1 source-apply artifacts scoped to Rust engine/source-apply targets under crates/ with source freshness and rollback metadata."
+    },
+    {
+      "id": "high-risk-proposal-blocked",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/self-diagnosis-fix-proposal-v1/contract.fixture.json",
+      "locks": "High-risk/source-affecting proposals remain blocked/unapplied, forbid auto_apply/merge, and require the thin human go/no-go tail through trust-gradient."
+    },
+    {
+      "id": "autonomous-demo-no-human",
+      "status": "pass",
+      "evidenceRef": "examples/real-title-dogfood-v1/run/ledger.jsonl",
+      "locks": "The diagnosis to proposal demo runs the autonomous path with no human input and records no source mutation, no high-risk auto-apply, and no self-apply authority."
+    },
+    {
+      "id": "regression-fail-closed",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v62_self_diagnosis_fix_proposal.rs",
+      "locks": "Hidden human input, high-risk auto-apply ledger drift, non-source targets, and missing human go/no-go review drift fail closed in Rust tests."
+    },
+    {
+      "id": "coverage-v62-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v62-self-diagnosis-fix-proposal.md",
+      "locks": "Coverage v62 is test-only and preserves openchrome, scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, and trust-gradient boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v62 is test-only Rust regression coverage over the existing openchrome/evidence pipeline: scenario verdicts, the four gates plus design-integrity, journal.md, ledger.jsonl, loop-coverage attribution, evolve, source-apply, and trust-gradient. It introduces no new verification engine, no new data plane, and no new persistent store. The autonomous path completes with zero human input; high-risk/source-affecting changes are never auto-applied and remain blocked for a thin human go/no-go. Fun/taste and release go/no-go remain human Ring 2. #1 and #23 remain open."
+}
