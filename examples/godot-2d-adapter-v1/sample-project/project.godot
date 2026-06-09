@@ -1,0 +1,4 @@
+; source-project text only fixture
+[input]
+jump={"events": [Object(InputEventKey,"physical_keycode":32)]}
+move_left={"events": [Object(InputEventKey,"physical_keycode":65)]}

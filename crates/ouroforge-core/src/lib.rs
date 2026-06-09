@@ -121,6 +121,7 @@ pub mod evolve_campaign;
 pub mod generative_accessibility;
 pub mod generative_intake;
 pub mod generative_promotion_guard;
+pub mod godot_2d_adapter_ir;
 pub use evolve_campaign::*;
 pub mod economy_system;
 pub mod funfeel_gate;

@@ -1,0 +1,34 @@
+[gd_scene load_steps=5 format=3 uid="uid://ourofixture"]
+
+[ext_resource type="Texture2D" path="res://assets/player.png" id="player_tex"]
+[ext_resource type="Script" path="res://scripts/player.gd" id="player_script"]
+[sub_resource type="RectangleShape2D" id="player_shape"]
+
+[node name="World" type="Node2D"]
+position = Vector2(0, 0)
+
+[node name="Player" type="Sprite2D" parent="."]
+position = Vector2(10, 20)
+scale = Vector2(2, 2)
+z_index = 3
+texture = ExtResource("player_tex")
+script = ExtResource("player_script")
+export/speed = 120
+
+[node name="Camera" type="Camera2D" parent="."]
+position = Vector2(10, 20)
+zoom = Vector2(1.5, 1.5)
+position_smoothing_enabled = true
+
+[node name="Hitbox" type="Area2D" parent="Player"]
+collision_layer = 2
+collision_mask = 4
+shape = SubResource("player_shape")
+
+[node name="NameLabel" type="Label" parent="Player"]
+text = "Hero"
+
+[node name="Sparkles" type="GPUParticles2D" parent="Player"]
+amount = 12
+
+[connection signal="body_entered" from="Hitbox" to="Player" method="_on_hitbox_body_entered"]
