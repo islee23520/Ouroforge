@@ -14,7 +14,8 @@ defmodule OuroforgeExecutor.ContractTest do
              :backpressure,
              :telemetry,
              :live_steering,
-             :guided_generative_intake
+             :guided_generative_intake,
+             :onboarding_first_run
            ]
   end
 

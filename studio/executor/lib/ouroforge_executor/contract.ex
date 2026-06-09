@@ -16,7 +16,8 @@ defmodule OuroforgeExecutor.Contract do
     :backpressure,
     :telemetry,
     :live_steering,
-    :guided_generative_intake
+    :guided_generative_intake,
+    :onboarding_first_run
   ]
 
   @data_plane_owner :rust_kernel
