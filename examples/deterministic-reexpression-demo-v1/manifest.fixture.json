@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "deterministic-reexpression-demo-v1",
+  "issueRef": "#2230",
+  "milestone": "Era R M110",
+  "contractRef": "docs/deterministic-re-expression-engine-contract-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/deterministic_reexpression.rs",
+  "seedRef": "seeds/migration-demo.yaml",
+  "summary": {
+    "skeletonImport": "best-effort source-project/open-text skeleton context only",
+    "logicHandling": "clean-room deterministic re-expression from captured oracle evidence",
+    "portedClaimAllowed": false,
+    "studioTrustedWriteAuthority": false,
+    "sourceApplyRequired": true,
+    "determinism": "2D bit-exact state hash primary",
+    "primaryStateHash": "fnv64:1234567890abcdef"
+  },
+  "expectedFidelity": {
+    "greenCount": 1,
+    "yellowCount": 1,
+    "redCount": 0,
+    "noOracleNotPorted": true,
+    "cleanRoomSourceOnly": true,
+    "deterministicReexpression": true
+  },
+  "rows": [
+    {
+      "id": "demo.captured-unit-reexpressed",
+      "status": "pass",
+      "locks": "A captured oracle produces a behavior_runtime draft candidate plus M111 verification handoff; it is not a port claim."
+    },
+    {
+      "id": "demo.oracle-less-unit-is-task",
+      "status": "pass",
+      "locks": "A unit without a captured oracle stays Yellow with a re-derivation task and no behavior draft."
+    },
+    {
+      "id": "demo.state-hash-determinism",
+      "status": "pass",
+      "locks": "The demo digest is stable for identical state hashes and changes when the oracle state hash changes."
+    },
+    {
+      "id": "demo.no-trusted-studio-write",
+      "status": "pass",
+      "locks": "The demo is Rust data-plane evidence only; Studio may render later but cannot mutate artifacts."
+    }
+  ]
+}
