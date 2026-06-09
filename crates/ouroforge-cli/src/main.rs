@@ -183,6 +183,16 @@ enum MigrationCommand {
         )]
         output: PathBuf,
     },
+    /// Verify the imported skeleton and write a composed import fidelity report.
+    VerifyDemo {
+        #[arg(long, default_value = "examples/godot-2d-adapter-v1/sample-project")]
+        project: PathBuf,
+        #[arg(
+            long,
+            default_value = "examples/godot-2d-adapter-v1/generated/import-verification-report.json"
+        )]
+        output: PathBuf,
+    },
 }
 
 /// Read-only local plugin registry inspection (#752). No install, update, run,
@@ -1528,6 +1538,34 @@ fn main() -> Result<()> {
                 artifact.claimed_ported_units.len()
             );
             println!("{}", artifact.fidelity_report.oracle_rule);
+        }
+        Commands::Migration {
+            command: MigrationCommand::VerifyDemo { project, output },
+        } => {
+            let report =
+                ouroforge_core::import_verification_report::write_godot_import_verification_report(
+                    &project, &output,
+                )?;
+            println!("Import verification report: {}", output.display());
+            println!(
+                "Verification state hash: {}",
+                report.verification_state_hash
+            );
+            println!(
+                "Fidelity: clean={} flagged={} rederive={}",
+                report.fidelity_report.clean,
+                report.fidelity_report.flagged,
+                report.fidelity_report.rederive
+            );
+            println!(
+                "OpenChrome skeleton smoke: {}",
+                report.skeleton_verification.status
+            );
+            println!(
+                "Claimed ported units: {}",
+                report.claimed_ported_units.len()
+            );
+            println!("{}", report.fidelity_report.oracle_rule);
         }
         Commands::Plugin { command } => {
             handle_plugin_command(command)?;
