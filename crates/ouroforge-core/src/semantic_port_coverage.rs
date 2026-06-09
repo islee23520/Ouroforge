@@ -223,6 +223,11 @@ pub fn evaluate_semantic_port_coverage(
     let digest_payload = serde_json::json!({
         "projectId": request.project_id,
         "targetDimensionality": request.target_dimensionality,
+        "unitEvidence": request
+            .units
+            .iter()
+            .map(unit_digest_payload)
+            .collect::<Vec<_>>(),
         "summary": summary,
         "convergenceStatus": convergence_status,
         "convergenceTerminated": convergence_terminated,
@@ -267,6 +272,20 @@ fn validate_request(request: &SemanticPortCoverageRequest) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn unit_digest_payload(unit: &SemanticPortCoverageUnit) -> serde_json::Value {
+    serde_json::json!({
+        "unitId": unit.unit_id,
+        "behavioralUnitRef": unit.behavioral_unit_ref,
+        "status": unit.status,
+        "fidelityGrade": unit.fidelity_grade,
+        "oracleRef": unit.oracle_ref,
+        "primaryStateHash": unit.primary_state_hash,
+        "secondaryRenderDigest": unit.secondary_render_digest,
+        "evidenceRefs": unit.evidence_refs,
+        "gapSummary": unit.gap_summary,
+    })
 }
 
 fn validate_unit(

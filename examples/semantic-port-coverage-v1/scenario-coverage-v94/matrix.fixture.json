@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "scenario-coverage-v94-semantic-port-coverage-v1",
+  "coverageVersion": 94,
+  "issueRef": "#2236",
+  "milestone": "Era R M112",
+  "contractRef": "docs/semantic-port-coverage-convergence-v1.md",
+  "implementationRef": "crates/ouroforge-core/src/semantic_port_coverage.rs",
+  "invariants": {
+    "oneWayOnRamp": true,
+    "sourceProjectOpenTextOnly": true,
+    "cleanRoomReDerivation": true,
+    "autoPortWithoutOracleAllowed": false,
+    "lossyImportMayGradeClean": false,
+    "ungatedAutoTranslatedPortAllowed": false,
+    "deterministicStateHashRequired": true,
+    "perceptualRenderSecondaryOnly": true,
+    "rustOwnsArtifactTruth": true,
+    "studioTrustedWriteAuthority": false,
+    "decompiledSourceAllowed": false,
+    "foreignRuntimeBridgeAllowed": false,
+    "fullyPortedClaimAllowed": false,
+    "anchorsRemainOpen": true
+  },
+  "rows": [
+    {
+      "id": "v94.coverage-complete-without-ported-claim",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "All units verified can terminate convergence, but ported/fully-ported claim flags remain false."
+    },
+    {
+      "id": "v94.lossy-import-not-graded-clean",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "Pending Yellow units keep residual backlog and re-derivation tasks instead of being counted as clean semantic coverage."
+    },
+    {
+      "id": "v94.no-auto-port-without-oracle-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "Verified units require captured oracle refs and evidence; missing oracle cannot be labeled ported."
+    },
+    {
+      "id": "v94.ungated-auto-translated-port-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "Decompiler, shipped-build, foreign-runtime, live-bridge, and trusted-write drift fails closed through safe ref validation."
+    },
+    {
+      "id": "v94.deterministic-state-hash-break-fails",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "Invalid primary state hashes fail, and valid hash changes alter the deterministic coverage digest."
+    },
+    {
+      "id": "v94.3d-state-hash-primary-render-secondary",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v94_semantic_port_coverage.rs",
+      "locks": "2.5D/3D verified rows require primary state-hash evidence plus secondary perceptual render corroboration."
+    },
+    {
+      "id": "v94.clean-room-source-only-and-no-studio-trusted-write",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v94-semantic-port-coverage.md",
+      "locks": "Coverage records source-only clean-room boundaries, no runtime bridge, Rust data-plane ownership, no Studio trusted writes, and #1/#23 open anchors."
+    }
+  ]
+}
