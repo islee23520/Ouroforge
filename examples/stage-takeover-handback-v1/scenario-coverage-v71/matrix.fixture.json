@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "scenario-coverage-v71-stage-takeover-handback-v1",
+  "coverageVersion": 71,
+  "campaignId": "campaign-m80-demo",
+  "issueRef": "#2076",
+  "milestone": "Era M M80",
+  "autonomyInvariants": {
+    "humanInputRequired": false,
+    "loopCompletesWithoutHuman": true,
+    "manualWorkRequiresEvidence": true,
+    "handbackRequiresReverify": true,
+    "studioTrustedWriteAuthority": false,
+    "elixirOwnsArtifactSemantics": false,
+    "rustDataPlaneOwnsValidation": true,
+    "hostedCollaborativeStudioDeferred": true,
+    "cliFallbackIntact": true
+  },
+  "rows": [
+    {
+      "id": "stage-takeover-locks-local-session-only",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/stage_takeover_test.exs",
+      "locks": "Stage takeover locks executor session state only; it preserves no trusted write authority, no mandatory human dependency, and the local-first two-plane boundary."
+    },
+    {
+      "id": "manual-work-captured-as-evidence",
+      "status": "pass",
+      "evidenceRef": "studio/executor/lib/ouroforge_executor/stage_takeover.ex",
+      "locks": "Manual work must carry base, evidence, and provenance refs and is retained as pending evidence metadata until Rust gate phases accept it."
+    },
+    {
+      "id": "handback-reverifies-through-rust-gates",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/stage_takeover_test.exs",
+      "locks": "Handback fails closed without manual work and requires validation, record, and reverify evidence refs before autonomous execution resumes."
+    },
+    {
+      "id": "no-raw-bypass-from-elixir-control-plane",
+      "status": "pass",
+      "evidenceRef": "crates/ouroforge-core/tests/scenario_coverage_v71_stage_takeover_handback.rs",
+      "locks": "Coverage greps the Elixir executor control plane for direct file-write or raw bypass candidates and rejects presentation-plane artifact authority."
+    },
+    {
+      "id": "loop-completes-without-human-input",
+      "status": "pass",
+      "evidenceRef": "studio/executor/test/ouroforge_executor/stage_takeover_demo_test.exs",
+      "locks": "The scripted demo includes a no-human autonomous path that completes without requiring or waiting for a Studio human surface."
+    },
+    {
+      "id": "coverage-v71-boundaries",
+      "status": "pass",
+      "evidenceRef": "docs/scenario-coverage-v71-stage-takeover-handback.md",
+      "locks": "Coverage v71 records read + gated-write, intervention-as-evidence, Rust data-plane validation, local-first CLI fallback, no hosted collaboration, no new store, and #1/#23 governance boundaries."
+    }
+  ],
+  "boundary": "Scenario Coverage v71 is a regression suite for Era M M80 stage takeover and handback. Human takeover is opt-in and every manual work item is captured as evidence/provenance metadata, then validated, recorded, and reverified through existing Rust CLI gates before handback can resume autonomous execution. Elixir/Phoenix is local control and presentation only and never writes artifacts, ledger, evidence, scene, source, release, merge, or deploy semantics. Rust remains the data plane for truth, validation, determinism, evidence, provenance, scene/source-apply, and gated writes. The autonomous loop completes with zero human input. No new write path, no new data store, no hosted/multi-user/collaborative Studio, no mandatory human dependency, no fun/taste automation, and no release go/no-go automation are introduced. CLI fallback remains intact. #1 and #23 remain open."
+}

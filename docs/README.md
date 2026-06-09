@@ -202,4 +202,5 @@ should remain ignored/untracked.
 - [Stage Takeover and Handback Scope & Contract v1](stage-takeover-handback-contract-v1.md) — Milestone 80 contract for local stage takeover/handback as intervention-as-evidence through existing read + gated-write paths.
 
 ## Scenario Coverage
+- [Scenario Coverage v71 — Stage Takeover and Handback](scenario-coverage-v71-stage-takeover-handback.md)
 - [Scenario Coverage v68 — Live Campaign Steering Directives](scenario-coverage-v68-live-campaign-steering-directives.md)
