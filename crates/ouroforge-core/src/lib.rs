@@ -20,11 +20,11 @@ pub mod complexity_ladder;
 pub mod evolve_iteration_journal;
 pub mod live_failure_classifier;
 pub mod physics_2d;
+pub mod playtest_gap_backlog;
 pub mod product_backlog_handoff;
 pub mod product_gap_taxonomy;
-pub mod production_journal;
-pub mod playtest_gap_backlog;
 pub mod production_decision_log;
+pub mod production_journal;
 pub use physics_2d::{
     simulate_scene_physics_step, Physics2dBlockedMovement, Physics2dCollisionEvent,
     Physics2dStepEvidence, Physics2dVector,
