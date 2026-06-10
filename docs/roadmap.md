@@ -3163,3 +3163,13 @@ approval, and evidence that the change belongs in the current roadmap.
 - Full Studio Editor integrated demo: [`docs/full-studio-editor-integrated-demo-v1.md`](full-studio-editor-integrated-demo-v1.md).
 - Full Studio Editor Scenario Coverage v17: [`docs/scenario-coverage-v17-full-studio-editor.md`](scenario-coverage-v17-full-studio-editor.md).
 - Godot-Plus Demo Game v1 scope contract: [`docs/godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md).
+
+## Product-Observed Rebaseline (M115, 2026-06-10 corrective)
+
+See `docs/product-observed-completion.md` for contract-complete vs product-observed complete semantics, closure template, and examples.
+
+Historical ✅ milestones remain contract-complete unless later marked 🟩 with live dogfood evidence.
+
+Current corrective open issues (#2343–#2394) address the gap between fixture/probe reality and practical game-production engine (Eras S–W per #1).
+
+#1 and #23 remain open governance anchors.

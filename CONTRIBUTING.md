@@ -89,3 +89,8 @@ Do not add these unless an issue explicitly authorizes them:
 - [ ] Generated local state is not committed.
 - [ ] Public wording is conservative and audited when applicable.
 - [ ] Documentation is updated when command behavior changes.
+
+## M115 Wording Guard (completion semantics)
+Run `node scripts/m115-completion-semantics.test.cjs` (or equivalent) before claiming practical usability.
+Forbidden unqualified claims in docs/PR/issue text for runtime/Studio/gameplay: production-ready, commercial-release-ready, secure-sandbox, full Godot parity, Godot replacement, plugin runtime ready, etc.
+See docs/product-observed-completion.md.

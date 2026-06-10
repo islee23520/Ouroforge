@@ -233,3 +233,4 @@ should remain ignored/untracked.
 - [Scenario Coverage v71 — Stage Takeover and Handback](scenario-coverage-v71-stage-takeover-handback.md)
 - [Scenario Coverage v68 — Live Campaign Steering Directives](scenario-coverage-v68-live-campaign-steering-directives.md)
 - [Scenario Coverage v69 — Human Constraints as First-Class Gates](scenario-coverage-v69-human-constraints-first-class-gates.md)
+- M115 semantics: docs/product-observed-completion.md (and m115-historical-classification-ledger.md)

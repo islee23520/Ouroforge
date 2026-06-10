@@ -9,6 +9,8 @@ Ownership boundary: this document defines **completion semantics** and the
 M115.3 product-observed checklist and must be cross-linked from here once that
 issue lands.
 
+Historical classification for earlier milestones is seeded in [`m115-historical-classification-ledger.md`](m115-historical-classification-ledger.md) and should be updated or superseded by later governance evidence rather than used for practical usability overclaims.
+
 ## Stable terms
 
 ### `contract-complete`
