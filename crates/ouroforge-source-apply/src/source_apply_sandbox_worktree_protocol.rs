@@ -444,3 +444,261 @@ fn require_text(field: &str, value: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplySandboxMutation {
+    pub path: String,
+    #[serde(rename = "fileClass")]
+    pub file_class: SourceApplySandboxFileClass,
+    #[serde(rename = "expectedBeforeHash")]
+    pub expected_before_hash: String,
+    #[serde(rename = "expectedAfterHash")]
+    pub expected_after_hash: String,
+    #[serde(rename = "replacementUtf8")]
+    pub replacement_utf8: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SourceApplySandboxApplyRequest {
+    #[serde(rename = "protocolId")]
+    pub protocol_id: String,
+    #[serde(rename = "patchPreviewId")]
+    pub patch_preview_id: String,
+    #[serde(rename = "applyTransactionId")]
+    pub apply_transaction_id: String,
+    #[serde(rename = "reviewDecisionRef")]
+    pub review_decision_ref: String,
+    #[serde(rename = "rollbackSnapshotRef")]
+    pub rollback_snapshot_ref: String,
+    pub context: SourceApplySandboxWorktreeContext,
+    #[serde(rename = "mainStatusBefore")]
+    pub main_status_before: SourceApplySandboxStatusSnapshot,
+    #[serde(rename = "mainStatusAfter")]
+    pub main_status_after: SourceApplySandboxStatusSnapshot,
+    pub mutations: Vec<SourceApplySandboxMutation>,
+    #[serde(rename = "cleanupState")]
+    pub cleanup_state: SourceApplySandboxCleanupState,
+    #[serde(rename = "auditLedgerRef")]
+    pub audit_ledger_ref: String,
+    pub guardrails: Vec<String>,
+}
+
+pub fn fnv1a64_utf8_digest(input: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in input.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
+pub fn apply_sandbox_utf8_mutations(
+    request: SourceApplySandboxApplyRequest,
+) -> Result<SourceApplySandboxWorktreeProtocol> {
+    request.validate()?;
+    let sandbox_root = std::path::Path::new(&request.context.sandbox_worktree_path);
+    let mut targets = Vec::new();
+    for mutation in &request.mutations {
+        mutation.validate()?;
+        let target_path = sandbox_root.join(&mutation.path);
+        let before = std::fs::read_to_string(&target_path).with_context(|| {
+            format!(
+                "failed to read sandbox target `{}` before apply",
+                mutation.path
+            )
+        })?;
+        let before_hash = fnv1a64_utf8_digest(&before);
+        if before_hash != mutation.expected_before_hash {
+            return Err(anyhow!(
+                "sandbox target `{}` before hash is stale: expected {}, observed {}",
+                mutation.path,
+                mutation.expected_before_hash,
+                before_hash
+            ));
+        }
+        let after_hash = fnv1a64_utf8_digest(&mutation.replacement_utf8);
+        if after_hash != mutation.expected_after_hash {
+            return Err(anyhow!(
+                "sandbox target `{}` replacement does not match expected after hash",
+                mutation.path
+            ));
+        }
+        std::fs::write(&target_path, &mutation.replacement_utf8)
+            .with_context(|| format!("failed to write sandbox target `{}`", mutation.path))?;
+        targets.push(SourceApplySandboxTarget {
+            path: mutation.path.clone(),
+            file_class: mutation.file_class,
+            before_hash,
+            expected_after_hash: mutation.expected_after_hash.clone(),
+            observed_after_hash: after_hash,
+        });
+    }
+    Ok(SourceApplySandboxWorktreeProtocol {
+        schema_version: SOURCE_APPLY_SANDBOX_WORKTREE_PROTOCOL_SCHEMA_VERSION.to_string(),
+        protocol_id: request.protocol_id,
+        patch_preview_id: request.patch_preview_id,
+        apply_transaction_id: request.apply_transaction_id,
+        review_decision_ref: request.review_decision_ref,
+        rollback_snapshot_ref: request.rollback_snapshot_ref,
+        safe_source_apply_version: "safe-source-mutation-apply-v1".to_string(),
+        context: request.context,
+        main_status_before: request.main_status_before,
+        main_status_after: request.main_status_after,
+        targets,
+        apply_state: SourceApplySandboxApplyState::Applied,
+        cleanup_state: request.cleanup_state,
+        audit_ledger_ref: request.audit_ledger_ref,
+        guardrails: request.guardrails,
+    })
+}
+
+impl SourceApplySandboxApplyRequest {
+    fn validate(&self) -> Result<()> {
+        require_local_id(
+            "source apply sandbox apply request protocolId",
+            &self.protocol_id,
+        )?;
+        require_local_id(
+            "source apply sandbox apply request patchPreviewId",
+            &self.patch_preview_id,
+        )?;
+        require_local_id(
+            "source apply sandbox apply request applyTransactionId",
+            &self.apply_transaction_id,
+        )?;
+        self.context.validate()?;
+        self.main_status_before.validate()?;
+        self.main_status_after.validate()?;
+        if self.mutations.is_empty() {
+            return Err(anyhow!(
+                "source apply sandbox apply request mutations must not be empty"
+            ));
+        }
+        if self.context.sandbox_worktree_path == self.context.trusted_worktree_path {
+            return Err(anyhow!(
+                "source apply sandbox apply request cannot target the trusted/main worktree"
+            ));
+        }
+        require_local_ref(
+            "source apply sandbox apply request reviewDecisionRef",
+            &self.review_decision_ref,
+        )?;
+        require_local_ref(
+            "source apply sandbox apply request rollbackSnapshotRef",
+            &self.rollback_snapshot_ref,
+        )?;
+        require_local_ref(
+            "source apply sandbox apply request auditLedgerRef",
+            &self.audit_ledger_ref,
+        )?;
+        require_nonempty(
+            "source apply sandbox apply request guardrails",
+            self.guardrails.len(),
+        )?;
+        Ok(())
+    }
+}
+
+impl SourceApplySandboxMutation {
+    fn validate(&self) -> Result<()> {
+        require_local_ref("source apply sandbox mutation path", &self.path)?;
+        if !self.file_class.is_allowed() {
+            return Err(anyhow!(
+                "source apply sandbox mutation file class is blocked"
+            ));
+        }
+        require_text(
+            "source apply sandbox mutation expectedBeforeHash",
+            &self.expected_before_hash,
+        )?;
+        require_text(
+            "source apply sandbox mutation expectedAfterHash",
+            &self.expected_after_hash,
+        )?;
+        require_text(
+            "source apply sandbox mutation replacementUtf8",
+            &self.replacement_utf8,
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_apply_mutates_only_isolated_worktree_and_evaluates_valid() {
+        let unique = format!(
+            "ouroforge-sandbox-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(unique);
+        let main = root.join("main");
+        let sandbox = root.join("sandbox");
+        std::fs::create_dir_all(main.join("docs")).unwrap();
+        std::fs::create_dir_all(sandbox.join("docs")).unwrap();
+        std::fs::write(main.join("docs/spec.md"), "before\n").unwrap();
+        std::fs::write(sandbox.join("docs/spec.md"), "before\n").unwrap();
+
+        let before_hash = fnv1a64_utf8_digest("before\n");
+        let after_hash = fnv1a64_utf8_digest("after\n");
+        let request = SourceApplySandboxApplyRequest {
+            protocol_id: "sandbox-protocol-smoke".to_string(),
+            patch_preview_id: "preview-smoke".to_string(),
+            apply_transaction_id: "tx-smoke".to_string(),
+            review_decision_ref: "evidence/review.json".to_string(),
+            rollback_snapshot_ref: "evidence/rollback.json".to_string(),
+            context: SourceApplySandboxWorktreeContext {
+                sandbox_worktree_path: sandbox.display().to_string(),
+                trusted_worktree_path: main.display().to_string(),
+                base_revision: "abc123".to_string(),
+                created_at: "2026-06-10T00:00:00Z".to_string(),
+                evidence_root: "target/sandbox-smoke".to_string(),
+                cargo_target_dir: "/tmp/ouroforge-sandbox-target-smoke".to_string(),
+            },
+            main_status_before: SourceApplySandboxStatusSnapshot {
+                snapshot_id: "main-before".to_string(),
+                worktree_path: main.display().to_string(),
+                git_status_short: " M README.md".to_string(),
+            },
+            main_status_after: SourceApplySandboxStatusSnapshot {
+                snapshot_id: "main-after".to_string(),
+                worktree_path: main.display().to_string(),
+                git_status_short: " M README.md".to_string(),
+            },
+            mutations: vec![SourceApplySandboxMutation {
+                path: "docs/spec.md".to_string(),
+                file_class: SourceApplySandboxFileClass::SpecDocument,
+                expected_before_hash: before_hash,
+                expected_after_hash: after_hash,
+                replacement_utf8: "after\n".to_string(),
+            }],
+            cleanup_state: SourceApplySandboxCleanupState::Complete,
+            audit_ledger_ref: "evidence/audit.json".to_string(),
+            guardrails: vec!["reuse Safe Source Apply v1".to_string()],
+        };
+
+        let artifact = apply_sandbox_utf8_mutations(request).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(main.join("docs/spec.md")).unwrap(),
+            "before\n",
+            "trusted/main worktree fixture remains unchanged"
+        );
+        assert_eq!(
+            std::fs::read_to_string(sandbox.join("docs/spec.md")).unwrap(),
+            "after\n",
+            "sandbox worktree fixture receives the reviewed mutation"
+        );
+        assert_eq!(
+            artifact.evaluate().status,
+            SourceApplySandboxProtocolStatus::Valid
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+}
