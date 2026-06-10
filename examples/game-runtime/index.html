@@ -3,27 +3,285 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ouroforge Minimal 2D Runtime</title>
+  <title>Ouroforge Runtime Shell</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: #0f1f34;
+      --panel-strong: #162b46;
+      --line: #2d4c73;
+      --text: #e8f2ff;
+      --muted: #9bb1ca;
+      --accent: #f8d66d;
+      --good: #72e6a6;
+      --warn: #ffba6b;
+      --bad: #ff7a90;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(75, 125, 210, 0.22), transparent 34rem),
+        linear-gradient(180deg, #09182a 0%, var(--bg) 58%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+    button, select { font: inherit; }
+    button:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .runtime-shell {
+      width: min(1100px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+    .shell-header, .game-card, .hud-strip, .status-card, .debug-card {
+      border: 1px solid var(--line);
+      background: rgba(15, 31, 52, 0.9);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+      border-radius: 18px;
+    }
+    .shell-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+    .title-block h1 {
+      font-size: clamp(22px, 3vw, 34px);
+      letter-spacing: 0.02em;
+      line-height: 1.05;
+    }
+    .scene-meta {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 32px;
+      border: 1px solid rgba(248, 214, 109, 0.45);
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: rgba(248, 214, 109, 0.12);
+      color: #ffe9a3;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 12px;
+    }
+    .shell-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      align-items: stretch;
+    }
+    .game-card {
+      padding: 14px;
+    }
+    .viewport-frame {
+      border: 2px solid #4b78ad;
+      border-radius: 14px;
+      padding: 10px;
+      background: linear-gradient(180deg, #10233d, #091422);
+    }
+    #game {
+      display: block;
+      image-rendering: pixelated;
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      margin: 0 auto;
+      border-radius: 8px;
+      background: #0b1220;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .hud-strip {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .hud-strip h2, .status-card h2, .debug-card summary {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .hud-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .hud-item {
+      border: 1px solid rgba(155, 177, 202, 0.24);
+      border-radius: 12px;
+      background: rgba(7, 17, 31, 0.55);
+      padding: 10px;
+      min-height: 62px;
+    }
+    .hud-label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hud-value {
+      display: block;
+      margin-top: 5px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .hud-value.good { color: var(--good); }
+    .hud-value.warn { color: var(--warn); }
+    .hud-value.bad { color: var(--bad); }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      padding-top: 12px;
+    }
+    .shell-button, #scene-picker {
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: var(--panel-strong);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .shell-button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .shell-button:hover { border-color: var(--accent); }
+    .status-card {
+      padding: 14px 16px;
+      display: grid;
+      gap: 6px;
+    }
+    #status-message {
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .debug-card {
+      overflow: hidden;
+    }
+    .debug-card summary {
+      cursor: pointer;
+      padding: 13px 16px;
+      background: rgba(7, 17, 31, 0.45);
+      user-select: none;
+    }
+    #debug {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      max-height: 280px;
+      overflow: auto;
+      padding: 14px 16px;
+      white-space: pre-wrap;
+      color: #b5c7dc;
+      border-top: 1px solid var(--line);
+      background: rgba(2, 6, 13, 0.55);
+    }
+    @media (max-width: 860px) {
+      body { padding: 12px; }
+      .shell-main { grid-template-columns: 1fr; }
+      .hud-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .hud-grid { grid-template-columns: 1fr 1fr; }
+      .controls-row { align-items: stretch; flex-direction: column; }
+      .shell-button, #scene-picker { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-  <h1>Ouroforge Minimal 2D Runtime Foundation</h1>
-  <p>This page exposes the runtime foundation through <code>window.__OUROFORGE__</code>.</p>
-  <canvas id="game" width="320" height="180" aria-label="Ouroforge 2D runtime canvas"></canvas>
-  <pre id="debug"></pre>
+  <main class="runtime-shell" aria-labelledby="game-title">
+    <header class="shell-header">
+      <div class="title-block">
+        <h1 id="game-title">Signal Gate Runtime</h1>
+        <p class="scene-meta">Loaded scene: <strong id="scene-name">scene.json</strong></p>
+      </div>
+      <div class="badge" id="run-state" aria-live="polite">Start</div>
+    </header>
+
+    <section class="shell-main" aria-label="Playable runtime">
+      <div class="game-card">
+        <div class="viewport-frame" aria-label="Framed game viewport">
+          <canvas id="game" width="320" height="180" aria-label="Ouroforge playable 2D runtime canvas"></canvas>
+        </div>
+        <div id="controls" class="controls-row">
+          <span>Move: Arrow keys / WASD · Jump: Space/Up</span>
+          <span id="fps" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <aside class="hud-strip" aria-label="Objective HUD">
+        <h2>Objective HUD</h2>
+        <div class="hud-grid">
+          <div class="hud-item"><span class="hud-label">Key</span><span class="hud-value warn" id="hud-key">Missing</span></div>
+          <div class="hud-item"><span class="hud-label">Gate</span><span class="hud-value warn" id="hud-gate">Closed</span></div>
+          <div class="hud-item"><span class="hud-label">Exit</span><span class="hud-value warn" id="hud-exit">Locked</span></div>
+          <div class="hud-item"><span class="hud-label">Player</span><span class="hud-value good" id="hud-player">Alive</span></div>
+          <div class="hud-item"><span class="hud-label">Tick</span><span class="hud-value" id="hud-tick">0</span></div>
+          <div class="hud-item"><span class="hud-label">Event</span><span class="hud-value" id="hud-event">Scene loaded</span></div>
+        </div>
+        <label for="scene-picker" class="hud-label">Scene</label>
+        <select id="scene-picker">
+          <option value="scene.json">Foundation (scene.json)</option>
+          <option value="/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json">Collect & Exit Demo</option>
+        </select>
+      </aside>
+    </section>
+
+    <section class="status-card" aria-live="polite" aria-label="Runtime status">
+      <h2>Status</h2>
+      <p id="status-message">Start: collect the key, open the gate, and reach the exit.</p>
+    </section>
+
+    <details class="debug-card" id="debug-panel">
+      <summary>Evidence / debug JSON (collapsed by default)</summary>
+      <pre id="debug" aria-label="Raw runtime world state JSON"></pre>
+    </details>
+  </main>
+
   <script src="collision.js"></script>
   <script src="snapshot.js"></script>
   <script src="assets.js"></script>
   <script src="animation.js"></script>
   <script src="audio.js"></script>
-  <script src="juice.js"></script>
   <script src="renderer.js"></script>
   <script src="tilemap.js"></script>
-  <script src="uiux-flow.js"></script>
-  <script src="deck-roguelike.js"></script>
-  <script src="deckbuilder-ui.js"></script>
-  <script src="synthetic-player.js"></script>
-  <script src="balance-telemetry.js"></script>
-  <script src="balance-cockpit.js"></script>
   <script src="runtime.js"></script>
+  <script>
+    // Scene picker: reload with ?scene= parameter.
+    const picker = document.getElementById('scene-picker');
+    const params = new URLSearchParams(window.location.search);
+    const currentScene = params.get('scene') || 'scene.json';
+    picker.value = currentScene;
+    document.getElementById('scene-name').textContent = currentScene;
+    picker.addEventListener('change', () => {
+      const scene = picker.value;
+      if (scene === 'scene.json') {
+        window.location.search = '';
+      } else {
+        window.location.search = '?scene=' + encodeURIComponent(scene);
+      }
+    });
+  </script>
 </body>
 </html>
