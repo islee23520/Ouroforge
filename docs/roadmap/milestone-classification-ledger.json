@@ -1,0 +1,389 @@
+{
+  "schemaVersion": "ouroforge.milestone-classification-ledger.v1",
+  "issue": 2344,
+  "classificationTermsSource": "docs/product-observed-completion.md",
+  "requiredFields": [
+    "id",
+    "era",
+    "milestoneRange",
+    "title",
+    "classification",
+    "confidence",
+    "evidenceRefs",
+    "gapNotes",
+    "rationale"
+  ],
+  "allowedClassifications": [
+    "contract-complete",
+    "product-observed complete",
+    "product-observed fail",
+    "defer"
+  ],
+  "allowedConfidence": [
+    "low",
+    "medium",
+    "high"
+  ],
+  "entries": [
+    {
+      "id": "era-a",
+      "era": "A",
+      "milestoneRange": "M1-M3",
+      "title": "Original evidence-native MVP/run loop",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/roadmap.md",
+        "README.md"
+      ],
+      "gapNotes": "Historical run/project evidence predates the product-observed checklist; no current live dogfood proof is attached here.",
+      "rationale": "Preserves early local MVP and evidence-native loop claims as contract evidence only."
+    },
+    {
+      "id": "era-b",
+      "era": "B",
+      "milestoneRange": "M4-M6",
+      "title": "Agentic review and orchestration foundations",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/agentic-loop-orchestration-v1.md",
+        "docs/authoring-loop-evidence-bundle-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Agentic-loop evidence is docs/fixtures/read-model oriented; no product-surface before/after dogfood loop is attached here.",
+      "rationale": "Classifies agentic-loop foundations as contract evidence pending product-observed mutation-loop proof."
+    },
+    {
+      "id": "era-c",
+      "era": "C",
+      "milestoneRange": "M7-M12",
+      "title": "Engine expressiveness, assets, visual authoring, and early runtime surfaces",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/engine-expressiveness-v2.md",
+        "docs/asset-pipeline-v1.md",
+        "docs/visual-authoring-v1-governance-handoff.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Collect-and-exit and authoring fixtures prove contracts, but not practical engine usability under the M115 checklist.",
+      "rationale": "Narrows runtime/gameplay/asset/editor claims to contract-complete unless later checklist evidence upgrades them."
+    },
+    {
+      "id": "era-d",
+      "era": "D",
+      "milestoneRange": "M13-M19",
+      "title": "Production 2D, 3D gate, gameplay logic, GDD prototype, evaluator depth",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/3d-capability-gate-v1.md",
+        "docs/gameplay-scripting-logic-system-v1.md",
+        "docs/evaluator-depth-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Milestones include deterministic demos and read-only Studio surfaces, but no current product-observed usability verdict is attached.",
+      "rationale": "Keeps high-value runtime/Studio/gameplay evidence as contract proof only."
+    },
+    {
+      "id": "era-e",
+      "era": "E",
+      "milestoneRange": "M20-M26",
+      "title": "Loop metrics, trust gradient, campaigns, complexity ladder, provenance",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/loop-coverage-metric-v1.md",
+        "docs/trust-gradient-design.md",
+        "docs/evolve-campaign-v1.md",
+        "docs/end-to-end-provenance-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Auto-apply and loop evidence remains bounded, local, and fixture-backed; no practical autonomous repair claim is attached.",
+      "rationale": "Classifies evolve/trust evidence conservatively because M115 requires product-surface proof for loop usability."
+    },
+    {
+      "id": "era-f",
+      "era": "F",
+      "milestoneRange": "M27-M32",
+      "title": "Generative front door and game-class expansion",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/roadmap.md",
+        "docs/generative-front-door-v1.md",
+        "docs/generative-front-door-v1-demo.md"
+      ],
+      "gapNotes": "Generation is proposal/fixture evidence; no live authoring dogfood pass is attached here.",
+      "rationale": "Mandatory M30 generative front door group is preserved as contract-complete only."
+    },
+    {
+      "id": "era-g",
+      "era": "G",
+      "milestoneRange": "M33-M38",
+      "title": "Content scale and design-regression evidence",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/content-scale-v1.md",
+        "docs/design-regression-harness-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Scale/regression fixtures do not show product-observed game-production usability.",
+      "rationale": "Classifies content-scale claims as contract evidence pending live dogfood use."
+    },
+    {
+      "id": "era-h",
+      "era": "H",
+      "milestoneRange": "M39-M46",
+      "title": "Narrative/autonomy/multi-agent production pipeline assessment",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/era-h-autonomy-assessment.md",
+        "docs/multi-agent-production-pipeline-governance-handoff.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Autonomy assessment is descriptive and governance-oriented; human taste/release ownership remains outside product-observed closure.",
+      "rationale": "Preserves autonomy/multi-agent claims as bounded contract evidence."
+    },
+    {
+      "id": "era-i",
+      "era": "I",
+      "milestoneRange": "M47-M56",
+      "title": "Deckbuilder substrate through Steam-shaped local export",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/card-roguelite-substrate-v1.md",
+        "docs/deckbuilder-ui-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Steam-shaped and deckbuilder evidence is local/mechanical; no public release or product-observed engine usability claim is attached.",
+      "rationale": "Keeps shippable-shape language descriptive and contract-bounded."
+    },
+    {
+      "id": "era-j",
+      "era": "J",
+      "milestoneRange": "M57-M60",
+      "title": "Human playtest, curation, narrative assist, go/no-go surfaces",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/playtest-funfeel-gate-v1.md",
+        "docs/era-j-creative-leverage-assessment.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Human fun/feel gates are recorded as contracts; no current real-player product-observed pass is attached here.",
+      "rationale": "Classifies human-gated readiness surfaces as contract-complete only."
+    },
+    {
+      "id": "era-k",
+      "era": "K",
+      "milestoneRange": "M61-M66",
+      "title": "QA/playtest and evaluator expansion",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/autonomous-qa-playtest-swarm-v1.md",
+        "docs/autonomous-qa-playtest-swarm-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "QA swarm/evaluator evidence remains deterministic/local; it is not a live product-observed quality verdict.",
+      "rationale": "Maintains evaluator/QA claims as contract evidence."
+    },
+    {
+      "id": "era-l",
+      "era": "L",
+      "milestoneRange": "M67-M74",
+      "title": "Executor cockpit and autonomous-loop maturity",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/executor-operator-cockpit-v1-governance-handoff.md",
+        "docs/era-l-autonomous-loop-maturity-assessment.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Cockpit surfaces are read-only/local; no product-observed agentic production loop pass is attached here.",
+      "rationale": "Classifies executor/operator cockpit and maturity claims as contract-complete."
+    },
+    {
+      "id": "era-m",
+      "era": "M",
+      "milestoneRange": "M75-M81",
+      "title": "Human steerability and intervention controls",
+      "classification": "contract-complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/era-m-human-steerability-assessment.md",
+        "docs/active-intervention-scope-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Steerability controls are contract/read-model evidence, not a product-observed usability pass.",
+      "rationale": "Preserves human-control claims without overclaiming product usability."
+    },
+    {
+      "id": "era-n",
+      "era": "N",
+      "milestoneRange": "M82-M87",
+      "title": "Human-grade Studio and adoption UX",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-n-adoption-ux-assessment.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "M82-M87 improve adoption UX structurally, but current M115 semantics require live browser/editor dogfood artifacts before product-observed Studio usability claims.",
+      "rationale": "Mandatory Studio/adoption group remains contract-complete until checklist evidence exists."
+    },
+    {
+      "id": "era-o",
+      "era": "O",
+      "milestoneRange": "M88-M95",
+      "title": "External-engine 2D migration on-ramp",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-o-migration-on-ramp-governance-refresh.md",
+        "docs/2d-migration-on-ramp-scope-ir-legal-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Migration on-ramp proves one-way source-project/open-text contracts and fidelity reporting; it does not prove practical game-engine usability.",
+      "rationale": "Mandatory migration on-ramp group remains contract-complete."
+    },
+    {
+      "id": "era-p",
+      "era": "P",
+      "milestoneRange": "M96-M100",
+      "title": "2.5D migration on-ramp",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-p-2-5d-migration-on-ramp-governance-refresh.md",
+        "docs/2-5d-migration-on-ramp-scope-contract-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Presentation import evidence is deterministic/contractual with render comparison secondary; no product-observed production usability pass is attached.",
+      "rationale": "Classifies 2.5D migration evidence as contract-complete."
+    },
+    {
+      "id": "era-q",
+      "era": "Q",
+      "milestoneRange": "M101-M106",
+      "title": "Full-3D on-ramp re-evaluation",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/full-3d-on-ramp-reevaluation-gate-v1.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Era Q is a DEFER decision gate and does not implement or prove 3D production usability.",
+      "rationale": "Records the gate as contract-complete decision evidence, not product-observed completion."
+    },
+    {
+      "id": "era-r",
+      "era": "R",
+      "milestoneRange": "M107-M114",
+      "title": "Semantic re-derivation governance",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-r-semantic-rederivation-governance-refresh.md",
+        "docs/scenario-coverage-v95-rederivation-ux.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Re-derivation evidence is oracle/determinism/governance oriented; no current product-observed game-making pass is attached.",
+      "rationale": "Classifies Era R as contract-complete under M115 semantics."
+    },
+    {
+      "id": "group-runtime-foundation",
+      "era": "D",
+      "milestoneRange": "Production 2D Engine Core v1",
+      "title": "Runtime foundation usability-claim group",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/roadmap.md",
+        "docs/production-2d-engine-core-v1.md",
+        "docs/production-2d-engine-core-governance-handoff.md"
+      ],
+      "gapNotes": "Runtime demos and regression fixtures are contract evidence; current collect-and-exit browser page remains product-observed FAIL for broad engine usability until #2345 checklist evidence says otherwise.",
+      "rationale": "Mandatory runtime-foundation group is explicitly narrowed."
+    },
+    {
+      "id": "group-studio-surfaces",
+      "era": "C-N",
+      "milestoneRange": "Studio surfaces through Human-Grade Studio",
+      "title": "Studio usability-claim group",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/studio-v1.md",
+        "docs/full-studio-editor-v1.md",
+        "docs/era-n-adoption-ux-assessment.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Read-only/draft-only Studio surfaces and local packaging smoke evidence do not by themselves satisfy product-observed editor usability.",
+      "rationale": "Mandatory Studio surface group is explicitly narrowed."
+    },
+    {
+      "id": "group-generative-front-door-m30",
+      "era": "F",
+      "milestoneRange": "M30",
+      "title": "Generative Front Door v1",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/roadmap.md",
+        "docs/generative-front-door-v1.md",
+        "docs/generative-front-door-v1-demo.md"
+      ],
+      "gapNotes": "Natural-language generation remains proposal/fixture evidence without current live authoring-loop dogfood pass.",
+      "rationale": "Mandatory M30 group is explicitly classified."
+    },
+    {
+      "id": "group-studio-adoption-m82-m87",
+      "era": "N",
+      "milestoneRange": "M82-M87",
+      "title": "Studio and adoption UX",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-n-adoption-ux-assessment.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Adoption UX and local Studio evidence are structural contract evidence; no product-observed practical authoring pass is recorded here.",
+      "rationale": "Mandatory M82-M87 group is explicitly classified."
+    },
+    {
+      "id": "group-migration-m88-m95",
+      "era": "O",
+      "milestoneRange": "M88-M95",
+      "title": "2D migration on-ramp",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "docs/era-o-migration-on-ramp-governance-refresh.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Migration evidence proves source-only import/fidelity contracts, not product-observed engine usability.",
+      "rationale": "Mandatory M88-M95 group is explicitly classified."
+    },
+    {
+      "id": "current-collect-and-exit-runtime-page",
+      "era": "C",
+      "milestoneRange": "Collect-and-exit fixture",
+      "title": "Current collect-and-exit runtime page",
+      "classification": "contract-complete",
+      "confidence": "high",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/README.md",
+        "docs/engine-expressiveness-v2.md",
+        "docs/roadmap.md"
+      ],
+      "gapNotes": "Current page is useful contract/runtime fixture evidence but is not product-observed practical engine usability under M115 semantics.",
+      "rationale": "Satisfies #2344 requirement to classify collect-and-exit as contract evidence only."
+    }
+  ]
+}
