@@ -598,10 +598,10 @@ fn validate_taste_feedback_record(record: &OptionalHumanTasteFeedbackRecord) -> 
         return Err(anyhow!("optional human taste feedback record schemaVersion must be {OPTIONAL_HUMAN_TASTE_FEEDBACK_RECORD_SCHEMA_VERSION}"));
     }
     validate_pipeline_refs(&record.evidence_refs)?;
-    if !(record.recorded_as_provenance_only
-        && !record.auto_applied
-        && !record.source_apply_performed
-        && record.ring2_human_taste_verdict_required)
+    if !record.recorded_as_provenance_only
+        || record.auto_applied
+        || record.source_apply_performed
+        || !record.ring2_human_taste_verdict_required
     {
         return Err(anyhow!(
             "taste feedback record must remain Ring-2 provenance only and never auto-applied"

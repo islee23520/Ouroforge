@@ -162,6 +162,7 @@ enum Commands {
 }
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::enum_variant_names)]
 enum MigrationCommand {
     /// Run the Godot 2D source-text adapter demo and write an honest fidelity report.
     GodotDemo {
