@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use ouroforge_core::tilemap_authoring::{
-    tilemap_base_digest, validate_tilemap_draft_against_base, TilemapDraftArtifact,
-    TilemapSourceArtifact, TILEMAP_SOURCE_PATH_PREFIX, TILEMAP_SOURCE_PATH_SUFFIX,
+    tilemap_base_digest, tilemap_reachability_report_from_json_str,
+    validate_tilemap_draft_against_base, TilemapDraftArtifact, TilemapReachabilityDiagnostic,
+    TilemapReachabilityStatus, TilemapSourceArtifact, TILEMAP_SOURCE_PATH_PREFIX,
+    TILEMAP_SOURCE_PATH_SUFFIX,
 };
 use serde_json::Value;
 
@@ -101,4 +103,17 @@ fn tilemap_draft_preview_evidence_is_generated_not_source() {
     assert!(repo_root()
         .join(evidence["targetTilemapRef"].as_str().unwrap())
         .exists());
+}
+
+#[test]
+fn blocked_map_fails_with_named_reachability_diagnostic() {
+    let report = tilemap_reachability_report_from_json_str(&read_text(
+        "examples/tilemap-authoring-v1/maps/blocked-dogfood.tilemap.json",
+    ))
+    .expect("blocked map produces report");
+    assert_eq!(report.status, TilemapReachabilityStatus::Blocked);
+    assert!(report
+        .diagnostics
+        .contains(&TilemapReachabilityDiagnostic::ObjectiveUnreachable));
+    assert!(report.objective_path.is_empty());
 }

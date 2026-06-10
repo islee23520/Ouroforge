@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const TILEMAP_SOURCE_SCHEMA_VERSION: &str = "ouroforge.tilemap-source.v1";
 pub const TILEMAP_DRAFT_SCHEMA_VERSION: &str = "ouroforge.tilemap-draft.v1";
@@ -462,4 +462,151 @@ fn validate_identifier(label: &str, value: &str) -> Result<()> {
         return Err(anyhow!("{label} must be a bounded identifier"));
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub enum TilemapReachabilityDiagnostic {
+    MissingSpawn,
+    MissingObjective,
+    SpawnBlocked,
+    ObjectiveBlocked,
+    ObjectiveUnreachable,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TilemapReachabilityStatus {
+    Passed,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapReachabilityReport {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "mapId")]
+    pub map_id: String,
+    #[serde(rename = "targetTilemapRef")]
+    pub target_tilemap_ref: String,
+    pub status: TilemapReachabilityStatus,
+    pub diagnostics: Vec<TilemapReachabilityDiagnostic>,
+    #[serde(rename = "objectivePath")]
+    pub objective_path: Vec<TilemapGridPoint>,
+    pub boundary: String,
+}
+
+pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReachabilityReport {
+    let mut diagnostics = BTreeSet::new();
+    let spawn = map
+        .markers
+        .iter()
+        .find(|m| m.kind == TilemapMarkerKind::Spawn);
+    let objective = map
+        .markers
+        .iter()
+        .find(|m| m.kind == TilemapMarkerKind::Objective);
+    let mut path = Vec::new();
+    match (spawn, objective) {
+        (None, _) => {
+            diagnostics.insert(TilemapReachabilityDiagnostic::MissingSpawn);
+        }
+        (_, None) => {
+            diagnostics.insert(TilemapReachabilityDiagnostic::MissingObjective);
+        }
+        (Some(spawn), Some(objective)) => {
+            if map.is_blocked(spawn.x, spawn.y) {
+                diagnostics.insert(TilemapReachabilityDiagnostic::SpawnBlocked);
+            }
+            if map.is_blocked(objective.x, objective.y) {
+                diagnostics.insert(TilemapReachabilityDiagnostic::ObjectiveBlocked);
+            }
+            if diagnostics.is_empty() {
+                path = bfs_path(map, (spawn.x, spawn.y), (objective.x, objective.y));
+                if path.is_empty() {
+                    diagnostics.insert(TilemapReachabilityDiagnostic::ObjectiveUnreachable);
+                }
+            }
+        }
+    }
+    let diagnostics: Vec<_> = diagnostics.into_iter().collect();
+    TilemapReachabilityReport {
+        schema_version: TILEMAP_REACHABILITY_SCHEMA_VERSION.to_string(),
+        map_id: map.map_id.clone(),
+        target_tilemap_ref: map.source_path.clone(),
+        status: if diagnostics.is_empty() {
+            TilemapReachabilityStatus::Passed
+        } else {
+            TilemapReachabilityStatus::Blocked
+        },
+        diagnostics,
+        objective_path: path,
+        boundary: "Rust/local reachability evidence only; no browser trusted writes, no auto-apply, no gameplay quality claim.".to_string(),
+    }
+}
+
+pub fn tilemap_reachability_report_from_json_str(
+    map_json: &str,
+) -> Result<TilemapReachabilityReport> {
+    let map = TilemapSourceArtifact::from_json_str(map_json)?;
+    Ok(evaluate_tilemap_reachability(&map))
+}
+
+fn bfs_path(
+    map: &TilemapSourceArtifact,
+    start: (u32, u32),
+    goal: (u32, u32),
+) -> Vec<TilemapGridPoint> {
+    let mut queue = VecDeque::new();
+    let mut seen = BTreeSet::new();
+    let mut prev = BTreeMap::new();
+    queue.push_back(start);
+    seen.insert(start);
+    while let Some((x, y)) = queue.pop_front() {
+        if (x, y) == goal {
+            break;
+        }
+        for (nx, ny) in neighbors(map.width, map.height, x, y) {
+            if map.is_blocked(nx, ny) || !seen.insert((nx, ny)) {
+                continue;
+            }
+            prev.insert((nx, ny), (x, y));
+            queue.push_back((nx, ny));
+        }
+    }
+    if !seen.contains(&goal) {
+        return Vec::new();
+    }
+    let mut cursor = goal;
+    let mut out = vec![TilemapGridPoint {
+        x: cursor.0,
+        y: cursor.1,
+    }];
+    while cursor != start {
+        cursor = prev[&cursor];
+        out.push(TilemapGridPoint {
+            x: cursor.0,
+            y: cursor.1,
+        });
+    }
+    out.reverse();
+    out
+}
+
+fn neighbors(width: u32, height: u32, x: u32, y: u32) -> impl Iterator<Item = (u32, u32)> {
+    let mut values = Vec::new();
+    if x > 0 {
+        values.push((x - 1, y));
+    }
+    if y > 0 {
+        values.push((x, y - 1));
+    }
+    if x + 1 < width {
+        values.push((x + 1, y));
+    }
+    if y + 1 < height {
+        values.push((x, y + 1));
+    }
+    values.into_iter()
 }
