@@ -1,5 +1,73 @@
 (() => {
   const fixedDeltaMs = 16;
+
+  const runtimeApiVersion = '119.1.0';
+  const runtimeApiCompatibility = Object.freeze({
+    schemaVersion: 'ouroforge.runtime-api-compatibility.v1',
+    apiVersion: runtimeApiVersion,
+    stabilityPolicy: 'Exported keys are snapshot-governed; additions/removals require inventory and test updates.',
+    closureAuthority: 'contract-complete unless paired with live product-observed evidence',
+    consumers: Object.freeze(['runtime-shell', 'studio', 'observability-harness']),
+  });
+  const runtimeApiInventoryEntries = Object.freeze([
+    ['apiCompatibility', 'stable', 'Compatibility policy for runtime shell, Studio, and observability harness consumers.'],
+    ['apiInventory', 'stable', 'Machine-readable inventory generated from the actual frozen runtime API object.'],
+    ['apiVersion', 'stable', 'Semver-like runtime API inventory version.'],
+    ['compareReplayDigest', 'stable', 'Compare an expected replay digest against the current final state digest.'],
+    ['createSave', 'stable', 'Create a generated runtime-state save artifact; browser trusted writes remain disabled.'],
+    ['getEvents', 'stable', 'Read recent runtime events for observability harnesses.'],
+    ['getFrameStats', 'stable', 'Read frame/render/collision counters for runtime shell diagnostics.'],
+    ['getWorldState', 'stable', 'Read the browser runtime world-state evidence model.'],
+    ['loadSave', 'stable', 'Restore a generated runtime-state save artifact.'],
+    ['loadScene', 'stable', 'Load a bounded scene object into the browser runtime.'],
+    ['nextRandom', 'stable', 'Advance the deterministic seeded RNG stream.'],
+    ['pause', 'stable', 'Pause runtime stepping.'],
+    ['replayStateDigest', 'stable', 'Capture a deterministic final state digest evidence record.'],
+    ['restore', 'stable', 'Restore an in-memory snapshot by id.'],
+    ['resume', 'stable', 'Resume runtime stepping.'],
+    ['rngState', 'stable', 'Read seeded RNG state used by replay digesting.'],
+    ['runtimeState', 'stable', 'Capture the canonical runtime state evidence payload used for digesting.'],
+    ['seedRng', 'stable', 'Set the deterministic runtime RNG seed.'],
+    ['setInput', 'stable', 'Set direction/key/action input state.'],
+    ['snapshot', 'stable', 'Capture an in-memory runtime snapshot.'],
+    ['step', 'stable', 'Advance the fixed-step runtime loop.'],
+    ['transition', 'stable', 'Load a declared bounded scene transition.'],
+    ['whenReady', 'stable', 'Promise for the initial fetched scene load.'],
+    ['reload', 'experimental', 'Reload a scene from a bounded browser-side payload.'],
+    ['deckRoguelikeEndTurn', 'experimental', 'Advance deck-roguelike runtime demo state.'],
+    ['deckRoguelikePlayCard', 'experimental', 'Play a card in deck-roguelike runtime demo state.'],
+    ['deckbuilderUiPlanRunMapNode', 'experimental', 'Draft-only deckbuilder run-map planning interaction.'],
+    ['deckbuilderUiQueueSelected', 'experimental', 'Draft-only deckbuilder queue interaction.'],
+    ['deckbuilderUiSelectCard', 'experimental', 'Deckbuilder hand selection interaction.'],
+    ['deckbuilderUiSelectShopOffer', 'experimental', 'Draft-only deckbuilder shop selection interaction.'],
+    ['uiuxNavigate', 'experimental', 'Navigate in-game UI/UX flow demo state.'],
+    ['uiuxSetAccessibility', 'experimental', 'Update in-game UI/UX accessibility option demo state.'],
+  ]);
+
+  function runtimeApiInventory(apiObject) {
+    const exportedKeys = Object.keys(apiObject).sort();
+    const entryByKey = new Map(runtimeApiInventoryEntries.map(([key, stability, description]) => [key, {
+      key,
+      stability,
+      description,
+    }]));
+    return {
+      schemaVersion: 'ouroforge.runtime-api-inventory.v1',
+      apiVersion: runtimeApiVersion,
+      exportedKeys,
+      stable: exportedKeys.filter((key) => entryByKey.get(key) && entryByKey.get(key).stability === 'stable'),
+      experimental: exportedKeys.filter((key) => entryByKey.get(key) && entryByKey.get(key).stability === 'experimental'),
+      testOnly: exportedKeys.filter((key) => entryByKey.get(key) && entryByKey.get(key).stability === 'test-only'),
+      undocumented: exportedKeys.filter((key) => !entryByKey.has(key)),
+      staleInventory: Array.from(entryByKey.keys()).filter((key) => !exportedKeys.includes(key)),
+      entries: exportedKeys.map((key) => entryByKey.get(key) || {
+        key,
+        stability: 'undocumented',
+        description: 'Missing runtime API inventory entry; update the inventory when changing exports.',
+      }),
+      compatibility: clone(runtimeApiCompatibility),
+    };
+  }
   const input = { left: false, right: false, up: false, down: false };
   const rawKeys = {};
   const actionInput = {};
@@ -2179,6 +2247,11 @@
 
   let sceneReady = Promise.resolve();
   const api = Object.freeze({
+    apiVersion: runtimeApiVersion,
+    apiCompatibility: runtimeApiCompatibility,
+    apiInventory() {
+      return runtimeApiInventory(api);
+    },
     getWorldState() {
       const state = clone(world);
       state.gridPuzzle = world.gridPuzzle && gridPuzzleModule
@@ -2239,6 +2312,7 @@
         },
       };
       state.runtimeEvents = clone(events);
+      state.runtimeApi = runtimeApiInventory(api);
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
       state.componentModel = componentModelDebugState(world.entities);
