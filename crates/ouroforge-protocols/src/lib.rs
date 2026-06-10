@@ -4,4 +4,5 @@
 //! compilation unit. Modules are explicit `pub mod` declarations only; no glob
 //! re-exports are used.
 
+pub mod before_after_comparison;
 pub mod behavior_authoring_spec;
