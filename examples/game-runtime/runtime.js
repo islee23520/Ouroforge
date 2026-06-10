@@ -9,6 +9,20 @@
     closureAuthority: 'contract-complete unless paired with live product-observed evidence',
     consumers: Object.freeze(['runtime-shell', 'studio', 'observability-harness']),
   });
+
+  const runtimeDiagnosticTypes = Object.freeze([
+    { code: 'scene_load_failed', severity: 'error', class: 'scene-load', description: 'Scene normalization, fetch, or transition loading failed.' },
+    { code: 'invalid_query', severity: 'warning', class: 'invalid-query', description: 'A runtime query was malformed or targeted a missing entity.' },
+    { code: 'missing_asset', severity: 'warning', class: 'missing-asset', description: 'An asset reference failed to resolve or load from the bounded manifest.' },
+    { code: 'replay_sequence_failed', severity: 'error', class: 'replay', description: 'Replay sequence execution failed before final digest evidence.' },
+    { code: 'replay_run_failed', severity: 'error', class: 'replay', description: 'One run in a replay determinism check failed.' },
+    { code: 'replay_determinism_diverged', severity: 'error', class: 'replay', description: 'Same scene and seed produced divergent final state digests.' },
+    { code: 'sampler_failed', severity: 'error', class: 'sampler', description: 'Runtime state sampler could not produce bounded evidence.' },
+    { code: 'render_failed', severity: 'error', class: 'render', description: 'Runtime render evidence generation failed.' },
+    { code: 'collision_trigger_anomaly', severity: 'warning', class: 'collision-trigger', description: 'Collision or trigger evidence was anomalous.' },
+  ]);
+  const runtimeDiagnosticTypeByCode = new Map(runtimeDiagnosticTypes.map((diagnostic) => [diagnostic.code, diagnostic]));
+
   const runtimeApiInventoryEntries = Object.freeze([
     ['apiCompatibility', 'stable', 'Compatibility policy for runtime shell, Studio, and observability harness consumers.'],
     ['apiInventory', 'stable', 'Machine-readable inventory generated from the actual frozen runtime API object.'],
@@ -16,6 +30,11 @@
     ['compareReplayDigest', 'stable', 'Compare an expected replay digest against the current final state digest.'],
     ['createSave', 'stable', 'Create a generated runtime-state save artifact; browser trusted writes remain disabled.'],
     ['getEvents', 'stable', 'Read recent runtime events for observability harnesses.'],
+    ['sampleRuntimeState', 'stable', 'Run a bounded runtime-state sampler and emit typed sampler diagnostics on failure.'],
+    ['scenarioCoverageV100', 'test-only', 'Runs the M119 Scenario Coverage v100 planted diagnostic suite in bounded runtime scope.'],
+    ['queryEntity', 'stable', 'Query an entity by id and emit typed invalid-query diagnostics.'],
+    ['getDiagnostics', 'stable', 'Read structured runtime diagnostics emitted by the browser runtime.'],
+    ['diagnosticTypes', 'stable', 'Machine-readable single-source runtime diagnostic enum consumed by classifiers.'],
     ['getFrameStats', 'stable', 'Read frame/render/collision counters for runtime shell diagnostics.'],
     ['getWorldState', 'stable', 'Read the browser runtime world-state evidence model.'],
     ['loadSave', 'stable', 'Restore a generated runtime-state save artifact.'],
@@ -74,6 +93,7 @@
   const rawKeys = {};
   const actionInput = {};
   const events = [];
+  const runtimeDiagnostics = [];
   const saveSlots = new Map();
   const collision = window.OuroforgeCollision || { detectAabbCollisions: () => [], scene3dCollisionSummary: () => ({ present: false, events: [] }) };
   const snapshotFactory = (window.OuroforgeSnapshots || {
@@ -93,19 +113,31 @@
     }),
   }).createAssetTracker({
     onChange: () => renderCanvas(),
-    onEvent: (asset) => record(`runtime.asset.${asset.status}`, {
-      attemptId: asset.attemptId,
-      assetId: asset.id,
-      assetType: asset.kind,
-      path: asset.path,
-      status: asset.status,
-      startedAtUnixMs: asset.startedAtUnixMs,
-      endedAtUnixMs: asset.endedAtUnixMs,
-      loadDurationMs: asset.loadDurationMs,
-      width: asset.width,
-      height: asset.height,
-      failureReason: asset.failureReason,
-    }),
+    onEvent: (asset) => {
+      record(`runtime.asset.${asset.status}`, {
+        attemptId: asset.attemptId,
+        assetId: asset.id,
+        assetType: asset.kind,
+        path: asset.path,
+        status: asset.status,
+        startedAtUnixMs: asset.startedAtUnixMs,
+        endedAtUnixMs: asset.endedAtUnixMs,
+        loadDurationMs: asset.loadDurationMs,
+        width: asset.width,
+        height: asset.height,
+        failureReason: asset.failureReason,
+      });
+      if (asset.status === 'failed' || asset.status === 'rejected') {
+        recordRuntimeDiagnostic('missing_asset', `Asset ${asset.id || asset.path || 'unknown'} did not load.`, {
+          assetId: asset.id,
+          assetType: asset.kind,
+          path: asset.path,
+          status: asset.status,
+          failureReason: asset.failureReason,
+          evidenceRefs: [asset.attemptId].filter(Boolean),
+        });
+      }
+    },
   });
   const animation = window.OuroforgeAnimation || {
     normalizeAnimation: () => null,
@@ -254,6 +286,34 @@
     events.push({ tick: world.tick, type, payload: clone(payload) });
     if (events.length > 64) events.shift();
   }
+
+  function recordRuntimeDiagnostic(code, message, details = {}) {
+    const type = runtimeDiagnosticTypeByCode.get(code) || { code, severity: 'warning', class: 'unknown' };
+    const diagnostic = {
+      schemaVersion: 'ouroforge.runtime-diagnostic.v1',
+      code: type.code,
+      class: type.class,
+      severity: type.severity,
+      message: String(message || type.description || code),
+      sceneId: world.sceneId,
+      tick: world.tick,
+      evidenceRefs: Array.isArray(details.evidenceRefs) ? clone(details.evidenceRefs) : [],
+      details: clone({ ...details, evidenceRefs: undefined }),
+    };
+    runtimeDiagnostics.push(diagnostic);
+    if (runtimeDiagnostics.length > 64) runtimeDiagnostics.shift();
+    record('runtime.diagnostic', diagnostic);
+    return diagnostic;
+  }
+
+  function diagnosticTypes() {
+    return {
+      schemaVersion: 'ouroforge.runtime-diagnostic-types.v1',
+      source: 'window.__OUROFORGE__.diagnosticTypes',
+      types: clone(runtimeDiagnosticTypes),
+    };
+  }
+
 
   // Seeded stochastic determinism (Era F Milestone 31, #1600). All runtime
   // randomness derives from an explicit seed via a mulberry32 stream whose state
@@ -1692,7 +1752,17 @@
   }
 
   function loadScene(scene) {
-    const normalized = normalizeScene(scene);
+    let normalized;
+    try {
+      normalized = normalizeScene(scene);
+    } catch (error) {
+      recordRuntimeDiagnostic('scene_load_failed', 'Scene failed to load.', {
+        error: String(error && error.message ? error.message : error),
+        sceneId: scene && scene.id,
+      });
+      throw error;
+    }
+    runtimeDiagnostics.splice(0, runtimeDiagnostics.length);
     snapshots = snapshotFactory.createSnapshotRegistry();
     for (const key of Object.keys(input)) input[key] = false;
     for (const key of Object.keys(rawKeys)) delete rawKeys[key];
@@ -1758,6 +1828,58 @@
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
     const assetMetadata = assets.load(world, world.assetManifest);
+    const assetDiagnostics = assetMetadata.concat(typeof assets.metadata === 'function' ? assets.metadata() : []);
+    const reportedAssets = new Set();
+    for (const asset of assetDiagnostics) {
+      const key = asset && (asset.attemptId || asset.id || asset.path);
+      if (!asset || reportedAssets.has(key)) continue;
+      reportedAssets.add(key);
+      if (asset.status === 'failed' || asset.status === 'rejected') {
+        recordRuntimeDiagnostic('missing_asset', `Asset ${asset.id || asset.path || 'unknown'} did not load.`, {
+          assetId: asset.id,
+          assetType: asset.kind,
+          path: asset.path,
+          status: asset.status,
+          failureReason: asset.failureReason,
+          evidenceRefs: [asset.attemptId].filter(Boolean),
+        });
+      }
+    }
+    const manifestSummary = assets.manifestSummary ? assets.manifestSummary() : null;
+    for (const error of (manifestSummary && Array.isArray(manifestSummary.errors) ? manifestSummary.errors : [])) {
+      recordRuntimeDiagnostic('missing_asset', 'Asset manifest is invalid.', {
+        assetManifestId: manifestSummary.id,
+        failureReason: error,
+      });
+    }
+    if (manifestSummary && manifestSummary.enabled) {
+      const declaredAssetIds = new Set((manifestSummary.assets || []).map((asset) => asset.id));
+      for (const entity of world.entities) {
+        const refs = [];
+        if (entity.sprite && typeof entity.sprite.asset === 'string') refs.push({ ref: entity.sprite.asset, entityId: entity.id, source: 'sprite.asset' });
+        const vfx = entity.components && entity.components.vfx;
+        for (const emitter of (vfx && Array.isArray(vfx.emitters)) ? vfx.emitters : []) {
+          if (typeof emitter.asset === 'string') refs.push({ ref: emitter.asset, entityId: entity.id, source: 'vfx.emitter.asset' });
+        }
+        const animationComponent = entity.components && entity.components.animation;
+        const animationFrames = []
+          .concat(animationComponent && Array.isArray(animationComponent.frames) ? animationComponent.frames : [])
+          .concat(...((animationComponent && Array.isArray(animationComponent.clips) ? animationComponent.clips : []).map((clip) => Array.isArray(clip.frames) ? clip.frames : [])));
+        for (const frame of animationFrames) {
+          if (frame && typeof frame.asset === 'string') refs.push({ ref: frame.asset, entityId: entity.id, source: 'animation.frame.asset' });
+        }
+        for (const { ref, entityId, source } of refs) {
+          if (!declaredAssetIds.has(ref)) {
+            recordRuntimeDiagnostic('missing_asset', `Asset reference ${ref} is not declared in the active manifest.`, {
+              assetId: ref,
+              entityId,
+              source,
+              assetManifestId: manifestSummary.id,
+            });
+          }
+        }
+      }
+    }
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,
       sceneId: world.sceneId,
@@ -1765,7 +1887,7 @@
       sceneTransitionCount: world.sceneTransitions.length,
       assetCount: assetMetadata.length,
       gameplayFlagCount: world.gameplayRules.flags.length,
-      assetManifestId: assets.manifestSummary ? assets.manifestSummary().id : null,
+      assetManifestId: manifestSummary ? manifestSummary.id : null,
     });
     emitAudioEvents('scene_loaded');
     emitJuiceEvents('scene_loaded');
@@ -2133,15 +2255,7 @@
   }
 
   function replayDiagnostic(code, message, details = {}) {
-    const diagnostic = {
-      schemaVersion: 'ouroforge.runtime-replay-diagnostic.v1',
-      code,
-      severity: code === 'replay_determinism_diverged' ? 'error' : 'warning',
-      message,
-      sceneId: world.sceneId,
-      tick: world.tick,
-      details: clone(details),
-    };
+    const diagnostic = recordRuntimeDiagnostic(code, message, details);
     record('runtime.replay.diagnostic', diagnostic);
     return diagnostic;
   }
@@ -2274,6 +2388,110 @@
       diagnosticCount: diagnostics.length,
     });
     return evidence;
+  }
+
+  function queryEntity(query) {
+    const id = typeof query === 'string'
+      ? query
+      : (query && typeof query === 'object' && typeof query.id === 'string' ? query.id : null);
+    if (!id) {
+      const diagnostic = recordRuntimeDiagnostic('invalid_query', 'Entity query requires a string id.', { query });
+      return { schemaVersion: 'ouroforge.runtime-query-result.v1', status: 'invalid', diagnostic };
+    }
+    const entity = world.entities.find((candidate) => candidate.id === id) || null;
+    if (!entity) {
+      const diagnostic = recordRuntimeDiagnostic('invalid_query', `Entity ${id} was not found.`, { query: { id } });
+      return { schemaVersion: 'ouroforge.runtime-query-result.v1', status: 'missing', entity: null, diagnostic };
+    }
+    return { schemaVersion: 'ouroforge.runtime-query-result.v1', status: 'found', entity: clone(entity), diagnostic: null };
+  }
+
+  function sampleRuntimeState(sample = {}) {
+    try {
+      if (sample && sample.forceFailure === true) throw new Error('planted sampler failure');
+      const sampleId = safeEvidenceStem(sample.sampleId || sample.id || `sample-${world.tick}`, 'runtime sampler id');
+      if (sample.entityId !== undefined) {
+        const result = queryEntity({ id: sample.entityId });
+        if (result.status !== 'found') throw new Error(`sampler entity ${sample.entityId} not found`);
+      }
+      const state = runtimeState(sampleId);
+      return {
+        schemaVersion: 'ouroforge.runtime-state-sample.v1',
+        status: 'sampled',
+        sampleId,
+        sceneId: state.sceneId,
+        tick: state.tick,
+        digest: clone(state.digest),
+        diagnostic: null,
+      };
+    } catch (error) {
+      const diagnostic = recordRuntimeDiagnostic('sampler_failed', 'Runtime state sampler failed.', {
+        sample,
+        error: String(error && error.message ? error.message : error),
+      });
+      return {
+        schemaVersion: 'ouroforge.runtime-state-sample.v1',
+        status: 'failed',
+        diagnostic,
+      };
+    }
+  }
+
+  function scenarioCoverageV100(options = {}) {
+    const baseScene = options.baseScene && typeof options.baseScene === 'object'
+      ? clone(options.baseScene)
+      : {
+        schemaVersion: '1',
+        id: 'scenario-coverage-v100-base',
+        bounds: { width: 64, height: 64 },
+        entities: [{
+          id: 'player',
+          sprite: { color: '#5eead4' },
+          components: {
+            transform: { x: 0, y: 0 },
+            velocity: { x: 0, y: 0 },
+            size: { width: 8, height: 8 },
+            controllable: true,
+          },
+        }],
+      };
+    const observed = [];
+    function collect(kind) {
+      for (const diagnostic of runtimeDiagnostics) observed.push({ kind, diagnostic: clone(diagnostic) });
+    }
+    try {
+      loadScene({ id: 'scenario-coverage-v100-scene-load-failure', gridPuzzle: {} });
+    } catch (_error) {
+      collect('scene-load');
+    }
+    loadScene(baseScene);
+    queryEntity({ invalid: true });
+    collect('invalid-query');
+    replayDeterminismCheck({ scene: baseScene, seed: 100, sequence: [null], label: 'scenario-v100-replay' });
+    collect('replay');
+    const missingAssetScene = clone(baseScene);
+    missingAssetScene.id = 'scenario-coverage-v100-missing-asset';
+    missingAssetScene.assetManifest = { id: 'scenario-v100-assets', assets: [{ id: 'declared-other', kind: 'sprite', path: 'assets/sprites/declared-other.svg' }] };
+    missingAssetScene.entities = [{
+      id: 'asset-user',
+      sprite: { asset: 'missing-sprite' },
+      components: { transform: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, size: { width: 8, height: 8 } },
+    }];
+    loadScene(missingAssetScene);
+    collect('missing-asset');
+    sampleRuntimeState({ forceFailure: true, sampleId: 'scenario-v100-sampler' });
+    collect('sampler');
+    const requiredCodes = ['scene_load_failed', 'invalid_query', 'missing_asset', 'replay_run_failed', 'sampler_failed'];
+    const observedCodes = observed.map((entry) => entry.diagnostic.code);
+    return {
+      schemaVersion: 'ouroforge.scenario-coverage-v100.v1',
+      status: requiredCodes.every((code) => observedCodes.includes(code)) ? 'passed' : 'failed',
+      requiredCodes,
+      observedCodes,
+      plantedFailureCount: requiredCodes.length,
+      observed,
+      classification: 'contract-complete',
+    };
   }
 
 
@@ -2458,6 +2676,8 @@
         },
       };
       state.runtimeEvents = clone(events);
+      state.runtimeDiagnostics = clone(runtimeDiagnostics);
+      state.runtimeDiagnosticTypes = diagnosticTypes();
       state.runtimeApi = runtimeApiInventory(api);
       state.tilemaps = tilemap.debugState(world.tilemaps);
       state.composition = compositionDebugState(world.entities);
@@ -2532,6 +2752,13 @@
     getEvents() {
       return clone(events);
     },
+    diagnosticTypes,
+    getDiagnostics() {
+      return clone(runtimeDiagnostics);
+    },
+    queryEntity,
+    sampleRuntimeState,
+    scenarioCoverageV100,
     step,
     pause() {
       world.paused = true;
@@ -2697,7 +2924,13 @@
   sceneReady = fetch(sceneSource)
     .then((response) => response.json())
     .then((scene) => loadScene(scene))
-    .catch((error) => record('runtime.scene.load_failed', { sceneSource, error: String(error) }));
+    .catch((error) => {
+      record('runtime.scene.load_failed', { sceneSource, error: String(error) });
+      recordRuntimeDiagnostic('scene_load_failed', 'Initial scene fetch or load failed.', {
+        sceneSource,
+        error: String(error && error.message ? error.message : error),
+      });
+    });
   // Expose a readiness accessor so harnesses can await the fetched scene before
   // reading world state (otherwise they observe the synchronous fallback scene
   // and a late loadScene would reset the steps they executed in the interim).
