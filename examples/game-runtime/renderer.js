@@ -525,6 +525,35 @@
     return drawn;
   }
 
+
+  function entityTags(entity) {
+    return new Set(Array.isArray(entity && entity.tags) ? entity.tags.map((tag) => String(tag).toLowerCase()) : []);
+  }
+
+  function visualCue(entity) {
+    const tags = entityTags(entity);
+    const id = String((entity && entity.id) || '').toLowerCase();
+    if (tags.has('player') || id.includes('player')) return { glyph: '●', label: 'YOU', stroke: '#7dd3fc' };
+    if (tags.has('key') || tags.has('collectible') || id.includes('key') || id.includes('coin')) return { glyph: '◆', label: 'KEY', stroke: '#fde68a' };
+    if (tags.has('exit') || tags.has('door') || id.includes('door') || id.includes('exit') || id.includes('gate')) return { glyph: '▣', label: 'EXIT', stroke: '#c4b5fd' };
+    if (tags.has('hazard') || id.includes('hazard') || id.includes('spike')) return { glyph: '!', label: 'DANGER', stroke: '#fda4af' };
+    return null;
+  }
+
+  function drawEntityCue(context, entity, x, y, entitySize) {
+    const cue = visualCue(entity);
+    if (!cue) return;
+    if (typeof context.strokeRect === 'function') {
+      context.strokeStyle = cue.stroke;
+      context.lineWidth = 2;
+      context.strokeRect(x - 1, y - 1, entitySize.width + 2, entitySize.height + 2);
+    }
+    context.fillStyle = cue.stroke;
+    context.font = '9px ui-monospace, monospace';
+    context.fillText(cue.glyph, x + Math.max(1, entitySize.width - 8), y + 8);
+    context.fillText(cue.label, x, y - 3);
+  }
+
   function drawEntityRenderable({ context, renderer, entity, assets, animation }) {
     const components = entity.components || {};
     const transform = point(components.transform);
@@ -558,6 +587,7 @@
       context.fillStyle = (activeFrame && activeFrame.color) || (entity.sprite && entity.sprite.color) || '#f2f6f8';
       context.fillRect(x, y, entitySize.width, entitySize.height);
     }
+    drawEntityCue(context, entity, x, y, entitySize);
     if (components.uiText && typeof components.uiText.text === 'string') {
       context.fillStyle = (entity.sprite && entity.sprite.color) || '#f2f6f8';
       context.font = '10px ui-monospace, monospace';
