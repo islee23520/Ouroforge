@@ -15,7 +15,7 @@ fn scenario_coverage_v106_good_bounded_proposal_passes_rule_based_gate() {
         report.rule_catalog.len(),
         proposal_quality_gate_rules().len()
     );
-    assert_eq!(report.llm_sole_gate, false);
+    assert!(!report.llm_sole_gate);
 }
 
 #[test]
@@ -64,6 +64,6 @@ fn scenario_coverage_v106_every_rule_has_negative_fixture() {
             "expected {rule_id}, got {:?}",
             report.findings
         );
-        assert_eq!(report.llm_sole_gate, false);
+        assert!(!report.llm_sole_gate);
     }
 }
