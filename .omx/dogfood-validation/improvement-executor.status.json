@@ -1,13 +1,22 @@
 {
   "status": "ready_for_verifier",
-  "selected_blocker": "B3 \u2014 canonical compact-demo pipeline dry-run evidence",
-  "branch": "dogfood/b3-pipeline-dry-run-20260609214129",
-  "worktree": "/Users/jh0927/Ouroforge-dogfood-b3-pipeline-dry-run-20260609214129",
-  "message": "B3 pipeline dry-run evidence report and validator implemented, verified, pushed, and opened as PR #2336. Ready for focused verifier re-measurement.",
+  "selected_blocker": "B4 \u2014 export/release readiness evidence is not yet durable on origin/main",
+  "branch": "dogfood/b4-export-readiness-20260610002739",
+  "worktree": "/Users/jh0927/Ouroforge-dogfood-b4-export-readiness-20260610002739",
+  "message": "Focused B4 local/manual export-readiness handoff is ready for focused verifier; no publishing, signing, upload, credential, release automation, hosted, Steam, or Era Q full-3D scope added.",
+  "tracked_artifacts": [
+    ".omx/dogfood-validation/export-release-readiness.md",
+    ".omx/dogfood-validation/export-release-readiness.status.json",
+    "examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs",
+    ".omx/dogfood-validation/improvement-executor.status.json",
+    ".omx/dogfood-validation/improvement-executor-report.md"
+  ],
   "verification": [
-    "node --test examples/dogfood-pipeline-dry-run-v1/pipeline-dry-run-smoke.test.cjs \u2014 passed",
+    "node --test examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs \u2014 passed",
+    "node --test examples/godot-plus-demo-performance-v794/performance-budget-smoke.test.cjs \u2014 passed",
+    "cargo test -p ouroforge-core --test build_export_packaging_demo --jobs 2 \u2014 passed",
     "git diff --check origin/main...HEAD \u2014 passed"
   ],
-  "updated_at": "2026-06-09T21:47:55.771225+00:00",
-  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2336"
+  "updated_at": "2026-06-10T00:32:32.542897Z",
+  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2337"
 }

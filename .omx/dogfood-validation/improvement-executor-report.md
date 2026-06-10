@@ -1,48 +1,43 @@
-# Improvement Executor Report — B3 Pipeline Dry-Run Evidence
+# Dogfood Improvement Executor Report — B4 Export / Release Readiness
 
-## Selected blocker
+PR: https://github.com/shaun0927/Ouroforge/pull/2337
 
-- **Blocker:** B3 — canonical compact-demo pipeline dry-run evidence missing/incomplete.
-- **Linked #1 claim:** [#1](https://github.com/shaun0927/Ouroforge/issues/1) evidence-native loop claim.
-- **Evidence/reproduction:** Governor iteration 17 selected B3 after B1/B2 merged; `.omx/dogfood-validation/pipeline-dry-run.md` needed refresh against merged B1/B2 artifacts.
+Updated: `2026-06-10T00:32:32.542897Z`
 
-## Files changed
+## Selection
 
-- `.omx/dogfood-validation/pipeline-dry-run.md` — refreshed B3 dry-run evidence report.
-- `examples/dogfood-pipeline-dry-run-v1/pipeline-dry-run-smoke.test.cjs` — tracked completeness/guardrail validator.
-- `.omx/dogfood-validation/improvement-executor.status.json` — B3 handoff status.
-- `.omx/dogfood-validation/improvement-executor-report.md` — this report.
+Governor iteration 20 selected **B4 — export/release readiness evidence is not yet durable on origin/main**. B1, B2, and B3 are accepted via merged PRs #2334, #2335, and #2336. No open B4 PR existed before this branch was created.
 
-## Commands run
+## Scope delivered
 
-- `cargo run --manifest-path ... -p ouroforge-cli -- seed validate ...collect-and-exit.yaml` — passed.
-- `cargo run --manifest-path ... -p ouroforge-cli -- project validate ...ouroforge.project.json` — passed.
-- `cargo run --manifest-path ... -p ouroforge-cli -- run ... --scenario-pack collect-and-exit --workers 2` — completed with run `run-1781041430565-62207` and failed-classified scenario verdict.
-- `cargo run --manifest-path ... -p ouroforge-cli -- evaluate runs/run-1781041430565-62207` — produced failed-classified evaluator output.
-- `cargo run --manifest-path ... -p ouroforge-cli -- journal show runs/run-1781041430565-62207` — passed.
-- `cargo run --manifest-path ... -p ouroforge-cli -- mutation list runs/run-1781041430565-62207` — passed.
-- `cargo run --manifest-path ... -p ouroforge-cli -- mutation review --defer ... runs/run-1781041430565-62207` — passed; no apply.
-- second run `run-1781041458557-98997`, `compare`, and `dashboard export` — passed as evidence generation/comparison steps.
+Focused evidence-only B4 handoff from fresh `origin/main`:
 
-## Acceptance criteria mapping
+- Added `.omx/dogfood-validation/export-release-readiness.md`.
+- Added `.omx/dogfood-validation/export-release-readiness.status.json`.
+- Added `examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs`.
+- Updated executor status/report for the current handoff.
 
-- Commands/run IDs/artifact paths/verdicts/journal/mutation/replay/cleanup boundaries: recorded in `.omx/dogfood-validation/pipeline-dry-run.md`.
-- B1/B2 references: report cites merged claim matrix and demo spec.
-- Evidence completeness guard: `examples/dogfood-pipeline-dry-run-v1/pipeline-dry-run-smoke.test.cjs` enforces required B3 sections, command names, table rows, classified failure, and guardrails.
-- Pipeline result: complete evidence with `failed-classified` verdict; not claimed as production/store readiness.
+The report ties B4 to merged B1/B2/B3 artifacts, records local/manual package fixture refs, makes the retained release-candidate package artifact an explicit gap, joins pipeline evidence to package metadata/profile evidence, and cites package probe/performance boundaries.
+
+## Guardrails preserved
+
+- #1 remains OPEN and #23 remains OPEN.
+- Era Q M102–M106 remain deferred/non-goal; no full-3D implementation was added.
+- No release automation, signing, notarization, upload, publishing, Steam depot flow, credential flow, hosted/cloud/multi-user behavior, trusted browser/source writes, auto-port, or foreign-runtime embedding was added.
+- No production-ready, store-ready, commercial release, native export, Godot replacement, full Godot parity, or shipped-game maturity claim was made.
+- Generated package outputs remain generated/ignored; no generated package artifact was committed.
 
 ## Verification
 
-- `node --test examples/dogfood-pipeline-dry-run-v1/pipeline-dry-run-smoke.test.cjs` — passed.
-- `git diff --check origin/main...HEAD` — passed.
+Passed:
 
-## Non-goals preserved
+```bash
+node --test examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs
+node --test examples/godot-plus-demo-performance-v794/performance-budget-smoke.test.cjs
+cargo test -p ouroforge-core --test build_export_packaging_demo --jobs 2
+git diff --check origin/main...HEAD
+```
 
-- Leaves #1 and #23 open.
-- Does not implement Era Q full-3D M102–M106.
-- Does not add hosted/cloud/multi-user scope, trusted writes, auto-port/live bridge/runtime embedding, release automation/signing/upload/publishing, or production/store readiness claims.
-- Does not apply mutations or implement pipeline/runtime features.
+## Verifier handoff
 
-## PR
-
-- https://github.com/shaun0927/Ouroforge/pull/2336
+Verifier should inspect that the PR payload is tracked, the B4 smoke passes, and the report wording stays conservative: local/manual release-candidate evidence only, not public release or store readiness.
