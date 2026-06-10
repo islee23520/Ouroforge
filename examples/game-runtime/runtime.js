@@ -1751,7 +1751,7 @@
     if (debug) debug.textContent = JSON.stringify(api.getWorldState(), null, 2);
   }
 
-  function loadScene(scene) {
+  function loadScene(scene, options = {}) {
     let normalized;
     try {
       normalized = normalizeScene(scene);
@@ -1827,7 +1827,8 @@
     world.tick = 0;
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
-    const assetMetadata = assets.load(world, world.assetManifest);
+    if (options.sceneSource) activeSceneSource = options.sceneSource;
+    const assetMetadata = assets.load(world, world.assetManifest, { resolvePath: sceneRelativeAssetPath });
     const assetDiagnostics = assetMetadata.concat(typeof assets.metadata === 'function' ? assets.metadata() : []);
     const reportedAssets = new Set();
     for (const asset of assetDiagnostics) {
@@ -1942,7 +1943,7 @@
     try {
       const response = await fetch(declared.toScene);
       const scene = await response.json();
-      loadScene(scene);
+      loadScene(scene, { sceneSource: declared.toScene });
       recordTransitionOutcome({
         status: 'succeeded',
         id: declared.id,
@@ -2610,6 +2611,21 @@
   }
 
   let sceneReady = Promise.resolve();
+  let activeSceneSource = 'scene.json';
+
+  function assetBaseForSceneSource(sceneSource) {
+    if (typeof sceneSource !== 'string' || !sceneSource) return '';
+    const withoutQuery = sceneSource.split('?')[0].split('#')[0];
+    const sceneDir = withoutQuery.includes('/') ? withoutQuery.slice(0, withoutQuery.lastIndexOf('/') + 1) : '';
+    if (sceneDir.endsWith('/scenes/')) return sceneDir.slice(0, -'scenes/'.length);
+    return sceneDir;
+  }
+
+  function sceneRelativeAssetPath(assetPath) {
+    if (typeof assetPath !== 'string' || !assetPath.startsWith('assets/')) return assetPath;
+    const base = assetBaseForSceneSource(activeSceneSource);
+    return base ? `${base}${assetPath}` : assetPath;
+  }
   const api = Object.freeze({
     apiVersion: runtimeApiVersion,
     apiCompatibility: runtimeApiCompatibility,
@@ -2923,7 +2939,7 @@
   const sceneSource = sceneSourceFromLocation();
   sceneReady = fetch(sceneSource)
     .then((response) => response.json())
-    .then((scene) => loadScene(scene))
+    .then((scene) => loadScene(scene, { sceneSource }))
     .catch((error) => {
       record('runtime.scene.load_failed', { sceneSource, error: String(error) });
       recordRuntimeDiagnostic('scene_load_failed', 'Initial scene fetch or load failed.', {

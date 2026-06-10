@@ -86,7 +86,9 @@ function createRuntime() {
   assert.equal(startSave.slotId, 'demo-start');
   assert.equal(startSave.policy.browserWriteAccess, 'none');
   assert.equal(state.assetManifest.errors.length, 0);
-  assert.ok(state.assets.some((asset) => asset.id === 'collect_and_exit_sheet' && asset.path === 'assets/sprites/collect-and-exit-sheet.png'));
+  const sheetAsset = state.assets.find((asset) => asset.id === 'collect_and_exit_sheet');
+  assert.equal(sheetAsset.path, 'assets/sprites/collect-and-exit-sheet.png');
+  assert.equal(sheetAsset.resolvedPath, '/examples/playable-demo-v2/collect-and-exit/assets/sprites/collect-and-exit-sheet.png');
   assert.equal(state.tilemaps.tilemaps[0].id, 'collect_and_exit_level');
   assert.equal(state.tilemaps.tilemaps[0].grid.width, 10);
   assert.equal(state.tilemaps.tilemaps[0].authoring.triggerCells[0].trigger, 'key_collected');

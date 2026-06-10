@@ -52,6 +52,25 @@ let tick = 1000;
 const tracker = createAssetTracker({ ImageCtor: FakeImage, now: () => { tick += 5; return tick; } });
 tracker.load(scene);
 assert.deepEqual(FakeImage.loaded.sort(), ['assets/sprites/goal.svg', 'assets/sprites/player.svg']);
+
+FakeImage.loaded = [];
+let sceneRelativeTick = 5000;
+const sceneRelativeTracker = createAssetTracker({
+  ImageCtor: FakeImage,
+  now: () => { sceneRelativeTick += 5; return sceneRelativeTick; },
+});
+sceneRelativeTracker.load(scene, scene.assetManifest, {
+  resolvePath: (assetPath) => `/examples/playable-demo-v2/collect-and-exit/${assetPath}`,
+});
+assert.deepEqual(FakeImage.loaded.sort(), [
+  '/examples/playable-demo-v2/collect-and-exit/assets/sprites/goal.svg',
+  '/examples/playable-demo-v2/collect-and-exit/assets/sprites/player.svg',
+]);
+assert.deepEqual(sceneRelativeTracker.metadata().map((asset) => ({ id: asset.id, path: asset.path, resolvedPath: asset.resolvedPath })), [
+  { id: 'goal-sprite', path: 'assets/sprites/goal.svg', resolvedPath: '/examples/playable-demo-v2/collect-and-exit/assets/sprites/goal.svg' },
+  { id: 'player-sprite', path: 'assets/sprites/player.svg', resolvedPath: '/examples/playable-demo-v2/collect-and-exit/assets/sprites/player.svg' },
+]);
+
 assert.deepEqual(tracker.manifestSummary(), {
   id: 'runtime-v1-assets',
   enabled: true,
@@ -64,8 +83,8 @@ assert.deepEqual(tracker.manifestSummary(), {
   ],
 });
 assert.deepEqual(tracker.metadata(), [
-  { attemptId: 'load-goal-sprite', id: 'goal-sprite', path: 'assets/sprites/goal.svg', kind: 'image', status: 'loaded', startedAtUnixMs: 1005, endedAtUnixMs: 1010, loadDurationMs: 5, failureReason: null, width: 16, height: 16 },
-  { attemptId: 'load-player-sprite', id: 'player-sprite', path: 'assets/sprites/player.svg', kind: 'image', status: 'loaded', startedAtUnixMs: 1015, endedAtUnixMs: 1020, loadDurationMs: 5, failureReason: null, width: 16, height: 16 },
+  { attemptId: 'load-goal-sprite', id: 'goal-sprite', path: 'assets/sprites/goal.svg', resolvedPath: 'assets/sprites/goal.svg', kind: 'image', status: 'loaded', startedAtUnixMs: 1005, endedAtUnixMs: 1010, loadDurationMs: 5, failureReason: null, width: 16, height: 16 },
+  { attemptId: 'load-player-sprite', id: 'player-sprite', path: 'assets/sprites/player.svg', resolvedPath: 'assets/sprites/player.svg', kind: 'image', status: 'loaded', startedAtUnixMs: 1015, endedAtUnixMs: 1020, loadDurationMs: 5, failureReason: null, width: 16, height: 16 },
 ]);
 assert.ok(tracker.imageFor('player-sprite'));
 assert.equal(tracker.imageFor('assets/sprites/player.svg'), null, 'manifest mode rejects direct browser path lookup');

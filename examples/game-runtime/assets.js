@@ -152,12 +152,16 @@
     const onEvent = typeof options.onEvent === 'function' ? options.onEvent : null;
     const now = typeof options.now === 'function' ? options.now : () => Date.now();
     let manifest = normalizeManifest(options.manifest);
+    let pathResolver = typeof options.resolvePath === 'function' ? options.resolvePath : (assetPath) => assetPath;
     const records = new Map();
     const unresolvedRefs = new Set();
     const invalidSpriteRefs = new Map();
 
-    function configureManifest(nextManifest) {
+    function configureManifest(nextManifest, nextOptions = {}) {
       manifest = normalizeManifest(nextManifest);
+      if (Object.prototype.hasOwnProperty.call(nextOptions, 'resolvePath')) {
+        pathResolver = typeof nextOptions.resolvePath === 'function' ? nextOptions.resolvePath : (assetPath) => assetPath;
+      }
       records.clear();
       unresolvedRefs.clear();
       invalidSpriteRefs.clear();
@@ -204,10 +208,12 @@
       if (entry.kind === 'audio') return null;
       if (records.has(entry.id)) return records.get(entry.id);
       const startedAtUnixMs = now();
+      const resolvedPath = pathResolver(entry.path, entry);
       const record = {
         attemptId: `load-${entry.id}`,
         id: entry.id,
         path: entry.path,
+        resolvedPath,
         kind: entry.kind === 'sprite' ? 'image' : entry.kind,
         status: 'attempted',
         startedAtUnixMs,
@@ -244,13 +250,13 @@
         record.failureReason = 'Image load failed';
         emit(record);
       };
-      image.src = entry.path;
+      image.src = resolvedPath;
       return record;
     }
 
-    function load(sceneOrEntities, nextManifest) {
+    function load(sceneOrEntities, nextManifest, loadOptions = {}) {
       if (arguments.length > 1 || (sceneOrEntities && sceneOrEntities.assetManifest)) {
-        configureManifest(nextManifest || sceneOrEntities.assetManifest);
+        configureManifest(nextManifest || sceneOrEntities.assetManifest, loadOptions);
       }
       return collectSpriteAssets(sceneOrEntities, manifest).map(ensure).filter(Boolean);
     }
@@ -262,6 +268,7 @@
           attemptId: record.attemptId,
           id: record.id,
           path: record.path,
+          resolvedPath: record.resolvedPath,
           kind: record.kind,
           status: record.status,
           startedAtUnixMs: record.startedAtUnixMs,
