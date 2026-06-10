@@ -42,7 +42,7 @@ Artifact inventory entries require:
 
 - `path`: relative bundle path using `/` separators.
 - `kind`: `json`, `jsonl`, `markdown`, `directory`, `png`, or `other`.
-- `sha256`: lowercase 64-hex digest for files; omitted or `null` for directories.
+- `sha256`: lowercase 64-hex digest for files; omitted or `null` for directories and for `manifest.json` because the manifest inventories itself.
 - `required`: boolean.
 
 The inventory must include every required artifact path above.

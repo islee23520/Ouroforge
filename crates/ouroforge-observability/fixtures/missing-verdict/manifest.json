@@ -1,0 +1,58 @@
+{
+  "schema_version": "live-observability-v1",
+  "run_id": "missing-verdict",
+  "created_at": "2026-06-10T00:00:00Z",
+  "target_url": "http://127.0.0.1:8771/examples/game-runtime/",
+  "run_kind": "runtime",
+  "tool_versions": {
+    "schema": "live-observability-v1",
+    "validator": "fixture"
+  },
+  "browser": {
+    "name": "fixture",
+    "version": "0"
+  },
+  "retry_attempts": 0,
+  "artifact_inventory": [
+    {
+      "path": "manifest.json",
+      "kind": "json",
+      "required": true
+    },
+    {
+      "path": "console.jsonl",
+      "kind": "jsonl",
+      "sha256": "72a860888e0dbe1e8f432f8be9b03352724d83720104ab26c096013e470e5c74",
+      "required": true
+    },
+    {
+      "path": "frame-stats.jsonl",
+      "kind": "jsonl",
+      "sha256": "bccbc35db659611dd755d0b2dd9d5960ae31164afe2294009e6e1dd017636891",
+      "required": true
+    },
+    {
+      "path": "world-samples.jsonl",
+      "kind": "jsonl",
+      "sha256": "0cb617a40fc4ec8979ddc1d32a66ce35aa28abab227e6f5483672c14602e985a",
+      "required": true
+    },
+    {
+      "path": "events.json",
+      "kind": "json",
+      "sha256": "c8a7358c4092176638a1314406e93bdd185ebaea1b5de8534da93fd31db1e6a7",
+      "required": true
+    },
+    {
+      "path": "input-replay.json",
+      "kind": "json",
+      "sha256": "d99d74aa03e9ed63dc7d8f2c52f9e6acae6081a4f0b670f11a832649b4418c0b",
+      "required": true
+    },
+    {
+      "path": "screenshots/",
+      "kind": "directory",
+      "required": true
+    }
+  ]
+}
