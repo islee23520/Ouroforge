@@ -2624,6 +2624,21 @@ assert.equal(sourceGeneratedModel.scenarioCoverage.status, 'landed');
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /Scenario Coverage: v102 landed/);
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /backslash path separator/);
 
+// #2365 scene editor interaction spec: base-relative draft transaction model, no cumulative simulation.
+const sceneEditorSpec = cockpit.studioSceneEditorInteractionSpec();
+assert.equal(sceneEditorSpec.schemaVersion, 'studio-scene-editor-interaction-spec-v1');
+assert.equal(sceneEditorSpec.classification, 'contract-complete');
+assert.equal(sceneEditorSpec.draftTransactionModel.baseModel, 'base-relative');
+assert.equal(sceneEditorSpec.draftTransactionModel.baseDigestRequired, true);
+assert.equal(sceneEditorSpec.draftTransactionModel.cumulativeSimulation, false);
+assert.match(sceneEditorSpec.draftTransactionModel.reference, /scene-only-mutation-v2/);
+assert.ok(sceneEditorSpec.requiredSurfaces.some((surface) => surface.id === 'apply-handoff' && /Safe Source Apply/.test(surface.behavior)));
+assert.ok(sceneEditorSpec.forbiddenActions.includes('cumulative_simulation_base'));
+const specHtml = cockpit.renderStudioSceneEditorInteractionSpecSurface();
+assert.match(specHtml, /base-relative/);
+assert.match(specHtml, /cumulative simulation: false/);
+assert.match(specHtml, /Safe Source Apply handoff only/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
