@@ -228,3 +228,23 @@ node examples/game-runtime/visual-rubric-report.test.cjs
 
 This is a rubric report over deterministic source/runtime evidence. Browser
 pixel screenshots remain generated evidence under ignored `runs/` bundles.
+
+### Scenario Coverage v101 (M120)
+
+`scenario-coverage-v101.test.cjs` is the M120 visual quality/regression coverage
+suite landed with #2361. It composes:
+
+- screenshot-observable rubric contract (`visual-rubric.test.cjs`)
+- four-state Signal Gate rubric report (`visual-rubric-report.test.cjs`)
+- report-based visual regression capture (`visual-regression-capture.test.cjs`)
+- M118 shell regression coverage (`scenario-coverage-v99.test.cjs`)
+
+Run it with:
+
+```bash
+node examples/game-runtime/scenario-coverage-v101.test.cjs
+```
+
+The suite verifies report/rubric integration and generated artifact policy. It
+does not commit platform-dependent screenshots; generated outputs remain under
+ignored `runs/` bundles.
