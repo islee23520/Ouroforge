@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "signal-gate-visual-audio-rubric-v1",
+  "issue": 2387,
+  "m120Rubric": "examples/game-runtime/visual-readability-rubric.md",
+  "viewport": { "width": 480, "height": 220, "deviceScaleFactor": 1, "colorScheme": "dark", "fontPolicy": "system-ui fallback" },
+  "tokens": {
+    "background": "#111827",
+    "player": "#5eead4",
+    "relay": "#38bdf8",
+    "key": "#facc15",
+    "hazard": "#fb7185",
+    "gate": "#a78bfa",
+    "floor": "#334155",
+    "hudText": "#ffffff"
+  },
+  "checks": [
+    { "id": "objective-readability", "status": "pass", "evidence": "HUD states name objective/progression/fail/win" },
+    { "id": "silhouette-separation", "status": "pass", "evidence": "player/relay/key/hazard/gate use distinct hue families" },
+    { "id": "failure-feedback", "status": "pass", "evidence": "hazard fail event maps to explicit restart message" },
+    { "id": "asset-root-audit", "status": "pass", "evidence": "local asset manifest only; no generated asset roots committed" }
+  ],
+  "audioIntent": ["relay_ping", "key_chime", "gate_open", "hazard_fail", "win_sting"],
+  "boundary": "Rubric pass is source/report evidence, not pixel-perfect proof; live browser screenshots stay under ignored runs/ bundles."
+}
