@@ -2559,6 +2559,23 @@ assert.ok(!/applied successfully|operation applied|merge complete|apply succeede
 assert.doesNotMatch(boundaryFailCockpit, /<button|<form|<input/i);
 assert.doesNotMatch(boundaryFailCockpit, /data-action=/i);
 
+// #2362 workspace UX contract: every M121/M122 workspace element is mapped to an existing Studio/cockpit host surface.
+const workspaceContract = cockpit.studioWorkspaceUxContract();
+assert.equal(workspaceContract.schemaVersion, 'studio-workspace-ux-contract-v1');
+assert.equal(workspaceContract.browserCommandBridge, false);
+assert.equal(workspaceContract.classification, 'contract-complete');
+const workspaceSurfaceIds = workspaceContract.surfaces.map((surface) => surface.id).sort();
+assert.deepEqual(workspaceSurfaceIds, ['asset-list', 'evidence-browser', 'project-open', 'run-action', 'scene-editor', 'scene-list', 'state-labels'].sort());
+for (const surface of workspaceContract.surfaces) {
+  assert.match(surface.hostFile, /^examples\/authoring-cockpit\//);
+  assert.match(surface.hostSurface, /^render/);
+  assert.ok(surface.selector, `${surface.id} selector is recorded`);
+  assert.doesNotMatch(surface.stateBoundary, /command bridge enabled|auto-apply enabled|hidden execution enabled/i);
+}
+assert.match(cockpit.renderWorkspaceUxContractSurface(), /Workspace UX contract/);
+assert.match(cockpit.renderWorkspaceUxContractSurface(), /renderProjectRunSurface/);
+assert.match(cockpit.renderWorkspaceUxContractSurface(), /Safe Source Apply handoff/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
