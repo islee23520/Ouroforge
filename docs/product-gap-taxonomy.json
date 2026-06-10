@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "ouroforge.product-gap-taxonomy.v1",
+  "issue": 2350,
+  "sourceOfTruth": "docs/product-gap-taxonomy.json",
+  "consumers": [
+    "#2351 gap ledger",
+    "#2381 classifier",
+    "#2383 backlog",
+    "#2390 dogfood production log"
+  ],
+  "categoryEnum": [
+    {
+      "id": "runtime_ux",
+      "label": "Runtime UX",
+      "definition": "Can a user launch, understand, and recover from the running game loop without fixture-specific knowledge?",
+      "defaultOwner": "runtime",
+      "exampleFinding": "A user cannot find how to start/restart/play the loop."
+    },
+    {
+      "id": "renderer_quality",
+      "label": "Renderer Quality",
+      "definition": "Does the rendered output communicate game state clearly enough for practical play and review?",
+      "defaultOwner": "runtime",
+      "exampleFinding": "Sprites, camera, scaling, or visual ordering make gameplay unreadable."
+    },
+    {
+      "id": "input_control",
+      "label": "Input / Control",
+      "definition": "Do input mappings, responsiveness, replay, and control affordances support the claimed gameplay/editor action?",
+      "defaultOwner": "runtime",
+      "exampleFinding": "Required actions are missing, laggy, undiscoverable, or not replayable."
+    },
+    {
+      "id": "scene_authoring",
+      "label": "Scene Authoring",
+      "definition": "Can scenes, levels, entities, components, and layout edits be authored and reviewed through the scoped product flow?",
+      "defaultOwner": "studio",
+      "exampleFinding": "A level change requires hand-editing fixture JSON despite an editor-authoring claim."
+    },
+    {
+      "id": "asset_workflow",
+      "label": "Asset Workflow",
+      "definition": "Can assets be referenced, previewed, validated, and diagnosed in the scoped product flow?",
+      "defaultOwner": "studio",
+      "exampleFinding": "Missing/invalid assets fail silently or previews cannot be tied to source refs."
+    },
+    {
+      "id": "behavior_scripting",
+      "label": "Behavior / Scripting",
+      "definition": "Can gameplay behavior be expressed, constrained, verified, and debugged without unsafe arbitrary code expansion?",
+      "defaultOwner": "core",
+      "exampleFinding": "A behavior claim depends on opaque scripts or has no deterministic assertion path."
+    },
+    {
+      "id": "editor_workflow",
+      "label": "Editor Workflow",
+      "definition": "Can Studio/editor users navigate projects, inspect state, draft changes, and understand gated writes?",
+      "defaultOwner": "studio",
+      "exampleFinding": "The editor surface displays data but gives no usable workflow for the claimed task."
+    },
+    {
+      "id": "agentic_mutation",
+      "label": "Agentic Mutation",
+      "definition": "Can proposal, review, apply/rerun, rollback, and backlog steps be observed and bounded end to end?",
+      "defaultOwner": "agentic",
+      "exampleFinding": "An agent proposes changes without before/after evidence or human review gate proof."
+    },
+    {
+      "id": "qa_evaluator_depth",
+      "label": "QA / Evaluator Depth",
+      "definition": "Do evaluators catch mechanical, runtime, visual, semantic, regression, and product-observed failures with honest gaps?",
+      "defaultOwner": "qa",
+      "exampleFinding": "Green tests miss a visible product failure or collapse multiple failure modes into one vague verdict."
+    },
+    {
+      "id": "export_package_reality",
+      "label": "Export / Package Reality",
+      "definition": "Does export/package evidence reflect a runnable local artifact without implying store submission or release authority?",
+      "defaultOwner": "export",
+      "exampleFinding": "A bundle descriptor exists but no local smoke proves it runs."
+    },
+    {
+      "id": "dogfood_game_quality",
+      "label": "Dogfood Game Quality",
+      "definition": "Does a real dogfood game demonstrate coherent play, pacing, feedback, and human-owned fun/release judgment?",
+      "defaultOwner": "product",
+      "exampleFinding": "A dogfood slice is mechanically passable but confusing, unfun, or lacks human verdict evidence."
+    }
+  ],
+  "severityEnum": [
+    {
+      "id": "blocking",
+      "definition": "Prevents the scoped user/product flow from being completed or makes the claim materially false.",
+      "observableExample": "Runtime cannot be launched from the documented entry point; editor cannot open the project; agentic apply lacks review gate evidence."
+    },
+    {
+      "id": "major",
+      "definition": "The flow can complete only with significant workaround, missing diagnostics, or evidence gaps that would mislead product-observed closure.",
+      "observableExample": "Gameplay can finish, but console errors, missing frame stats, or absent replay prevent a product-observed pass."
+    },
+    {
+      "id": "polish",
+      "definition": "The core flow works and evidence exists, but usability, clarity, presentation, or ergonomics fall below practical quality expectations.",
+      "observableExample": "HUD wording or visual alignment is confusing but does not block the observed scenario."
+    }
+  ],
+  "ownerMapping": {
+    "runtime": "Runtime/data-plane owner: Rust contracts plus browser runtime evidence, depending on surface.",
+    "studio": "Studio/editor owner: presentation/control-plane UX with Rust-owned artifact truth and gated writes.",
+    "core": "Core gameplay/data owner: Rust validation and deterministic evidence contracts.",
+    "agentic": "Agentic-loop owner: proposal/review/apply/rerun evidence and human gate preservation.",
+    "qa": "QA/evaluator owner: failure taxonomy, scenario coverage, verdict quality, and gap escalation.",
+    "export": "Export/package owner: local package descriptors, provenance, checksums, and runnable smoke evidence.",
+    "product": "Dogfood/product owner: real-game slice quality, human fun/taste verdicts, and release-go/no-go boundaries."
+  },
+  "findingRequiredFields": [
+    "id",
+    "category",
+    "severity",
+    "owner",
+    "evidenceRefs",
+    "observedBehavior",
+    "expectedBehavior",
+    "productImpact",
+    "recommendedBacklogAction"
+  ],
+  "classificationRules": [
+    "Use exactly one category id from categoryEnum and one severity id from severityEnum per primary finding.",
+    "Use blocking when the claimed product flow cannot complete or required evidence is absent for product-observed closure.",
+    "Use major when the flow completes only with misleading gaps, diagnostics failures, or substantial workaround.",
+    "Use polish only when product-observed completion remains honest and the issue is usability/presentation refinement.",
+    "Record gaps as backlog items rather than changing failed product observations to green."
+  ]
+}
