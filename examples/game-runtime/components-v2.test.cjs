@@ -52,6 +52,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(state.componentModel.counts)), {
   cameraTarget: 1,
   uiText: 1,
   hudValue: 0,
+  vfx: 0,
 });
 assert.equal(state.componentModel.goalFlags.alive, true);
 assert.equal(state.componentModel.goalFlags.coin_collected, false);
