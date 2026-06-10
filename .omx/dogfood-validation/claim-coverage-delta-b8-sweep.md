@@ -1,6 +1,6 @@
 # Claim Coverage Delta — B8 Final Sweep
 
-Generated: 2026-06-10T03:10:00Z
+Generated: 2026-06-10T03:04:00Z
 Lane: `claim-coverage-delta-b8-sweep`
 Mode: final sweep; no new implementation.
 
