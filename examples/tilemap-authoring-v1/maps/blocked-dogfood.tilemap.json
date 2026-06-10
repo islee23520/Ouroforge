@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ouroforge.tilemap-source.v1",
+  "mapId": "blocked-dogfood",
+  "sourcePath": "examples/tilemap-authoring-v1/maps/blocked-dogfood.tilemap.json",
+  "pathConvention": "examples/tilemap-authoring-v1/maps/<map-id>.tilemap.json",
+  "tilesetRef": "examples/game-runtime/assets/tileset.basic.json",
+  "width": 3,
+  "height": 3,
+  "tileSize": 16,
+  "palette": [
+    { "tileId": "floor", "label": "Floor" },
+    { "tileId": "wall", "label": "Wall", "solid": true },
+    { "tileId": "exit", "label": "Exit" }
+  ],
+  "layers": [
+    { "layerId": "ground", "kind": "ground", "cells": [["floor", "floor", "floor"], ["floor", "floor", "floor"], ["floor", "floor", "floor"]] },
+    { "layerId": "collision", "kind": "collision", "cells": [[".", "wall", "."], ["wall", "wall", "wall"], [".", "wall", "."]] },
+    { "layerId": "objectives", "kind": "objective", "cells": [[".", ".", "."], [".", ".", "."], [".", ".", "exit"]] }
+  ],
+  "markers": [
+    { "markerId": "spawn-player", "kind": "spawn", "x": 0, "y": 0 },
+    { "markerId": "objective-exit", "kind": "objective", "x": 2, "y": 2 }
+  ],
+  "guardrails": ["blocked fixture for named diagnostics"]
+}

@@ -101,6 +101,7 @@ pub mod legacy_logic_ingestion;
 pub mod loop_coverage_attribution;
 pub mod semantic_port_coverage;
 pub mod tacit_oracle_capture;
+pub mod tilemap_authoring;
 pub mod trust_gradient_auto_apply;
 pub mod unity_2d_adapter_ir;
 pub use loop_coverage_attribution::*;

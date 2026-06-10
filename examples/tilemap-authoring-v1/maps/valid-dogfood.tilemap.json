@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "ouroforge.tilemap-source.v1",
+  "mapId": "valid-dogfood",
+  "sourcePath": "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
+  "pathConvention": "examples/tilemap-authoring-v1/maps/<map-id>.tilemap.json",
+  "tilesetRef": "examples/game-runtime/assets/tileset.basic.json",
+  "width": 5,
+  "height": 4,
+  "tileSize": 16,
+  "palette": [
+    {
+      "tileId": "floor",
+      "label": "Floor"
+    },
+    {
+      "tileId": "wall",
+      "label": "Wall",
+      "solid": true
+    },
+    {
+      "tileId": "exit",
+      "label": "Exit"
+    },
+    {
+      "tileId": "key",
+      "label": "Key trigger"
+    }
+  ],
+  "layers": [
+    {
+      "layerId": "ground",
+      "kind": "ground",
+      "cells": [
+        [
+          "floor",
+          "floor",
+          "floor",
+          "floor",
+          "floor"
+        ],
+        [
+          "floor",
+          "floor",
+          "floor",
+          "floor",
+          "floor"
+        ],
+        [
+          "floor",
+          "floor",
+          "floor",
+          "floor",
+          "floor"
+        ],
+        [
+          "floor",
+          "floor",
+          "floor",
+          "floor",
+          "floor"
+        ]
+      ]
+    },
+    {
+      "layerId": "collision",
+      "kind": "collision",
+      "cells": [
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          "wall",
+          ".",
+          "wall",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ]
+    },
+    {
+      "layerId": "triggers",
+      "kind": "trigger",
+      "cells": [
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ]
+    },
+    {
+      "layerId": "objectives",
+      "kind": "objective",
+      "cells": [
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "exit"
+        ],
+        [
+          ".",
+          ".",
+          ".",
+          ".",
+          "."
+        ]
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "markerId": "spawn-player",
+      "kind": "spawn",
+      "x": 0,
+      "y": 0,
+      "label": "Player spawn"
+    },
+    {
+      "markerId": "trigger-key",
+      "kind": "trigger",
+      "x": 2,
+      "y": 1,
+      "label": "Key pickup"
+    },
+    {
+      "markerId": "objective-exit",
+      "kind": "objective",
+      "x": 4,
+      "y": 2,
+      "label": "Reach exit"
+    }
+  ],
+  "guardrails": [
+    "source-like fixture only",
+    "browser and Studio surfaces may draft but not write trusted tilemap files"
+  ]
+}
