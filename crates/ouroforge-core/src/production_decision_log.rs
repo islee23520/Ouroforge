@@ -41,6 +41,45 @@ pub struct ProductionDecisionRecord {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct ProductionDecisionLogReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "logId")]
+    pub log_id: String,
+    #[serde(rename = "decisionCount")]
+    pub decision_count: usize,
+    #[serde(rename = "acceptedCount")]
+    pub accepted_count: usize,
+    #[serde(rename = "rejectedCount")]
+    pub rejected_count: usize,
+    #[serde(rename = "deferredCount")]
+    pub deferred_count: usize,
+    #[serde(rename = "humanReviewerCount")]
+    pub human_reviewer_count: usize,
+    #[serde(rename = "inspectionRows")]
+    pub inspection_rows: Vec<ProductionDecisionInspectionRow>,
+    #[serde(rename = "forbiddenActions")]
+    pub forbidden_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionDecisionInspectionRow {
+    #[serde(rename = "decisionId")]
+    pub decision_id: String,
+    pub outcome: ProductionDecisionOutcome,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: String,
+    #[serde(rename = "journalEntryRef")]
+    pub journal_entry_ref: String,
+    #[serde(rename = "humanReviewer")]
+    pub human_reviewer: String,
+    #[serde(rename = "evidenceCount")]
+    pub evidence_count: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ProductionDecisionLog {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
@@ -52,6 +91,52 @@ pub struct ProductionDecisionLog {
 }
 
 impl ProductionDecisionLog {
+    pub fn read_model(&self) -> ProductionDecisionLogReadModel {
+        let reviewers: BTreeSet<_> = self
+            .decisions
+            .iter()
+            .map(|decision| decision.human_reviewer.clone())
+            .collect();
+        ProductionDecisionLogReadModel {
+            schema_version: PRODUCTION_DECISION_LOG_SCHEMA_VERSION.to_string(),
+            log_id: self.log_id.clone(),
+            decision_count: self.decisions.len(),
+            accepted_count: self
+                .decisions
+                .iter()
+                .filter(|d| d.outcome == ProductionDecisionOutcome::Accepted)
+                .count(),
+            rejected_count: self
+                .decisions
+                .iter()
+                .filter(|d| d.outcome == ProductionDecisionOutcome::Rejected)
+                .count(),
+            deferred_count: self
+                .decisions
+                .iter()
+                .filter(|d| d.outcome == ProductionDecisionOutcome::Deferred)
+                .count(),
+            human_reviewer_count: reviewers.len(),
+            inspection_rows: self
+                .decisions
+                .iter()
+                .map(|decision| ProductionDecisionInspectionRow {
+                    decision_id: decision.decision_id.clone(),
+                    outcome: decision.outcome.clone(),
+                    proposal_ref: decision.proposal_ref.clone(),
+                    journal_entry_ref: decision.journal_entry_ref.clone(),
+                    human_reviewer: decision.human_reviewer.clone(),
+                    evidence_count: decision.evidence_refs.len(),
+                })
+                .collect(),
+            forbidden_actions: vec![
+                "agent_self_approval".to_string(),
+                "auto_apply".to_string(),
+                "hide_rejected_proposal".to_string(),
+            ],
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.schema_version != PRODUCTION_DECISION_LOG_SCHEMA_VERSION {
             return Err(anyhow!("production decision log schemaVersion must be {PRODUCTION_DECISION_LOG_SCHEMA_VERSION}"));

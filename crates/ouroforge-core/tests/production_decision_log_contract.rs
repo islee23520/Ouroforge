@@ -64,3 +64,22 @@ fn decision_log_rejects_self_approval_and_missing_rejections() {
         .to_string();
     assert!(error.contains("rejected proposal"), "{error}");
 }
+
+#[test]
+fn decision_log_read_model_supports_inspection_without_spelunking() {
+    let log = log();
+    log.validate().expect("valid decision log");
+    let model = log.read_model();
+    assert_eq!(model.decision_count, 2);
+    assert_eq!(model.accepted_count, 1);
+    assert_eq!(model.rejected_count, 1);
+    assert_eq!(model.human_reviewer_count, 1);
+    assert_eq!(model.inspection_rows.len(), 2);
+    assert!(model
+        .inspection_rows
+        .iter()
+        .all(|row| row.evidence_count > 0));
+    assert!(model
+        .forbidden_actions
+        .contains(&"agent_self_approval".to_string()));
+}
