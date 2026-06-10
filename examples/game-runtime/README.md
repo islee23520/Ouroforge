@@ -164,3 +164,31 @@ for example `runs/session-f-2353/screenshots/state-start.png`. The local Chrome
 headless run produced the start screenshot in this path; Chrome process stderr
 contained browser infrastructure shutdown/network messages after termination, so
 page-console fatal-error proof is not upgraded beyond the DOM smoke in #2353.
+
+### HUD checkpoint report (M118.3)
+
+`hud-binding.test.cjs` cross-checks collect-and-exit HUD DOM values against
+`getWorldState()` samples at `start`, `key-collected`, `gate-open`, and `win`.
+`hud-checkpoint-report.test.cjs` wraps that deterministic replay and records the
+corresponding screenshot filenames expected in live bundles:
+
+- `screenshots/state-start.png`
+- `screenshots/state-key-collected.png`
+- `screenshots/state-gate-open.png`
+- `screenshots/state-win.png`
+
+Run the report without writing generated artifacts:
+
+```bash
+node examples/game-runtime/hud-checkpoint-report.test.cjs
+```
+
+To materialize ignored local evidence for review, set:
+
+```bash
+OUROFORGE_WRITE_RUNS=1 node examples/game-runtime/hud-checkpoint-report.test.cjs
+```
+
+That writes `runs/session-f-2354/world-samples.jsonl` and
+`runs/session-f-2354/hud-checkpoint-report.json`. These generated files remain
+untracked; committed source contains only the reproducible replay/report logic.
