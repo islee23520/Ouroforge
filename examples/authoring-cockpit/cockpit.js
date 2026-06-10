@@ -3655,6 +3655,112 @@ const OuroforgeCockpit = (() => {
     return `<div class="proposal-rationale"><h3>Command palette</h3><p class="hint">Read-only. The palette only offers navigation, local draft, and copy commands. It does not run shell, apply source, merge, publish, deploy, install, or execute plugins, mutate dependencies/CI, or write trusted state.</p><ul role="listbox" aria-label="Studio command palette">${options}</ul></div>`;
   }
 
+
+
+  const PROPOSAL_PANEL_STATES = ['accepted', 'rejected', 'gate-failed'];
+
+  function proposalEvidenceRefs(proposal) {
+    const refs = [];
+    for (const key of ['problemEvidenceRefs', 'problem_evidence_refs', 'evidenceRefs', 'evidence_refs']) {
+      if (Array.isArray(proposal?.[key])) refs.push(...proposal[key]);
+    }
+    if (Array.isArray(proposal?.rollback?.rollbackRefs)) refs.push(...proposal.rollback.rollbackRefs);
+    if (Array.isArray(proposal?.rollback?.rollback_refs)) refs.push(...proposal.rollback.rollback_refs);
+    return refs.map((ref, index) => ({
+      id: ref?.id || ref?.artifactId || ref?.artifact_id || ref?.path || `evidence-${index + 1}`,
+      runId: ref?.runId || ref?.run_id || proposal?.runId || proposal?.run_id || 'unknown-run',
+      path: ref?.path || ref?.artifactPath || ref?.artifact_path || '',
+      digest: ref?.digest || ref?.hash || 'unknown',
+      kind: ref?.kind || ref?.artifactKind || ref?.artifact_kind || 'evidence',
+      exists: ref?.exists !== false,
+      readError: ref?.readError || ref?.read_error || '',
+    })).filter((ref) => ref.path);
+  }
+
+  function proposalState(proposal) {
+    const raw = String(proposal?.reviewState || proposal?.review_state || proposal?.state || proposal?.status || '').toLowerCase();
+    if (raw === 'accepted' || raw === 'approved') return 'accepted';
+    if (raw === 'rejected' || raw === 'declined') return 'rejected';
+    const gateStatus = String(proposal?.qualityGate?.status || proposal?.quality_gate?.status || proposal?.gateStatus || proposal?.gate_status || '').toLowerCase();
+    if (raw === 'gate-failed' || raw === 'gate_failed' || gateStatus === 'failed' || gateStatus === 'gate-failed') return 'gate-failed';
+    return raw || 'pending';
+  }
+
+  function proposalGateReasons(proposal) {
+    const gate = proposal?.qualityGate || proposal?.quality_gate || {};
+    const reasons = [];
+    for (const key of ['reasons', 'blockedReasons', 'blocked_reasons', 'diagnostics']) {
+      if (Array.isArray(gate[key])) reasons.push(...gate[key]);
+    }
+    return reasons.map((reason) => typeof reason === 'string' ? reason : (reason?.message || reason?.code || JSON.stringify(reason)));
+  }
+
+  function proposalWorkbenchPanelModel(run) {
+    const direct = Array.isArray(run?.proposal_workbench) ? run.proposal_workbench
+      : Array.isArray(run?.proposalWorkbench) ? run.proposalWorkbench
+      : Array.isArray(run?.proposals) ? run.proposals
+      : Array.isArray(run?.mutations) ? run.mutations : [];
+    const proposals = direct.map((proposal, index) => {
+      const state = proposalState(proposal);
+      const evidenceRefs = proposalEvidenceRefs(proposal);
+      const targetPaths = Array.isArray(proposal?.diffScope?.targetPaths) ? proposal.diffScope.targetPaths
+        : Array.isArray(proposal?.diff_scope?.target_paths) ? proposal.diff_scope.target_paths
+        : Array.isArray(proposal?.targetPaths) ? proposal.targetPaths
+        : Array.isArray(proposal?.target_paths) ? proposal.target_paths : [];
+      return {
+        id: proposal?.proposalId || proposal?.proposal_id || proposal?.id || `proposal-${index + 1}`,
+        state,
+        stateKnown: PROPOSAL_PANEL_STATES.includes(state),
+        category: proposal?.category || 'unknown',
+        hypothesis: proposal?.hypothesis || proposal?.summary || 'No proposal hypothesis recorded.',
+        expectedImpact: proposal?.expectedImpact || proposal?.expected_impact || 'No expected impact recorded.',
+        diffSummary: proposal?.diffScope?.operationSummary || proposal?.diff_scope?.operation_summary || proposal?.diffSummary || proposal?.diff_summary || 'No diff summary recorded.',
+        risk: proposal?.risk?.level || proposal?.riskLevel || proposal?.risk_level || 'unknown',
+        rollback: proposal?.rollback?.rollbackPlan || proposal?.rollback?.rollback_plan || proposal?.rollbackPlan || proposal?.rollback_plan || 'No rollback plan recorded.',
+        targetPaths,
+        evidenceRefs,
+        gateReasons: proposalGateReasons(proposal),
+      };
+    });
+    const unresolved = proposals.flatMap((proposal) => proposal.evidenceRefs.filter((ref) => !ref.exists || ref.readError).map((ref) => ({ proposalId: proposal.id, path: ref.path, readError: ref.readError || 'missing' })));
+    return {
+      present: proposals.length > 0,
+      proposals,
+      unresolved,
+      states: PROPOSAL_PANEL_STATES.slice(),
+      boundary: 'Read-only evidence-to-proposal panel; Studio does not accept, reject, apply, rerun, execute commands, write trusted state, self-approve, auto-apply, or auto-merge.',
+    };
+  }
+
+  function renderProposalWorkbenchPanelSurface(run) {
+    const model = proposalWorkbenchPanelModel(run);
+    if (!model.present) {
+      return `<section id="proposal-workbench-panel" class="panel"><h2>Evidence-linked proposals</h2><p class="empty">No evidence-linked proposals loaded.</p><p class="hint">${escapeText(model.boundary)}</p></section>`;
+    }
+    const rows = model.proposals.map((proposal) => {
+      const stateOk = proposal.state === 'accepted';
+      const gateRows = proposal.state === 'gate-failed'
+        ? `<ul class="proposal-gate-reasons">${(proposal.gateReasons.length ? proposal.gateReasons : ['quality gate failed without detailed reasons']).map((reason) => `<li>${surfaceState(false, escapeText(reason))}</li>`).join('')}</ul>`
+        : '';
+      const targetRows = proposal.targetPaths.length ? proposal.targetPaths.map((target) => escapeText(target)).join(', ') : 'none';
+      const evidenceRows = proposal.evidenceRefs.length ? proposal.evidenceRefs.map((ref) => {
+        const resolved = ref.exists && !ref.readError;
+        return `<li>${surfaceState(resolved, resolved ? 'resolved' : `unresolved: ${escapeText(ref.readError || 'missing')}`)} <a href="${escapeText(ref.path)}">${escapeText(ref.path)}</a> <small>run ${escapeText(ref.runId)} · ${escapeText(ref.digest)}</small></li>`;
+      }).join('') : '<li>No evidence refs recorded.</li>';
+      return `<article class="surface-row proposal-workbench-row" data-proposal="${escapeText(proposal.id)}" data-state="${escapeText(proposal.state)}">
+        <h3>${escapeText(proposal.id)} ${surfaceState(stateOk, proposal.state)}</h3>
+        <p><strong>Why:</strong> ${escapeText(proposal.hypothesis)}</p>
+        <p><strong>Diff:</strong> ${escapeText(proposal.diffSummary)} · targets: ${targetRows}</p>
+        <p><strong>Expected impact:</strong> ${escapeText(proposal.expectedImpact)}</p>
+        <p><strong>Risk/Rollback:</strong> ${escapeText(proposal.risk)} · ${escapeText(proposal.rollback)}</p>
+        ${gateRows}
+        <h4>Observed evidence artifacts</h4><ul>${evidenceRows}</ul>
+      </article>`;
+    }).join('');
+    const unresolved = model.unresolved.length ? `<p class="warning">Unresolved evidence refs: ${escapeText(model.unresolved.map((item) => `${item.proposalId}:${item.path}`).join(', '))}</p>` : '<p class="hint">All listed evidence refs are marked resolvable by the read model.</p>';
+    return `<section id="proposal-workbench-panel" class="panel"><h2>Evidence-linked proposals</h2><p class="hint">${escapeText(model.boundary)} States: ${escapeText(model.states.join(', '))}.</p>${unresolved}${rows}</section>`;
+  }
+
   function renderProposalRationaleSurface(run) {
     const direct = Array.isArray(run?.mutations) ? run.mutations : [];
     const proposed = mutationStage(run?.mutation_lifecycle, 'proposed');
@@ -6049,7 +6155,7 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderProvenanceAuditPanel, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, classifyStudioSourceGeneratedPath, studioSourceGeneratedBrowserModel, renderStudioSourceGeneratedBrowserSurface, liveObservabilityManifestEvidenceModel, renderLiveObservabilityEvidenceSurface, renderFullStudioEditorDemoSurface, fullStudioEditorDemoModel, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, loopCoverageInspectionModel, renderLoopCoverageInspectionSurface, trustGradientInspectionModel, renderTrustGradientInspectionSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioPluginPanelModel, renderStudioPluginPanelSurface, studioExportPackageInspectionModel, renderStudioExportPackageInspectionSurface, studioScenarioPanelModel, renderStudioScenarioPanelSurface, studioAssetBrowserModel, renderStudioAssetBrowserSurface, filterStudioAssets, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, studioSceneEditorInteractionSpec, renderStudioSceneEditorInteractionSpecSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioWorkspaceUxContract, renderWorkspaceUxContractSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST, entityComponentFieldAllowlisted, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderProvenanceAuditPanel, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, classifyStudioSourceGeneratedPath, studioSourceGeneratedBrowserModel, renderStudioSourceGeneratedBrowserSurface, liveObservabilityManifestEvidenceModel, renderLiveObservabilityEvidenceSurface, renderFullStudioEditorDemoSurface, fullStudioEditorDemoModel, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, loopCoverageInspectionModel, renderLoopCoverageInspectionSurface, trustGradientInspectionModel, renderTrustGradientInspectionSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioPluginPanelModel, renderStudioPluginPanelSurface, studioExportPackageInspectionModel, renderStudioExportPackageInspectionSurface, studioScenarioPanelModel, renderStudioScenarioPanelSurface, studioAssetBrowserModel, renderStudioAssetBrowserSurface, filterStudioAssets, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, proposalWorkbenchPanelModel, renderProposalWorkbenchPanelSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, studioSceneEditorInteractionSpec, renderStudioSceneEditorInteractionSpecSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioWorkspaceUxContract, renderWorkspaceUxContractSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST, entityComponentFieldAllowlisted, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

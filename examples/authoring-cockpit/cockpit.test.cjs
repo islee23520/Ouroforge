@@ -2762,6 +2762,51 @@ assert.match(handoffHtml2368, /Scenario Coverage: v103 landed/);
 assert.match(handoffHtml2368, /Main worktree status: unchanged/);
 assert.doesNotMatch(handoffHtml2368, /<button|<form|data-action=|auto-apply|self-approve enabled/i);
 
+const proposalPanelFixture = {
+  proposal_workbench: [{
+    proposalId: 'accepted-proposal',
+    state: 'accepted',
+    category: 'gameplay',
+    problemEvidenceRefs: [{ runId: 'live-run', path: 'examples/authoring-cockpit/fixtures/proposals/evidence/screenshots/live-proposal.png', digest: 'sha256:live-proposal', exists: true, kind: 'screenshot' }],
+    hypothesis: 'hazard timing is too strict in observed live replay evidence',
+    diffScope: { targetPaths: ['examples/playable-demo-v2/collect-and-exit/scene.patch.json'], operationSummary: 'relax hazard contact threshold' },
+    expectedImpact: 'player can read the hazard route before contact failure',
+    risk: { level: 'low' },
+    rollback: { rollbackPlan: 'restore previous hazard route timing' },
+  }, {
+    proposalId: 'rejected-proposal',
+    state: 'rejected',
+    problemEvidenceRefs: [{ runId: 'live-run', path: 'examples/authoring-cockpit/fixtures/proposals/evidence/screenshots/live-proposal.png', digest: 'sha256:live-proposal', exists: true }],
+    hypothesis: 'proposal was reviewed and rejected',
+    diffScope: { targetPaths: ['examples/playable-demo-v2/collect-and-exit/scene.patch.json'], operationSummary: 'change rejected route' },
+    expectedImpact: 'not accepted by reviewer',
+    risk: { level: 'medium' },
+    rollback: { rollbackPlan: 'no apply occurred' },
+  }, {
+    proposalId: 'gate-failed-proposal',
+    state: 'gate-failed',
+    qualityGate: { status: 'failed', reasons: ['missing rollback evidence'] },
+    problemEvidenceRefs: [{ runId: 'live-run', path: 'examples/authoring-cockpit/fixtures/proposals/evidence/screenshots/live-proposal.png', digest: 'sha256:live-proposal', exists: true }],
+    hypothesis: 'proposal lacks enough rollback detail',
+    diffScope: { targetPaths: ['examples/playable-demo-v2/collect-and-exit/scene.patch.json'], operationSummary: 'unsafe broad change' },
+    expectedImpact: 'blocked until gate reasons are resolved',
+    risk: { level: 'high' },
+    rollback: { rollbackPlan: 'missing rollback evidence' },
+  }],
+};
+const proposalPanelModel = cockpit.proposalWorkbenchPanelModel(proposalPanelFixture);
+assert.deepEqual(proposalPanelModel.proposals.map((proposal) => proposal.state), ['accepted', 'rejected', 'gate-failed']);
+assert.equal(proposalPanelModel.unresolved.length, 0);
+const liveScreenshotPath = proposalPanelModel.proposals[0].evidenceRefs[0].path;
+assert.equal(fs.existsSync(liveScreenshotPath), true, `expected resolvable live screenshot path ${liveScreenshotPath}`);
+const proposalPanelHtml = cockpit.renderProposalWorkbenchPanelSurface(proposalPanelFixture);
+assert.match(proposalPanelHtml, /accepted-proposal/);
+assert.match(proposalPanelHtml, /rejected-proposal/);
+assert.match(proposalPanelHtml, /gate-failed-proposal/);
+assert.match(proposalPanelHtml, /missing rollback evidence/);
+assert.match(proposalPanelHtml, /live-proposal\.png/);
+assert.doesNotMatch(proposalPanelHtml, /<script>|command bridge enabled|auto-apply enabled|self-approval granted/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
