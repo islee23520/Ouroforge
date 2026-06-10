@@ -496,8 +496,9 @@
     "fixture": "playable-demo-v2-collect-and-exit",
     "runContext": {
       "evidenceBoundary": "source-like fixture only; generated runs and dashboard exports remain untracked",
-      "issue": 591,
-      "prUnit": "P2D8.11.1"
+      "issue": 2490,
+      "prUnit": "session-k-product-observed-evidence-upgrade",
+      "sourceReview": "PR #2491 follow-up: fixture provenance must match Session K evidence scope"
     },
     "runtimeDebug": {
       "frameBudget": {
