@@ -83,3 +83,29 @@ fn decision_log_read_model_supports_inspection_without_spelunking() {
         .forbidden_actions
         .contains(&"agent_self_approval".to_string()));
 }
+
+#[test]
+fn sample_cycle_links_production_journal_decisions_and_read_model() {
+    let log = log();
+    log.validate().expect("valid decision log");
+    let model = log.read_model();
+    let accepted = model
+        .inspection_rows
+        .iter()
+        .find(|row| row.decision_id == "accept-hud-copy")
+        .expect("accepted row");
+    let rejected = model
+        .inspection_rows
+        .iter()
+        .find(|row| row.decision_id == "reject-auto-fun")
+        .expect("rejected row");
+    assert_eq!(accepted.outcome, ProductionDecisionOutcome::Accepted);
+    assert_eq!(rejected.outcome, ProductionDecisionOutcome::Rejected);
+    assert!(accepted
+        .journal_entry_ref
+        .starts_with("production-journal:"));
+    assert!(rejected.proposal_ref.contains("reject-auto-fun"));
+    assert!(model
+        .forbidden_actions
+        .contains(&"hide_rejected_proposal".to_string()));
+}
