@@ -38,6 +38,7 @@ pub use ouroforge_gdd::gdd_prototype_task_graph;
 pub use ouroforge_gdd::gdd_requirement_extraction;
 pub use ouroforge_gdd::gdd_scenario_acceptance_plan;
 pub use ouroforge_gdd::gdd_scene_level_plan;
+pub use ouroforge_source_apply::source_apply_controlled_failure_flow;
 pub use ouroforge_source_apply::source_apply_review_enforcement;
 pub use source_apply_review_enforcement::*;
 pub mod human_artifact_intake;

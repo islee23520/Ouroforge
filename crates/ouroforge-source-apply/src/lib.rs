@@ -6,6 +6,7 @@
 //! module so existing `ouroforge_core::source_apply_*` paths keep working.
 
 pub mod source_apply_audit_ledger;
+pub mod source_apply_controlled_failure_flow;
 pub mod source_apply_emergency_hold;
 pub mod source_apply_evidence_bundle;
 pub mod source_apply_highrisk_blocker;
