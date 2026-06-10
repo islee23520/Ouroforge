@@ -1,25 +1,24 @@
 {
   "status": "ready_for_verifier",
-  "selected_blocker": "B6 \u2014 Studio UX validation evidence is not yet durable on origin/main",
-  "branch": "dogfood/b6-studio-ux-validation-20260610015757",
-  "worktree": "/Users/jh0927/Ouroforge-dogfood-b6-studio-ux-20260610015757",
-  "message": "Focused B6 local read-only/review-gated Studio UX evidence handoff is ready for verifier; no product Studio feature, command bridge, trusted write, hosted, release, auto-port, foreign-runtime, or Era Q full-3D scope added.",
+  "selected_blocker": "B7 \u2014 Asset/content pipeline evidence is not yet durable on origin/main",
+  "branch": "dogfood/b7-asset-content-pipeline-20260610022409",
+  "worktree": "/Users/jh0927/Ouroforge-dogfood-b7-asset-content-20260610022409",
+  "message": "Focused B7 bounded local asset/content pipeline evidence handoff is ready for verifier; no product asset feature, remote fetch/upload, trusted write, hosted, release, auto-port, foreign-runtime, or Era Q full-3D scope added.",
   "tracked_artifacts": [
-    ".omx/dogfood-validation/studio-ux-validation.md",
-    ".omx/dogfood-validation/studio-ux-validation.status.json",
-    "examples/dogfood-studio-ux-validation-v1/studio-ux-validation-smoke.test.cjs",
+    ".omx/dogfood-validation/asset-content-pipeline.md",
+    ".omx/dogfood-validation/asset-content-pipeline.status.json",
+    "examples/dogfood-asset-content-pipeline-v1/asset-content-pipeline-smoke.test.cjs",
     ".omx/dogfood-validation/improvement-executor.status.json",
     ".omx/dogfood-validation/improvement-executor-report.md"
   ],
   "verification": [
-    "python3 -m json.tool .omx/dogfood-validation/studio-ux-validation.status.json \u2014 passed",
-    "node --test examples/dogfood-studio-ux-validation-v1/studio-ux-validation-smoke.test.cjs \u2014 passed",
-    "node --check examples/authoring-cockpit/cockpit.js \u2014 passed",
-    "node examples/authoring-cockpit/cockpit.test.cjs \u2014 passed",
-    "node examples/authoring-cockpit/integrated-demo-smoke.test.cjs \u2014 passed",
-    "node examples/godot-plus-demo-studio-walkthrough-v790/godot-plus-studio-walkthrough-smoke.test.cjs \u2014 passed",
+    "python3 -m json.tool .omx/dogfood-validation/asset-content-pipeline.status.json \u2014 passed",
+    "node --test examples/dogfood-asset-content-pipeline-v1/asset-content-pipeline-smoke.test.cjs \u2014 passed",
+    "node examples/playable-demo-v2/collect-and-exit/asset-pack-smoke.test.cjs \u2014 passed",
+    "node --test examples/asset-pipeline-v1-regression/evidence-smoke.test.cjs examples/asset-pipeline-v1-regression/dashboard-compatibility-smoke.test.cjs examples/game-runtime/tilemap.test.cjs \u2014 passed 3/3",
+    "cargo test -p ouroforge-core --test scenario_coverage_v34_asset_pipeline --jobs 2 \u2014 passed 6/6",
     "git diff --check origin/main...HEAD \u2014 passed"
   ],
-  "updated_at": "2026-06-10T02:01:38.212406Z",
-  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2340"
+  "updated_at": "2026-06-10T02:27:51.247591Z",
+  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2341"
 }
