@@ -117,3 +117,20 @@ fn blocked_map_fails_with_named_reachability_diagnostic() {
         .contains(&TilemapReachabilityDiagnostic::ObjectiveUnreachable));
     assert!(report.objective_path.is_empty());
 }
+
+#[test]
+fn reachable_map_links_generated_scenario_assertion_draft() {
+    let report = tilemap_reachability_report_from_json_str(&read_text(
+        "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
+    ))
+    .expect("valid map produces report");
+    assert_eq!(report.status, TilemapReachabilityStatus::Passed);
+    assert!(report.diagnostics.is_empty());
+    assert!(report
+        .scenario_assertion_draft_ref
+        .ends_with("valid-dogfood-assertion-draft.json"));
+    assert!(repo_root()
+        .join(&report.scenario_assertion_draft_ref)
+        .exists());
+    assert!(report.boundary.contains("no browser trusted writes"));
+}

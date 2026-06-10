@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "ouroforge.tilemap-scenario-assertion-draft.v1",
+  "issueRef": "#2371",
+  "targetTilemapRef": "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
+  "mapId": "valid-dogfood",
+  "assertions": [
+    {
+      "id": "spawn-can-reach-objective",
+      "kind": "objectiveReachability",
+      "fromMarkerId": "spawn-player",
+      "toMarkerId": "objective-exit",
+      "expected": "reachable"
+    },
+    {
+      "id": "trigger-marker-covered",
+      "kind": "triggerCoverageHint",
+      "markerId": "trigger-key",
+      "expected": "covered-by-scenario-draft"
+    }
+  ],
+  "boundary": "Generated scenario assertion draft only; not live replay evidence, not browser trusted write, not auto-apply."
+}

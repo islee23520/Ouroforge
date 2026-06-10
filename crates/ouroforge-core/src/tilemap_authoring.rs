@@ -472,6 +472,7 @@ pub enum TilemapReachabilityDiagnostic {
     SpawnBlocked,
     ObjectiveBlocked,
     ObjectiveUnreachable,
+    TriggerObjectiveUncovered,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -494,6 +495,8 @@ pub struct TilemapReachabilityReport {
     pub diagnostics: Vec<TilemapReachabilityDiagnostic>,
     #[serde(rename = "objectivePath")]
     pub objective_path: Vec<TilemapGridPoint>,
+    #[serde(rename = "scenarioAssertionDraftRef")]
+    pub scenario_assertion_draft_ref: String,
     pub boundary: String,
 }
 
@@ -530,6 +533,14 @@ pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReac
             }
         }
     }
+    if map
+        .markers
+        .iter()
+        .any(|m| m.kind == TilemapMarkerKind::Trigger)
+        && objective.is_none()
+    {
+        diagnostics.insert(TilemapReachabilityDiagnostic::TriggerObjectiveUncovered);
+    }
     let diagnostics: Vec<_> = diagnostics.into_iter().collect();
     TilemapReachabilityReport {
         schema_version: TILEMAP_REACHABILITY_SCHEMA_VERSION.to_string(),
@@ -542,6 +553,10 @@ pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReac
         },
         diagnostics,
         objective_path: path,
+        scenario_assertion_draft_ref: format!(
+            "examples/tilemap-authoring-v1/scenario-assertions/{}-assertion-draft.json",
+            map.map_id
+        ),
         boundary: "Rust/local reachability evidence only; no browser trusted writes, no auto-apply, no gameplay quality claim.".to_string(),
     }
 }
