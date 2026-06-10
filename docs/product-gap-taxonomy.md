@@ -135,3 +135,10 @@ Every downstream gap ledger, backlog item, classifier output, and dogfood produc
 - Use major when the flow completes only with misleading gaps, diagnostics failures, or substantial workaround.
 - Use polish only when product-observed completion remains honest and the issue is usability/presentation refinement.
 - Record gaps as backlog items rather than changing failed product observations to green.
+
+## Sample application
+
+The collect-and-exit sample application lives at
+[`docs/product-gap-taxonomy-sample-collect-and-exit.md`](product-gap-taxonomy-sample-collect-and-exit.md)
+with machine-readable findings at
+[`docs/product-gap-taxonomy-sample-collect-and-exit.json`](product-gap-taxonomy-sample-collect-and-exit.json).
