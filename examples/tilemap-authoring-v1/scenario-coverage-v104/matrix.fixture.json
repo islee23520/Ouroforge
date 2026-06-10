@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "scenario-coverage-v104-tilemap-level-editor-v1",
+  "coverageVersion": 104,
+  "issueRef": "#2371",
+  "milestone": "M123 Tilemap / Level Editor v1",
+  "rows": [
+    {
+      "id": "v104.tilemap-source-format-and-path-convention",
+      "status": "pass",
+      "issueRef": "#2369",
+      "evidenceRef": "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json"
+    },
+    {
+      "id": "v104.base-relative-digest-draft-preview",
+      "status": "pass",
+      "issueRef": "#2370",
+      "evidenceRef": "examples/tilemap-authoring-v1/drafts/valid-dogfood-open-lane.tilemap-draft.json"
+    },
+    {
+      "id": "v104.blocked-map-named-diagnostic",
+      "status": "pass",
+      "issueRef": "#2371",
+      "evidenceRef": "examples/tilemap-authoring-v1/maps/blocked-dogfood.tilemap.json"
+    },
+    {
+      "id": "v104.valid-map-live-replay-objective-reached",
+      "status": "pass",
+      "issueRef": "#2371",
+      "evidenceRef": "examples/tilemap-authoring-v1/evidence/valid-dogfood-live-replay.json"
+    }
+  ],
+  "invariants": {
+    "browserTrustedWritesAllowed": false,
+    "generatedPreviewMistakenForSource": false,
+    "baseDigestRequired": true,
+    "blockedFixtureUsesSharedNamedDiagnostic": true,
+    "validFixtureRequiresLiveReplay": true,
+    "productObservedClaimRequiresLiveEvidence": true
+  },
+  "boundary": "Scenario Coverage v104 covers tilemap source format, draft preview, named reachability diagnostics, and live replay evidence without browser trusted writes or auto-apply."
+}

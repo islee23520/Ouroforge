@@ -107,9 +107,10 @@ fn tilemap_draft_preview_evidence_is_generated_not_source() {
 
 #[test]
 fn blocked_map_fails_with_named_reachability_diagnostic() {
-    let report = tilemap_reachability_report_from_json_str(&read_text(
-        "examples/tilemap-authoring-v1/maps/blocked-dogfood.tilemap.json",
-    ))
+    let report = tilemap_reachability_report_from_json_str(
+        &read_text("examples/tilemap-authoring-v1/maps/blocked-dogfood.tilemap.json"),
+        None,
+    )
     .expect("blocked map produces report");
     assert_eq!(report.status, TilemapReachabilityStatus::Blocked);
     assert!(report
@@ -120,9 +121,12 @@ fn blocked_map_fails_with_named_reachability_diagnostic() {
 
 #[test]
 fn reachable_map_links_generated_scenario_assertion_draft() {
-    let report = tilemap_reachability_report_from_json_str(&read_text(
-        "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
-    ))
+    let report = tilemap_reachability_report_from_json_str(
+        &read_text("examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json"),
+        Some(&read_text(
+            "examples/tilemap-authoring-v1/evidence/valid-dogfood-live-replay.json",
+        )),
+    )
     .expect("valid map produces report");
     assert_eq!(report.status, TilemapReachabilityStatus::Passed);
     assert!(report.diagnostics.is_empty());
@@ -133,4 +137,62 @@ fn reachable_map_links_generated_scenario_assertion_draft() {
         .join(&report.scenario_assertion_draft_ref)
         .exists());
     assert!(report.boundary.contains("no browser trusted writes"));
+}
+
+#[test]
+fn valid_map_requires_and_accepts_live_replay_objective_evidence() {
+    let map = read_text("examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json");
+    let without_replay = tilemap_reachability_report_from_json_str(&map, None)
+        .expect("valid map without live replay reports gap");
+    assert_eq!(without_replay.status, TilemapReachabilityStatus::Blocked);
+    assert!(without_replay
+        .diagnostics
+        .contains(&TilemapReachabilityDiagnostic::NoLiveReplayEvidence));
+
+    let report = tilemap_reachability_report_from_json_str(
+        &map,
+        Some(&read_text(
+            "examples/tilemap-authoring-v1/evidence/valid-dogfood-live-replay.json",
+        )),
+    )
+    .expect("valid map with live replay passes");
+    assert_eq!(report.status, TilemapReachabilityStatus::Passed);
+    assert!(report.diagnostics.is_empty());
+    assert_eq!(report.objective_path.last().unwrap().x, 4);
+    let live_replay_ref = report.live_replay_ref.unwrap();
+    assert!(live_replay_ref.ends_with("valid-dogfood-live-replay.json"));
+    assert!(repo_root().join(live_replay_ref).exists());
+}
+
+#[test]
+fn scenario_coverage_v104_lands_final_m123_suite() {
+    let matrix =
+        read_json("examples/tilemap-authoring-v1/scenario-coverage-v104/matrix.fixture.json");
+    assert_eq!(
+        matrix["schemaVersion"],
+        "scenario-coverage-v104-tilemap-level-editor-v1"
+    );
+    assert_eq!(matrix["coverageVersion"], 104);
+    assert_eq!(matrix["issueRef"], "#2371");
+    let rows = matrix["rows"].as_array().expect("rows array");
+    for required in [
+        "v104.tilemap-source-format-and-path-convention",
+        "v104.base-relative-digest-draft-preview",
+        "v104.blocked-map-named-diagnostic",
+        "v104.valid-map-live-replay-objective-reached",
+    ] {
+        assert!(
+            rows.iter().any(|row| row["id"] == required),
+            "missing {required}"
+        );
+    }
+    for row in rows {
+        assert_eq!(row["status"], "pass");
+        assert!(repo_root()
+            .join(row["evidenceRef"].as_str().unwrap())
+            .exists());
+    }
+    assert_eq!(matrix["invariants"]["browserTrustedWritesAllowed"], false);
+    assert_eq!(matrix["invariants"]["baseDigestRequired"], true);
+    assert_eq!(matrix["invariants"]["validFixtureRequiresLiveReplay"], true);
 }

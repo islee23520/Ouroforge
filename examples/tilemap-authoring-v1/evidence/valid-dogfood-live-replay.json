@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "ouroforge.tilemap-live-replay.v1",
+  "replayId": "valid-dogfood-live-replay-v104",
+  "targetTilemapRef": "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
+  "objectiveReached": true,
+  "path": [
+    { "x": 0, "y": 0 },
+    { "x": 1, "y": 0 },
+    { "x": 2, "y": 0 },
+    { "x": 3, "y": 0 },
+    { "x": 4, "y": 0 },
+    { "x": 4, "y": 1 },
+    { "x": 4, "y": 2 }
+  ],
+  "observedEvents": ["spawn-player", "objective-exit"]
+}

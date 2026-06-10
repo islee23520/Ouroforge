@@ -353,6 +353,40 @@ pub fn validate_tilemap_draft_against_base(
         _ => Ok(preview),
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapLiveReplayEvidence {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "replayId")]
+    pub replay_id: String,
+    #[serde(rename = "targetTilemapRef")]
+    pub target_tilemap_ref: String,
+    #[serde(rename = "objectiveReached")]
+    pub objective_reached: bool,
+    pub path: Vec<TilemapGridPoint>,
+    #[serde(rename = "observedEvents")]
+    pub observed_events: Vec<String>,
+}
+
+impl TilemapLiveReplayEvidence {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        let evidence: Self =
+            serde_json::from_str(input).context("failed to parse tilemap live replay")?;
+        if evidence.schema_version != TILEMAP_LIVE_REPLAY_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "tilemap live replay schemaVersion must be {TILEMAP_LIVE_REPLAY_SCHEMA_VERSION}"
+            ));
+        }
+        validate_identifier("tilemap live replay replayId", &evidence.replay_id)?;
+        validate_source_path(&evidence.target_tilemap_ref)?;
+        if evidence.path.is_empty() {
+            return Err(anyhow!("tilemap live replay path must not be empty"));
+        }
+        Ok(evidence)
+    }
+}
+
 fn validate_palette(values: &[TilemapPaletteEntry]) -> Result<BTreeSet<&str>> {
     if values.is_empty() {
         return Err(anyhow!("tilemap source palette must not be empty"));
@@ -473,6 +507,7 @@ pub enum TilemapReachabilityDiagnostic {
     ObjectiveBlocked,
     ObjectiveUnreachable,
     TriggerObjectiveUncovered,
+    NoLiveReplayEvidence,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -497,10 +532,19 @@ pub struct TilemapReachabilityReport {
     pub objective_path: Vec<TilemapGridPoint>,
     #[serde(rename = "scenarioAssertionDraftRef")]
     pub scenario_assertion_draft_ref: String,
+    #[serde(
+        rename = "liveReplayRef",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub live_replay_ref: Option<String>,
     pub boundary: String,
 }
 
-pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReachabilityReport {
+pub fn evaluate_tilemap_reachability(
+    map: &TilemapSourceArtifact,
+    live_replay: Option<&TilemapLiveReplayEvidence>,
+) -> TilemapReachabilityReport {
     let mut diagnostics = BTreeSet::new();
     let spawn = map
         .markers
@@ -541,6 +585,17 @@ pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReac
     {
         diagnostics.insert(TilemapReachabilityDiagnostic::TriggerObjectiveUncovered);
     }
+    if diagnostics.is_empty() {
+        match live_replay {
+            Some(replay)
+                if replay.target_tilemap_ref == map.source_path
+                    && replay.objective_reached
+                    && !replay.path.is_empty() => {}
+            _ => {
+                diagnostics.insert(TilemapReachabilityDiagnostic::NoLiveReplayEvidence);
+            }
+        }
+    }
     let diagnostics: Vec<_> = diagnostics.into_iter().collect();
     TilemapReachabilityReport {
         schema_version: TILEMAP_REACHABILITY_SCHEMA_VERSION.to_string(),
@@ -557,15 +612,25 @@ pub fn evaluate_tilemap_reachability(map: &TilemapSourceArtifact) -> TilemapReac
             "examples/tilemap-authoring-v1/scenario-assertions/{}-assertion-draft.json",
             map.map_id
         ),
+        live_replay_ref: live_replay.map(|_| {
+            format!(
+                "examples/tilemap-authoring-v1/evidence/{}-live-replay.json",
+                map.map_id
+            )
+        }),
         boundary: "Rust/local reachability evidence only; no browser trusted writes, no auto-apply, no gameplay quality claim.".to_string(),
     }
 }
 
 pub fn tilemap_reachability_report_from_json_str(
     map_json: &str,
+    replay_json: Option<&str>,
 ) -> Result<TilemapReachabilityReport> {
     let map = TilemapSourceArtifact::from_json_str(map_json)?;
-    Ok(evaluate_tilemap_reachability(&map))
+    let replay = replay_json
+        .map(TilemapLiveReplayEvidence::from_json_str)
+        .transpose()?;
+    Ok(evaluate_tilemap_reachability(&map, replay.as_ref()))
 }
 
 fn bfs_path(
