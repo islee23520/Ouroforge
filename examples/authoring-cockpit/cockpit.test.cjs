@@ -2576,6 +2576,34 @@ assert.match(cockpit.renderWorkspaceUxContractSurface(), /Workspace UX contract/
 assert.match(cockpit.renderWorkspaceUxContractSurface(), /renderProjectRunSurface/);
 assert.match(cockpit.renderWorkspaceUxContractSurface(), /Safe Source Apply handoff/);
 
+// #2363 open/run/evidence workflow: run commands are copyable only and evidence comes from live-observability manifest records.
+assert.match(cockpit.renderProjectRunSurface(run), /Display-only project run commands/);
+assert.match(cockpit.renderProjectRunSurface(run), /cargo run -p ouroforge-cli -- run/);
+assert.doesNotMatch(cockpit.renderProjectRunSurface(run), /data-run-command|fetch\(|WebSocket|browser command bridge enabled/i);
+const liveRun = {
+  summary: { id: 'live-1', run_dir: 'runs/live-observability/live-1' },
+  live_observability: {
+    manifests: [{
+      id: 'live-1',
+      runId: 'live-1',
+      manifestPath: 'runs/live-observability/live-1/manifest.json',
+      evidence: [
+        { id: 'screenshot', kind: 'image/png', path: 'runs/live-observability/live-1/screenshots/open-run-evidence.png' },
+        { id: 'console', kind: 'application/json', path: 'runs/live-observability/live-1/console.json' },
+      ],
+    }],
+  },
+};
+const liveModel = cockpit.liveObservabilityManifestEvidenceModel(liveRun);
+assert.equal(liveModel.status, 'ready');
+assert.equal(liveModel.manifests[0].entries.length, 2);
+assert.equal(liveModel.manifests[0].entries[0].readOnly, true);
+assert.match(cockpit.renderLiveObservabilityEvidenceSurface(liveRun), /runs\/live-observability\/live-1\/manifest\.json/);
+assert.match(cockpit.renderLiveObservabilityEvidenceSurface(liveRun), /browser_command_bridge/);
+const blockedLiveModel = cockpit.liveObservabilityManifestEvidenceModel({ live_observability: { manifests: [{ manifestPath: 'runs/live-observability/live-2/manifest.json', evidence: [{ path: 'runs\\live-observability\\live-2\\bad.json' }] }] } });
+assert.equal(blockedLiveModel.status, 'blocked');
+assert.match(blockedLiveModel.manifests[0].entries[0].blockedReasons.join(' '), /hardened live-observability/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
