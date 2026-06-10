@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "proposal-workbench-v1",
+  "proposalId": "proposal-authoring-preview-label",
+  "category": "authoring",
+  "problemEvidenceRefs": [
+    { "runId": "run-authoring", "path": "evidence/authoring-preview.json", "digest": "sha256:authoring" }
+  ],
+  "hypothesis": "the authoring preview label hides the selected behavior draft state",
+  "diffScope": {
+    "kind": "behavior-data",
+    "targetPaths": ["docs/behavior-authoring-model-v1.md"],
+    "operationSummary": "clarify behavior preview label contract",
+    "boundedChangeCount": 1
+  },
+  "expectedImpact": "reviewers can trace preview labels to behavior draft evidence",
+  "risk": {
+    "level": "medium",
+    "rationale": "authoring wording can change reviewer interpretation",
+    "mitigations": ["review against behavior authoring model and Safe Source Apply handoff"]
+  },
+  "rollback": {
+    "rollbackPlan": "restore prior behavior authoring wording from rollback ref",
+    "rollbackRefs": [
+      { "runId": "run-authoring", "path": "rollback/behavior-doc.md", "digest": "sha256:rollback" }
+    ]
+  },
+  "reviewerRequirements": ["reviewer confirms no script or plugin execution claim was introduced"],
+  "nonGoals": ["no UI implementation", "no trusted file write from browser"],
+  "guardrails": ["proposal remains data-only and review-gated"]
+}

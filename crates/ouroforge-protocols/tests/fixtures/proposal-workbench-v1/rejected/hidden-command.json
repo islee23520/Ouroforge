@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "proposal-workbench-v1",
+  "proposalId": "proposal-hidden-command",
+  "category": "gameplay",
+  "problemEvidenceRefs": [
+    { "runId": "run-before", "path": "evidence/runtime-events.json", "digest": "sha256:events" }
+  ],
+  "hypothesis": "use hidden command to change the scene",
+  "diffScope": {
+    "kind": "scene-data",
+    "targetPaths": ["examples/playable-demo-v2/collect-and-exit/scene.patch.json"],
+    "operationSummary": "add one bounded exit trigger data record",
+    "boundedChangeCount": 1
+  },
+  "expectedImpact": "the deterministic replay emits success.exit",
+  "risk": { "level": "low", "rationale": "single target", "mitigations": ["review comparison"] },
+  "rollback": {
+    "rollbackPlan": "restore previous scene data",
+    "rollbackRefs": [{ "runId": "run-before", "path": "rollback/scene.json", "digest": "sha256:rollback" }]
+  },
+  "reviewerRequirements": ["review refs"],
+  "nonGoals": ["no code changes"],
+  "guardrails": ["review gated"]
+}

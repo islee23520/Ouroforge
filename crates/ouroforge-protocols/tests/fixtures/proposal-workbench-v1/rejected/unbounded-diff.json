@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "proposal-workbench-v1",
+  "proposalId": "proposal-unbounded-diff",
+  "category": "runtime-ux",
+  "problemEvidenceRefs": [
+    { "runId": "run-before", "path": "evidence/runtime-ux.json", "digest": "sha256:ux" }
+  ],
+  "hypothesis": "many files need changing",
+  "diffScope": {
+    "kind": "scene-data",
+    "targetPaths": ["crates/ouroforge-core/src/lib.rs"],
+    "operationSummary": "broad source rewrite",
+    "boundedChangeCount": 40
+  },
+  "expectedImpact": "improve everything",
+  "risk": { "level": "high", "rationale": "broad change", "mitigations": ["none"] },
+  "rollback": {
+    "rollbackPlan": "restore prior source",
+    "rollbackRefs": [{ "runId": "run-before", "path": "rollback/source.json", "digest": "sha256:rollback" }]
+  },
+  "reviewerRequirements": ["review refs"],
+  "nonGoals": ["no publish"],
+  "guardrails": ["review gated"]
+}

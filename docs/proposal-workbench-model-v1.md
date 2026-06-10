@@ -36,3 +36,17 @@ maturity, and Godot-replacement claims.
 
 This issue is contract-complete only. UI, live dogfood proposal capture, and
 quality-gate review are deferred to later M125 issues.
+
+## Fixtures
+
+Accepted and rejected schema examples live under
+`crates/ouroforge-protocols/tests/fixtures/proposal-workbench-v1/`:
+
+- accepted runtime gameplay proposal;
+- accepted authoring proposal;
+- rejected missing evidence refs;
+- rejected hidden command authority; and
+- rejected unbounded/source-affecting diff scope.
+
+The fixture tests parse accepted proposals, project them into Safe Source Apply
+review sections, and assert rejected proposals fail closed.

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "proposal-workbench-v1",
+  "proposalId": "proposal-runtime-gameplay-exit",
+  "category": "gameplay",
+  "problemEvidenceRefs": [
+    { "runId": "run-before", "path": "evidence/runtime-events.json", "digest": "sha256:events" },
+    { "runId": "run-before", "path": "evidence/world-flags.json", "digest": "sha256:flags" }
+  ],
+  "hypothesis": "the exit trigger data is absent from the collect-and-exit scene",
+  "diffScope": {
+    "kind": "scene-data",
+    "targetPaths": ["examples/playable-demo-v2/collect-and-exit/scene.patch.json"],
+    "operationSummary": "add one bounded exit trigger data record",
+    "boundedChangeCount": 1
+  },
+  "expectedImpact": "the deterministic replay emits success.exit and clears the known gap",
+  "risk": {
+    "level": "low",
+    "rationale": "single scene-data target with deterministic before-after evidence",
+    "mitigations": ["independent reviewer verifies target path and comparison artifact"]
+  },
+  "rollback": {
+    "rollbackPlan": "restore the previous scene data from the rollback ref",
+    "rollbackRefs": [
+      { "runId": "run-before", "path": "rollback/scene.json", "digest": "sha256:rollback" }
+    ]
+  },
+  "reviewerRequirements": ["reviewer must verify runId/path/digest refs and bounded target path"],
+  "nonGoals": ["no runtime code changes", "no dependency changes"],
+  "guardrails": ["Safe Source Apply review is required before trusted apply"]
+}
