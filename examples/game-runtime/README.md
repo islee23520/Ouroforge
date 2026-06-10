@@ -192,3 +192,23 @@ OUROFORGE_WRITE_RUNS=1 node examples/game-runtime/hud-checkpoint-report.test.cjs
 That writes `runs/session-f-2354/world-samples.jsonl` and
 `runs/session-f-2354/hud-checkpoint-report.json`. These generated files remain
 untracked; committed source contains only the reproducible replay/report logic.
+
+### Scenario Coverage v99 (M118)
+
+`scenario-coverage-v99.test.cjs` is the M118 runtime-shell scenario coverage
+suite landed with #2355. It composes the deterministic shell/HUD/control checks:
+
+- HUD checkpoint/world-state parity (`hud-binding.test.cjs`)
+- pause, restart, win, and fail shell states (`pause-restart.test.cjs`)
+- raw JSON secondary/collapsed shell DOM smoke (`game-ui.test.cjs`)
+- collect-and-exit runtime fixture compatibility (`playable-demo-v2.test.cjs`)
+
+Run it with:
+
+```bash
+node examples/game-runtime/scenario-coverage-v99.test.cjs
+```
+
+The suite is contract-complete deterministic runtime evidence. Browser pixel
+screenshots remain generated evidence under ignored `runs/` bundles and are not
+committed as trusted source.
