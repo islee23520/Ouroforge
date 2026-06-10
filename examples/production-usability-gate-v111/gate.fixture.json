@@ -11,10 +11,14 @@
       "evidenceRefs": [
         "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
         "examples/playable-demo-v2/signal-gate-dogfood/scenarios/signal-gate-relay-core.json",
-        "runs/m130/2391-first-playable/bundle.json"
+        "runs/m130/2391-first-playable/bundle.json",
+        "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/manifest.json",
+        "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/verdict.md",
+        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md"
       ],
       "screenshotRefs": [
-        "runs/m130/2391-first-playable/screenshots/state-start.png"
+        "runs/m130/2391-first-playable/screenshots/state-start.png",
+        "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/screenshots/final.png"
       ],
       "workflowTranscriptRefs": [
         "runs/m130/2391-first-playable/workflow-transcript.md"
@@ -25,12 +29,6 @@
           "ownerIssue": "#2394",
           "summary": "Studio launch and reviewer observation remain manual local steps; the gate records the transcript rather than claiming hidden automation.",
           "followUp": "Keep the step in the final postmortem backlog unless a later explicit issue automates product-surface capture."
-        },
-        {
-          "gapId": "m130-2391-win-state-browser-screenshot",
-          "ownerIssue": "#2394",
-          "summary": "Win-state is proven by deterministic live-evidence smoke, but only the start state was captured as a Chrome screenshot in this run.",
-          "followUp": "Keep browser win-state capture as an explicit postmortem backlog item instead of claiming a screenshot that was not generated."
         }
       ]
     },

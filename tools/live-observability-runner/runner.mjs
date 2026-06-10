@@ -96,7 +96,7 @@ async function launchChrome({ chrome, retries }) {
       } catch (error) {
         lastError = error;
         child.kill('SIGTERM');
-        await rm(profile, { recursive: true, force: true });
+        await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       }
     }
   }
@@ -288,6 +288,55 @@ async function evaluateJson(cdp, expression) {
 
 async function runInputReplay(cdp, replayName) {
   if (!replayName) return { name: null, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [] };
+  if (replayName === 'signal-gate-relay') {
+    return await evaluateJson(cdp, `
+      (async () => {
+        const api = window.__OUROFORGE__;
+        const used = [];
+        const diagnostics = [];
+        const sequence = [];
+        function need(key) {
+          if (!api || typeof api[key] !== 'function') {
+            diagnostics.push({ code: 'unsupported-target', message: 'window.__OUROFORGE__.' + key + ' is missing' });
+            return false;
+          }
+          used.push(key);
+          return true;
+        }
+        if (typeof api?.whenReady === 'function') {
+          used.push('whenReady');
+          await api.whenReady();
+        }
+        if (!need('getWorldState') || !need('setInput') || !need('step')) {
+          return { name: 'signal-gate-relay', used_keys: used, steps: [], objective_flag_sequence: sequence, diagnostics };
+        }
+        function flags(label) {
+          const world = api.getWorldState();
+          const goalFlags = world?.componentModel?.goalFlags ?? {};
+          sequence.push({ label, tick: world?.tick ?? null, goal_flags: goalFlags });
+          return goalFlags;
+        }
+        const steps = [
+          { index: 0, action: 'sample', label: 'start' },
+          { index: 1, action: 'setInput', input: { right: true, keys: { right: true } } },
+          { index: 2, action: 'step', count: 28, label: 'relay-1' },
+          { index: 3, action: 'step', count: 30, label: 'key-gate' },
+          { index: 4, action: 'step', count: 65, label: 'win-exit' },
+          { index: 5, action: 'setInput', input: { right: false, keys: { right: false } } }
+        ];
+        flags('start');
+        api.setInput({ right: true, keys: { right: true } });
+        api.step(28);
+        flags('relay-1');
+        api.step(30);
+        flags('key-gate');
+        api.step(65);
+        flags('win-exit');
+        api.setInput({ right: false, keys: { right: false } });
+        return { name: 'signal-gate-relay', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics };
+      })()
+    `);
+  }
   if (replayName !== 'collect-and-exit') {
     return { name: replayName, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [{ code: 'unsupported-target', message: `unknown replay: ${replayName}` }] };
   }
@@ -522,7 +571,7 @@ async function run() {
     consoleStream.end();
     if (chrome) {
       chrome.child.kill('SIGTERM');
-      await rm(chrome.profile, { recursive: true, force: true });
+      await rm(chrome.profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   }
 }

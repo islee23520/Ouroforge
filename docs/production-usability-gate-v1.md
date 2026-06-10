@@ -14,10 +14,22 @@ collaboration, a secure sandbox, Godot parity, or a public release.
 
 | Issue | Product-observed claim | Required evidence | Honest gap rule |
 | --- | --- | --- | --- |
-| #2391 | Seed/GDD -> scaffold -> first playable can be followed without raw JSON as the primary workflow. | `examples/playable-demo-v2/signal-gate-dogfood/`, `runs/m130/2391-first-playable/workflow-transcript.md`, `runs/m130/2391-first-playable/screenshots/state-*.png`, `runs/m130/2391-first-playable/bundle.json`. | Every manual Studio/CLI/reviewer step must appear in the gate fixture `manualGaps` array or the issue remains product-observed fail. |
+| #2391 | Seed/GDD -> scaffold -> first playable can be followed without raw JSON as the primary workflow. | `examples/playable-demo-v2/signal-gate-dogfood/`, `runs/m130/2391-first-playable/workflow-transcript.md`, `runs/m130/2391-first-playable/screenshots/state-*.png`, `runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/screenshots/final.png`, `runs/m130/2391-first-playable/bundle.json`. | Every manual Studio/CLI/reviewer step must appear in the gate fixture `manualGaps` array or the issue remains product-observed fail. |
 | #2392 | Studio edit / agent proposal / review / safe apply / live rerun produces an observable before/after result. | `examples/production-usability-gate-v111/studio-edit-proposal.fixture.json`, generated before/after screenshots, and `runs/m130/2392-studio-edit/comparison.json`. | The #2380 comparison verdict is authoritative: `improvement` passes; `regression` may close only as honestly recorded regression/fail, never as narrative pass. |
 | #2393 | Existing local web package/export path can assemble an inspectable local package with provenance. | Existing export profile, `examples/production-usability-gate-v111/local-package-provenance.fixture.json`, generated checksums, package smoke. | No new distribution scope; native/store/sign/upload/public release remains out of scope. |
 | #2394 | Final postmortem updates #1 status using M115.1 semantics and M115.2 ledger shape. | This document, v111 coverage, #1 final status update, milestone classification ledger update. | Any unresolved item is backlog, not marketing copy. #1 and #23 remain open. |
+
+### #2499 win-state screenshot follow-up
+
+Issue #2499 resolves the #2391 ledger gap `m130-2391-win-state-browser-screenshot` with a fresh live browser observability bundle:
+
+- run root: `runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/`;
+- win-state screenshot: `runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/screenshots/final.png`;
+- stable summary: `docs/evidence/signal-gate-win-state-browser-screenshot-2499.md`;
+- final replay flags: `exit_reached=true`, `gate_open=true`, `key_collected=true`, `player_alive=true`;
+- runtime diagnostics: none recorded for this bundle.
+
+The generated screenshot remains under ignored `runs/`; the tracked fixture/index records the path and removes only the stale missing-screenshot gap.
 
 ## Generated-state boundary
 

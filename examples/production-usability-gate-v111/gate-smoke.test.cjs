@@ -12,6 +12,14 @@ const byIssue = new Map(gate.phases.map((phase) => [phase.issue, phase]));
 assert.ok(byIssue.get(2391).workflowTranscriptRefs.length > 0, '#2391 needs transcript refs');
 assert.ok(byIssue.get(2391).screenshotRefs.length > 0, '#2391 needs screenshot refs');
 assert.ok(byIssue.get(2391).manualGaps.length > 0, '#2391 manual steps must be ledgered');
+assert.ok(
+  byIssue.get(2391).screenshotRefs.some((ref) => ref.includes('m130-2391-signal-gate-win-2499/screenshots/final.png')),
+  '#2391 needs the #2499 win-state browser screenshot ref'
+);
+assert.ok(
+  byIssue.get(2391).manualGaps.every((gap) => gap.gapId !== 'm130-2391-win-state-browser-screenshot'),
+  '#2499 resolves the stale #2391 win-state browser screenshot gap'
+);
 assert.match(byIssue.get(2392).comparisonVerdict, /^(improvement|regression)$/);
 assert.ok(byIssue.get(2393).packageRefs.every((ref) => ref.startsWith('dist/local-web/')));
 assert.ok(gate.guardrails.some((guardrail) => guardrail.includes('no new distribution scope')));

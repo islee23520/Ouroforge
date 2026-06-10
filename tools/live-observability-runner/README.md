@@ -110,3 +110,19 @@ The canonical collect-and-exit golden fixture lives at:
 - `crates/ouroforge-observability/fixtures/collect-and-exit-product-fail/`
 
 Its verdict is intentionally `contract-pass` / `product-observed FAIL`: replay reaches `exit_reached=true`, but the sampled runtime diagnostic records `missing_asset` for `collect_and_exit_sheet`, so practical product usability must remain a gap/backlog item rather than a green claim.
+
+## Signal Gate Relay replay
+
+Use `--replay signal-gate-relay` for the M130 Signal Gate Relay first-playable path. The replay drives the local runtime through start, relay activation, key/gate, and terminal win-exit checkpoints, then captures `screenshots/final.png` at the win state. This replay is browser evidence only: it does not grant browser trusted writes, command bridges, self-approval, auto-apply, or auto-merge.
+
+Example:
+
+```sh
+python3 -m http.server 8879 --bind 127.0.0.1
+CARGO_TARGET_DIR=/tmp/ouroforge-target-2490 \
+  node tools/live-observability-runner/runner.mjs \
+  --url 'http://127.0.0.1:8879/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json' \
+  --run-id m130-2391-signal-gate-win-2499 \
+  --out-root runs/m130/2391-first-playable \
+  --replay signal-gate-relay
+```
