@@ -85,3 +85,28 @@ whenReady,getWorldState,getFrameStats,getEvents,setInput,step
 ```
 
 Known live diagnostic preserved in the bundle: `missing_asset` for `collect_and_exit_sheet`; this is runtime/product evidence, not a harness failure.
+
+## Verdict generation
+
+M116.4 verdicts are rendered by the Rust schema crate, not by the JS runner:
+
+```sh
+CARGO_TARGET_DIR=/Users/jh0927/.cache/ouroforge-targets/session-b-2346 \
+  cargo run --manifest-path crates/ouroforge-observability/Cargo.toml -- \
+  render-verdict /tmp/ouroforge-live-test/collect-and-exit-2348-det-a \
+  --generated-at 2026-06-10T00:00:00Z \
+  --write
+```
+
+Renderer guarantees:
+
+- every M115.3 checklist id is present in `verdict.md`;
+- every checklist claim references concrete bundle artifact paths;
+- fatal failures are separated from usability gaps/diagnostics;
+- same bundle input produces byte-identical output except the `Generated at:` line.
+
+The canonical collect-and-exit golden fixture lives at:
+
+- `crates/ouroforge-observability/fixtures/collect-and-exit-product-fail/`
+
+Its verdict is intentionally `contract-pass` / `product-observed FAIL`: replay reaches `exit_reached=true`, but the sampled runtime diagnostic records `missing_asset` for `collect_and_exit_sheet`, so practical product usability must remain a gap/backlog item rather than a green claim.
