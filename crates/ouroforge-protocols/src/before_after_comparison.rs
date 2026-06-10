@@ -607,6 +607,130 @@ fn require_boundary_text(field: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
+impl BeforeAfterComparisonArtifact {
+    pub fn render_markdown(&self) -> Result<String> {
+        self.validate_report_ready()?;
+        let mut out = String::new();
+        out.push_str(&format!(
+            "# Before/After Comparison `{}`\n\n",
+            self.comparison_id
+        ));
+        out.push_str(&format!("- Verdict: `{:?}`\n", self.verdict));
+        out.push_str(&format!("- Before run: `{}`\n", self.before_run_id));
+        out.push_str(&format!("- After run: `{}`\n", self.after_run_id));
+        out.push_str(&format!("- Determinism key: `{}`\n", self.determinism_key));
+        out.push_str("- Boundary: data-only comparison report; no command execution, browser trusted write, source mutation, auto-apply, or auto-merge.\n\n");
+        out.push_str("## Dimensions\n\n");
+        out.push_str("| Dimension | Verdict | Summary | Before refs | After refs |\n");
+        out.push_str("| --- | --- | --- | --- | --- |\n");
+        for dimension in &self.dimensions {
+            out.push_str(&format!(
+                "| {:?} | `{:?}` | {} | {} | {} |\n",
+                dimension.kind,
+                dimension.verdict,
+                escape_markdown_cell(&dimension.summary),
+                markdown_refs(&dimension.before_refs),
+                markdown_refs(&dimension.after_refs)
+            ));
+        }
+        out.push_str("\n## Evidence refs\n\n");
+        for reference in &self.evidence_refs {
+            out.push_str(&format!(
+                "- `{}` `{}` `{}`\n",
+                reference.run_id, reference.path, reference.digest
+            ));
+        }
+        out.push_str("\n## Known gaps\n\n");
+        if self.known_gaps.is_empty() {
+            out.push_str("- none recorded\n");
+        } else {
+            for gap in &self.known_gaps {
+                out.push_str(&format!("- {}\n", escape_markdown_cell(gap)));
+            }
+        }
+        out.push_str("\n## Forbidden actions\n\n");
+        for action in &self.forbidden_actions {
+            out.push_str(&format!("- `{action}`\n"));
+        }
+        Ok(out)
+    }
+
+    pub fn markdown_json_pair(&self) -> Result<(String, String)> {
+        let json = serde_json::to_string_pretty(self)
+            .context("failed to serialize before/after comparison JSON report")?;
+        Ok((json, self.render_markdown()?))
+    }
+
+    fn validate_report_ready(&self) -> Result<()> {
+        if self.schema_version != BEFORE_AFTER_COMPARISON_SCHEMA_VERSION {
+            return Err(anyhow!(
+                "before/after comparison report schemaVersion must be {BEFORE_AFTER_COMPARISON_SCHEMA_VERSION}"
+            ));
+        }
+        require_local_id(
+            "before/after comparison report comparisonId",
+            &self.comparison_id,
+        )?;
+        require_local_id(
+            "before/after comparison report beforeRunId",
+            &self.before_run_id,
+        )?;
+        require_local_id(
+            "before/after comparison report afterRunId",
+            &self.after_run_id,
+        )?;
+        if self.before_run_id == self.after_run_id {
+            return Err(anyhow!(
+                "before/after comparison report requires distinct run ids"
+            ));
+        }
+        require_digest(
+            "before/after comparison report determinismKey",
+            &self.determinism_key,
+        )?;
+        if self.dimensions.is_empty() {
+            return Err(anyhow!(
+                "before/after comparison report dimensions must not be empty"
+            ));
+        }
+        if self.evidence_refs.is_empty() {
+            return Err(anyhow!(
+                "before/after comparison report evidenceRefs must not be empty"
+            ));
+        }
+        for reference in &self.evidence_refs {
+            reference.validate("before/after comparison report evidence ref")?;
+        }
+        for dimension in &self.dimensions {
+            require_boundary_text(
+                "before/after comparison report dimension summary",
+                &dimension.summary,
+            )?;
+            for reference in &dimension.before_refs {
+                reference.validate("before/after comparison report before ref")?;
+            }
+            for reference in &dimension.after_refs {
+                reference.validate("before/after comparison report after ref")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn markdown_refs(refs: &[BeforeAfterEvidenceRef]) -> String {
+    if refs.is_empty() {
+        return "_none_".to_string();
+    }
+    refs.iter()
+        .map(|reference| format!("`{}:{}`", reference.run_id, reference.path))
+        .collect::<Vec<_>>()
+        .join("<br>")
+}
+
+fn escape_markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -651,6 +775,30 @@ mod tests {
         input.after.replay_result = None;
         let artifact = input.compare().unwrap();
         assert_eq!(artifact.verdict, BeforeAfterVerdict::Inconclusive);
+    }
+
+    #[test]
+    fn markdown_report_links_before_after_refs_and_json_pair() {
+        let artifact = planted_input(true).compare().unwrap();
+        let (json, markdown) = artifact.markdown_json_pair().unwrap();
+        assert!(json.contains("before-after-comparison-v1"));
+        assert!(markdown.contains("# Before/After Comparison"));
+        assert!(markdown.contains("run-before:evidence/before-flags.json"));
+        assert!(markdown.contains("run-after:evidence/after-flags.json"));
+        assert!(markdown.contains("screenshots/before.png"));
+        assert!(markdown.contains("screenshots/after.png"));
+        assert!(markdown.contains("Forbidden actions"));
+    }
+
+    #[test]
+    fn markdown_report_rejects_unsafe_reference() {
+        let mut artifact = planted_input(true).compare().unwrap();
+        artifact.evidence_refs[0].path = "../escape.json".to_string();
+        let err = artifact.render_markdown().unwrap_err().to_string();
+        assert!(
+            err.contains("must stay inside the local artifact root"),
+            "unexpected error: {err}"
+        );
     }
 
     fn planted_input(improved: bool) -> BeforeAfterComparisonInput {
