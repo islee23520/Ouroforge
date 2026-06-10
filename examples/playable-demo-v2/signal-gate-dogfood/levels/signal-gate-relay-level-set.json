@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "signal-gate-level-set-v1",
+  "id": "signal-gate-relay-levels",
+  "issue": 2386,
+  "gdd": "docs/dogfood-mini-game-gdd-v1.md",
+  "studioEditSmoke": {
+    "blockedBy2368": "closed",
+    "path": "M122 review/apply handoff from scene editor",
+    "claim": "source-like level data is eligible for Studio draft/review/apply smoke; no JSON hand-edit is represented as completed Studio authoring"
+  },
+  "levels": [
+    {
+      "id": "relay-yard",
+      "title": "Relay Yard",
+      "encounter": 1,
+      "targetDurationSeconds": 75,
+      "purpose": "Teach movement, objective reading, relay activation, and HUD progression.",
+      "sceneRef": "scenes/signal-gate-relay.scene.json",
+      "startState": "start",
+      "completeState": "relay-1",
+      "objectives": ["read HUD objective", "activate relay_1_active"],
+      "evidenceStates": ["state-start.png", "state-relay-1.png"],
+      "hudSignals": ["objective", "relay 0/1 -> 1/1"],
+      "knownGaps": []
+    },
+    {
+      "id": "key-switch-hall",
+      "title": "Key Switch Hall",
+      "encounter": 2,
+      "targetDurationSeconds": 105,
+      "purpose": "Collect the signal key after relay activation and visibly open the gate.",
+      "sceneRef": "scenes/signal-gate-relay.scene.json",
+      "startState": "relay-1",
+      "completeState": "gate-open",
+      "objectives": ["collect key_collected", "open gate_open", "prove blocked-before-key remains false until relay is active"],
+      "evidenceStates": ["state-key-collected.png", "state-gate-open.png"],
+      "hudSignals": ["key missing -> collected", "gate locked -> open"],
+      "knownGaps": []
+    }
+  ],
+  "progression": [
+    { "from": "relay-yard", "to": "key-switch-hall", "requires": ["relay_1_active"] }
+  ],
+  "guardrails": [
+    "generated screenshots stay under ignored runs/ bundles",
+    "Studio edit smoke must use merged M122 path or record a gap",
+    "known content gaps remain explicit"
+  ]
+}
