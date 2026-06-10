@@ -395,6 +395,20 @@ pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -
     Ok(out)
 }
 
+pub fn write_rendered_verdict(
+    bundle_root: impl AsRef<Path>,
+    options: &VerdictOptions,
+) -> Result<()> {
+    let bundle_root = bundle_root.as_ref();
+    let markdown = render_verdict(bundle_root, options)?;
+    let verdict_path = bundle_root.join("verdict.md");
+    fs::write(&verdict_path, markdown)
+        .with_context(|| format!("writing {}", verdict_path.display()))?;
+    refresh_inventory_sha256(bundle_root, "verdict.md")?;
+    validate_bundle(bundle_root)?;
+    Ok(())
+}
+
 fn push_row(out: &mut String, id: &str, result: &str, paths: &str, rationale: &str) {
     out.push_str(&format!(
         "| `{}` | {} | `{}` | {} |\n",
@@ -660,6 +674,33 @@ fn sha256_file(path: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
     hasher.update(fs::read(path)?);
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn refresh_inventory_sha256(bundle_root: &Path, artifact_path: &str) -> Result<()> {
+    let manifest_path = bundle_root.join("manifest.json");
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path)?)
+        .context("manifest.json is not valid JSON")?;
+    let digest = sha256_file(&bundle_root.join(artifact_path))?;
+    let inventory = manifest
+        .get_mut("artifact_inventory")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| anyhow!("manifest artifact_inventory must be an array"))?;
+    let mut updated = false;
+    for entry in inventory {
+        if entry.get("path").and_then(Value::as_str) == Some(artifact_path) {
+            entry["sha256"] = Value::String(digest.clone());
+            updated = true;
+        }
+    }
+    if !updated {
+        bail!("artifact inventory missing path: {artifact_path}");
+    }
+    fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest)? + "\n",
+    )
+    .with_context(|| format!("writing {}", manifest_path.display()))?;
+    Ok(())
 }
 
 pub fn artifact_inventory_paths(bundle_root: impl AsRef<Path>) -> Result<BTreeSet<String>> {

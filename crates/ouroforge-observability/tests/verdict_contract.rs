@@ -1,4 +1,8 @@
-use ouroforge_observability::{checklist_ids, render_verdict, VerdictOptions};
+use ouroforge_observability::{
+    checklist_ids, render_verdict, validate_bundle, write_rendered_verdict, VerdictOptions,
+};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 fn strip_generated_at(markdown: &str) -> String {
     markdown
@@ -58,4 +62,46 @@ fn rendered_verdict_is_stable_across_equivalent_bundle_paths() {
         .join("fixtures/collect-and-exit-product-fail");
     let absolute_render = render_verdict(&absolute, &options).unwrap();
     assert_eq!(relative, absolute_render);
+}
+
+#[test]
+fn write_rendered_verdict_refreshes_manifest_digest() {
+    let temp = copy_fixture_to_temp("collect-and-exit-product-fail");
+    let options = VerdictOptions {
+        generated_at: "2026-06-10T00:00:02Z".to_string(),
+        ..Default::default()
+    };
+    write_rendered_verdict(&temp, &options).unwrap();
+    validate_bundle(&temp).unwrap();
+    let verdict = fs::read_to_string(temp.join("verdict.md")).unwrap();
+    assert!(verdict.contains("Generated at: 2026-06-10T00:00:02Z"));
+    let _ = fs::remove_dir_all(temp);
+}
+
+fn copy_fixture_to_temp(name: &str) -> PathBuf {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures")
+        .join(name);
+    let parent = std::env::temp_dir().join(format!(
+        "ouroforge-observability-test-{}",
+        std::process::id()
+    ));
+    let dest = parent.join(name);
+    let _ = fs::remove_dir_all(&parent);
+    copy_dir_all(&source, &dest);
+    dest
+}
+
+fn copy_dir_all(source: &Path, dest: &Path) {
+    fs::create_dir_all(dest).unwrap();
+    for entry in fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        let file_type = entry.file_type().unwrap();
+        let dest_path = dest.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_all(&entry.path(), &dest_path);
+        } else {
+            fs::copy(entry.path(), dest_path).unwrap();
+        }
+    }
 }

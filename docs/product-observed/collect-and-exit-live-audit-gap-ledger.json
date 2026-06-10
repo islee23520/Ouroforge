@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "ouroforge.product-observed-gap-ledger.v1",
+  "issue": 2351,
+  "auditId": "collect-and-exit-2351-live-audit",
+  "taxonomySource": "docs/product-gap-taxonomy.json",
+  "classification": "contract-pass / product-observed FAIL",
+  "generatedBundleRoot": "runs/live-observability/collect-and-exit-2351-live-audit/",
+  "targetUrl": "http://127.0.0.1:8871/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "verdictRef": "runs/live-observability/collect-and-exit-2351-live-audit/verdict.md",
+  "scenarioCoverage": "docs/scenario-coverage-v98-current-live-audit.md",
+  "findings": [
+    {
+      "id": "ce-live-2351-001",
+      "category": "runtime_ux",
+      "severity": "blocking",
+      "owner": "runtime",
+      "owningMilestone": "M118",
+      "owningIssueRange": "#2352-#2355",
+      "evidenceRefs": [
+        "docs/product-observed/collect-and-exit-live-audit-2351.md#observed-facts",
+        "runs/live-observability/collect-and-exit-2351-live-audit/screenshots/start.png",
+        "runs/live-observability/collect-and-exit-2351-live-audit/screenshots/final.png"
+      ],
+      "observedBehavior": "The page presents as 'Ouroforge Minimal 2D Runtime Foundation', describes window.__OUROFORGE__, shows a small probe viewport, and exposes raw world-state JSON instead of a discoverable play shell.",
+      "expectedBehavior": "A practical runtime product page should expose a clear game entry point with playable instructions, restart/recovery affordances, and no fixture/debug-probe framing for the primary user flow.",
+      "productImpact": "A reviewer can verify the harness contract, but cannot honestly treat the page as a usable game-runtime surface for non-fixture users.",
+      "recommendedBacklogAction": "M118 should define and implement the playable runtime shell contract, including launch/start/restart/objective affordances and a product-facing layout separate from debug/probe output."
+    },
+    {
+      "id": "ce-live-2351-002",
+      "category": "renderer_quality",
+      "severity": "major",
+      "owner": "runtime",
+      "owningMilestone": "M120",
+      "owningIssueRange": "#2359-#2361",
+      "evidenceRefs": [
+        "runs/live-observability/collect-and-exit-2351-live-audit/world-samples.jsonl",
+        "runs/live-observability/collect-and-exit-2351-live-audit/verdict.md#fatal-failures-vs-usability-gaps",
+        "runs/live-observability/collect-and-exit-2351-live-audit/screenshots/final.png"
+      ],
+      "observedBehavior": "The live sample records runtime diagnostic code missing_asset for collect_and_exit_sheet / assets/sprites/collect-and-exit-sheet.png, while the visible scene uses block-like placeholder shapes.",
+      "expectedBehavior": "A product-observed visual baseline should load declared visual assets or present an explicit intentional-placeholder state without asset-load diagnostics.",
+      "productImpact": "The mechanical scenario can complete, but the visual result is not a reliable quality baseline and should not be used as a green practical usability claim.",
+      "recommendedBacklogAction": "M120 should turn the missing sprite/load diagnostic and readability baseline into visual rubric checks, including screenshot comparison and diagnostic-to-fail mapping."
+    },
+    {
+      "id": "ce-live-2351-003",
+      "category": "input_control",
+      "severity": "major",
+      "owner": "runtime",
+      "owningMilestone": "M118",
+      "owningIssueRange": "#2352-#2355",
+      "evidenceRefs": [
+        "runs/live-observability/collect-and-exit-2351-live-audit/input-replay.json",
+        "runs/live-observability/collect-and-exit-2351-live-audit/manifest.json",
+        "docs/product-observed/collect-and-exit-live-audit-2351.md#observed-facts"
+      ],
+      "observedBehavior": "The audit reaches the exit through the M116 harness calling window.__OUROFORGE__ keys, but the page itself does not present discoverable human controls or an in-page interaction transcript.",
+      "expectedBehavior": "A runtime shell should make the required inputs visible and playable by a human while still allowing deterministic replay evidence.",
+      "productImpact": "Input correctness is currently evidenced by API replay, not by practical player-facing control usability.",
+      "recommendedBacklogAction": "M118 should require visible controls/help text and replay parity between human-facing controls and harness-driven input."
+    },
+    {
+      "id": "ce-live-2351-004",
+      "category": "qa_evaluator_depth",
+      "severity": "major",
+      "owner": "qa",
+      "owningMilestone": "M130",
+      "owningIssueRange": "#2391-#2394",
+      "evidenceRefs": [
+        "runs/live-observability/collect-and-exit-2351-live-audit/verdict.md#classification",
+        "docs/scenario-coverage-v97-live-observability-harness.md#product-observed-evidence-from-m116-closure",
+        "docs/product-observed/collect-and-exit-live-audit-2351.md#verdict"
+      ],
+      "observedBehavior": "The verdict is contract-pass and product-observed FAIL at the same time; prior fixture-green behavior would be misleading if collapsed into one pass/fail bit.",
+      "expectedBehavior": "Production usability gates must preserve contract-complete vs product-observed status and keep runtime diagnostics red for practical claims.",
+      "productImpact": "Without this split, future milestones could protect historical green tests by softening visible product failures.",
+      "recommendedBacklogAction": "M130 should make product-observed classification mandatory in the final usability gate and reject soft-pass verdicts when diagnostics or visible usability gaps remain."
+    },
+    {
+      "id": "ce-live-2351-005",
+      "category": "dogfood_game_quality",
+      "severity": "blocking",
+      "owner": "product",
+      "owningMilestone": "M128",
+      "owningIssueRange": "#2384-#2387",
+      "evidenceRefs": [
+        "docs/product-observed/collect-and-exit-live-audit-2351.md#verdict",
+        "runs/live-observability/collect-and-exit-2351-live-audit/screenshots/start.png",
+        "runs/live-observability/collect-and-exit-2351-live-audit/screenshots/final.png"
+      ],
+      "observedBehavior": "The live page demonstrates a minimal fixture/probe and contract replay, not a coherent dogfood game slice with human-readable fun, pacing, clarity, or release-go/no-go judgment.",
+      "expectedBehavior": "A dogfood game milestone should include a playable vertical slice and a human-owned quality verdict that is distinct from mechanical replay success.",
+      "productImpact": "The current collect-and-exit page cannot be cited as evidence that Ouroforge is practically usable to make or judge a real game.",
+      "recommendedBacklogAction": "M128 should use this audit as a negative baseline and require a real dogfood vertical slice with live screenshots, replay, diagnostics, and human quality notes."
+    }
+  ],
+  "boundaryReview": {
+    "noSoftPass": true,
+    "notes": [
+      "The ledger does not downgrade missing_asset or debug/probe presentation to polish because #2351 requires honest product-observed failure classification.",
+      "Generated screenshots and bundle files are evidence paths, not tracked source artifacts.",
+      "#1 and #23 must remain open governance anchors."
+    ]
+  }
+}

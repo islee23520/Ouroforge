@@ -48,17 +48,18 @@ fn render_verdict(bundle: &str, generated_at: &str, write: bool) -> ExitCode {
         generated_at: generated_at.to_string(),
         ..Default::default()
     };
+    if write {
+        return match ouroforge_observability::write_rendered_verdict(bundle, &options) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("failed to write rendered verdict: {error:#}");
+                ExitCode::from(1)
+            }
+        };
+    }
     match ouroforge_observability::render_verdict(bundle, &options) {
         Ok(markdown) => {
-            if write {
-                let path = std::path::Path::new(bundle).join("verdict.md");
-                if let Err(error) = std::fs::write(&path, markdown) {
-                    eprintln!("failed to write {}: {error:#}", path.display());
-                    return ExitCode::from(1);
-                }
-            } else {
-                print!("{markdown}");
-            }
+            print!("{markdown}");
             ExitCode::SUCCESS
         }
         Err(error) => {
