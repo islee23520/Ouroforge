@@ -23,6 +23,7 @@ pub mod physics_2d;
 pub mod product_backlog_handoff;
 pub mod product_gap_taxonomy;
 pub mod production_journal;
+pub mod production_decision_log;
 pub use physics_2d::{
     simulate_scene_physics_step, Physics2dBlockedMovement, Physics2dCollisionEvent,
     Physics2dStepEvidence, Physics2dVector,
