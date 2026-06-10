@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "proposal-workbench-v1",
+  "proposalId": "proposal-quality-good",
+  "category": "gameplay",
+  "problemEvidenceRefs": [{ "runId": "run-before", "path": "runs/session-h-2377/evidence/world-state.json", "digest": "sha256:world" }],
+  "hypothesis": "hazard threshold can be made readable with one bounded behavior-data change",
+  "diffScope": { "kind": "behavior-data", "targetPaths": ["examples/playable-demo-v2/collect-and-exit/behavior.patch.json"], "operationSummary": "adjust hazard threshold data", "boundedChangeCount": 1 },
+  "expectedImpact": "replay evidence should show the hazard warning before failure",
+  "risk": { "level": "low", "rationale": "single behavior-data target", "mitigations": ["review before apply"] },
+  "rollback": { "rollbackPlan": "restore previous behavior data", "rollbackRefs": [{ "runId": "run-before", "path": "runs/session-h-2377/rollback/behavior.json", "digest": "sha256:rollback" }] },
+  "reviewerRequirements": ["reviewer verifies before-after evidence"],
+  "nonGoals": ["no runtime code changes"],
+  "guardrails": ["Safe Source Apply review required"]
+}

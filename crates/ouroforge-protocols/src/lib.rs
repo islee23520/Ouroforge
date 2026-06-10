@@ -8,4 +8,5 @@ pub mod before_after_comparison;
 pub mod behavior_authoring_spec;
 pub mod behavior_parameter_preview;
 pub mod behavior_scenario_assertions;
+pub mod proposal_quality_gate;
 pub mod proposal_workbench_model;
