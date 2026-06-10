@@ -13,4 +13,5 @@ pub mod source_apply_post_apply_rerun;
 pub mod source_apply_review_enforcement;
 pub mod source_apply_rollback_snapshot;
 pub mod source_apply_sandbox_promotion;
+pub mod source_apply_sandbox_worktree_protocol;
 pub mod source_apply_verification_runner;
