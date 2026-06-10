@@ -6,6 +6,7 @@ members = [
   "crates/ouroforge-core-types",
   "crates/ouroforge-gdd",
   "crates/ouroforge-source-apply",
+  "crates/ouroforge-protocols",
   "crates/ouroforge-core",
   "crates/ouroforge-cli",
 ]
