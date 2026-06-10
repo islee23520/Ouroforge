@@ -11,8 +11,10 @@ assert.equal(levelSet.schemaVersion, 'signal-gate-level-set-v1');
 assert.equal(levelSet.issue, 2386);
 assert.equal(levelSet.studioEditSmoke.blockedBy2368, 'closed');
 assert.ok(levelSet.studioEditSmoke.path.includes('M122'));
-assert.equal(levelSet.levels.length, 2);
-assert.deepEqual(levelSet.levels.map((level) => level.id), ['relay-yard', 'key-switch-hall']);
+assert.ok(levelSet.levels.length >= 3, 'at least three encounters are required');
+assert.deepEqual(levelSet.levels.map((level) => level.id), ['relay-yard', 'key-switch-hall', 'hazard-timing-room']);
+assert.equal(levelSet.progressionSummary.encounterCount, 3);
+assert.deepEqual(levelSet.progression.map((edge) => edge.to), ['key-switch-hall', 'hazard-timing-room', 'final-signal-gate']);
 for (const level of levelSet.levels) {
   assert.ok(level.targetDurationSeconds >= 60, `${level.id} target duration too short`);
   assert.ok(level.sceneRef.startsWith('scenes/'));

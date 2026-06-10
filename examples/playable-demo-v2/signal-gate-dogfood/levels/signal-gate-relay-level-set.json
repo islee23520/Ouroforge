@@ -18,9 +18,18 @@
       "sceneRef": "scenes/signal-gate-relay.scene.json",
       "startState": "start",
       "completeState": "relay-1",
-      "objectives": ["read HUD objective", "activate relay_1_active"],
-      "evidenceStates": ["state-start.png", "state-relay-1.png"],
-      "hudSignals": ["objective", "relay 0/1 -> 1/1"],
+      "objectives": [
+        "read HUD objective",
+        "activate relay_1_active"
+      ],
+      "evidenceStates": [
+        "state-start.png",
+        "state-relay-1.png"
+      ],
+      "hudSignals": [
+        "objective",
+        "relay 0/1 -> 1/1"
+      ],
       "knownGaps": []
     },
     {
@@ -32,18 +41,80 @@
       "sceneRef": "scenes/signal-gate-relay.scene.json",
       "startState": "relay-1",
       "completeState": "gate-open",
-      "objectives": ["collect key_collected", "open gate_open", "prove blocked-before-key remains false until relay is active"],
-      "evidenceStates": ["state-key-collected.png", "state-gate-open.png"],
-      "hudSignals": ["key missing -> collected", "gate locked -> open"],
+      "objectives": [
+        "collect key_collected",
+        "open gate_open",
+        "prove blocked-before-key remains false until relay is active"
+      ],
+      "evidenceStates": [
+        "state-key-collected.png",
+        "state-gate-open.png"
+      ],
+      "hudSignals": [
+        "key missing -> collected",
+        "gate locked -> open"
+      ],
+      "knownGaps": []
+    },
+    {
+      "id": "hazard-timing-room",
+      "title": "Hazard Timing Room",
+      "encounter": 3,
+      "targetDurationSeconds": 150,
+      "purpose": "Avoid a deterministic hazard, observe fail/blocked status, and recover through checkpoint restart.",
+      "sceneRef": "scenes/signal-gate-relay.scene.json",
+      "startState": "gate-open",
+      "completeState": "restarted-or-win-ready",
+      "objectives": [
+        "avoid hazard_probe on the upper route",
+        "record fail/blocked if hazard is touched",
+        "restart from signal-yard-start checkpoint"
+      ],
+      "evidenceStates": [
+        "state-fail-blocked.png",
+        "state-restarted.png"
+      ],
+      "hudSignals": [
+        "fail message visible",
+        "restart restores objective flags"
+      ],
       "knownGaps": []
     }
   ],
   "progression": [
-    { "from": "relay-yard", "to": "key-switch-hall", "requires": ["relay_1_active"] }
+    {
+      "from": "relay-yard",
+      "to": "key-switch-hall",
+      "requires": [
+        "relay_1_active"
+      ]
+    },
+    {
+      "from": "key-switch-hall",
+      "to": "hazard-timing-room",
+      "requires": [
+        "relay_1_active",
+        "key_collected",
+        "gate_open"
+      ]
+    },
+    {
+      "from": "hazard-timing-room",
+      "to": "final-signal-gate",
+      "requires": [
+        "player_alive",
+        "gate_open"
+      ]
+    }
   ],
   "guardrails": [
     "generated screenshots stay under ignored runs/ bundles",
     "Studio edit smoke must use merged M122 path or record a gap",
     "known content gaps remain explicit"
-  ]
+  ],
+  "progressionSummary": {
+    "encounterCount": 3,
+    "observableHudState": "relay/key/gate/fail/restart/win flags are exposed through runtimeState and shell status",
+    "knownContentGaps": []
+  }
 }
