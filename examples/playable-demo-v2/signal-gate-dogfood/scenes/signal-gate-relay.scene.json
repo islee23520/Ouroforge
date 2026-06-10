@@ -1,0 +1,540 @@
+{
+  "schemaVersion": "1",
+  "id": "signal-gate-relay-core-scene",
+  "bounds": {
+    "width": 480,
+    "height": 220
+  },
+  "metadata": {
+    "fixture": "signal-gate-relay-dogfood",
+    "title": "Signal Gate Relay Core Loop",
+    "scenarioId": "signal-gate-relay-core-loop",
+    "issue": 2385,
+    "classification": "product-observed-pending-live-evidence",
+    "startState": {
+      "playerEntityId": "player",
+      "spawn": {
+        "x": 32,
+        "y": 112
+      },
+      "initialFlags": {
+        "relay_1_active": false,
+        "key_collected": false,
+        "gate_open": false,
+        "exit_reached": false,
+        "player_alive": true
+      },
+      "checkpointSlot": "signal-yard-start"
+    },
+    "runtimeDebug": {
+      "frameBudget": {
+        "updateMs": 8,
+        "renderMs": 16,
+        "evidenceMs": 4,
+        "totalMs": 20
+      },
+      "frameTimings": {
+        "updateMs": 2,
+        "renderMs": 6,
+        "evidenceMs": 1,
+        "totalMs": 9
+      }
+    },
+    "evidenceStates": [
+      "start",
+      "relay-1",
+      "key-collected",
+      "gate-open",
+      "fail/blocked",
+      "restarted",
+      "win/exit"
+    ]
+  },
+  "gameplayRules": {
+    "version": "1",
+    "flags": [
+      {
+        "id": "relay_1_active",
+        "initial": false,
+        "label": "Relay 1 active"
+      },
+      {
+        "id": "key_collected",
+        "initial": false,
+        "label": "Signal key collected"
+      },
+      {
+        "id": "gate_open",
+        "initial": false,
+        "label": "Gate open"
+      },
+      {
+        "id": "exit_reached",
+        "initial": false,
+        "label": "Exit reached"
+      },
+      {
+        "id": "player_alive",
+        "initial": true,
+        "label": "Player alive"
+      }
+    ]
+  },
+  "componentDefaults": {
+    "velocity": {
+      "x": 0,
+      "y": 0
+    },
+    "size": {
+      "width": 16,
+      "height": 16
+    },
+    "controllable": false,
+    "status": {
+      "hitPoints": 1,
+      "maxHitPoints": 1,
+      "flags": [],
+      "states": []
+    }
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": {
+        "color": "#5eead4",
+        "layer": "actors",
+        "order": 10,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 32,
+          "y": 112
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 16,
+          "height": 16
+        },
+        "controllable": true,
+        "collider": {
+          "shape": "aabb",
+          "body": "dynamic",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 16,
+            "height": 16
+          },
+          "sensor": false
+        },
+        "status": {
+          "hitPoints": 3,
+          "maxHitPoints": 3,
+          "flags": [
+            "player_alive"
+          ],
+          "states": [
+            "ready"
+          ]
+        },
+        "input": {
+          "scheme": "keyboard",
+          "moveSpeed": 3,
+          "allowedActions": [
+            "move",
+            "move_left",
+            "move_right",
+            "move_up",
+            "move_down"
+          ]
+        },
+        "audio": {
+          "events": [
+            {
+              "name": "player_spawn",
+              "trigger": "scene_loaded",
+              "action": "play",
+              "asset": "relay_ping"
+            }
+          ]
+        }
+      },
+      "tags": [
+        "player",
+        "controllable"
+      ]
+    },
+    {
+      "id": "relay_1",
+      "sprite": {
+        "color": "#38bdf8",
+        "layer": "actors",
+        "order": 4,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 104,
+          "y": 112
+        },
+        "size": {
+          "width": 14,
+          "height": 14
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 14,
+            "height": 14
+          },
+          "sensor": true
+        },
+        "trigger": {
+          "id": "activate_relay_1",
+          "kind": "overlap",
+          "targetFlag": "relay_1_active",
+          "onEnter": [
+            {
+              "kind": "setFlag",
+              "flag": "relay_1_active",
+              "value": true
+            }
+          ]
+        },
+        "goalFlag": {
+          "flag": "relay_1_active",
+          "label": "Activate relay"
+        }
+      },
+      "tags": [
+        "relay",
+        "objective"
+      ]
+    },
+    {
+      "id": "signal_key",
+      "sprite": {
+        "color": "#facc15",
+        "layer": "actors",
+        "order": 5,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 184,
+          "y": 112
+        },
+        "size": {
+          "width": 12,
+          "height": 12
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 12,
+            "height": 12
+          },
+          "sensor": true
+        },
+        "trigger": {
+          "id": "collect_signal_key",
+          "kind": "overlap",
+          "targetFlag": "key_collected",
+          "requiredFlags": [
+            "relay_1_active"
+          ],
+          "onEnter": [
+            {
+              "kind": "setFlag",
+              "flag": "key_collected",
+              "value": true
+            },
+            {
+              "kind": "setFlag",
+              "flag": "gate_open",
+              "value": true
+            },
+            {
+              "kind": "hideEntity",
+              "entityId": "signal_key"
+            }
+          ]
+        },
+        "goalFlag": {
+          "flag": "key_collected",
+          "label": "Collect signal key"
+        }
+      },
+      "tags": [
+        "key",
+        "collectible"
+      ]
+    },
+    {
+      "id": "hazard_probe",
+      "sprite": {
+        "color": "#fb7185",
+        "layer": "actors",
+        "order": 6,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 62,
+          "y": 92
+        },
+        "size": {
+          "width": 20,
+          "height": 20
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 20,
+            "height": 20
+          },
+          "sensor": true
+        },
+        "trigger": {
+          "id": "hazard_contact",
+          "kind": "overlap",
+          "targetFlag": "player_alive",
+          "onEnter": [
+            {
+              "kind": "setFlag",
+              "flag": "player_alive",
+              "value": false
+            }
+          ]
+        }
+      },
+      "tags": [
+        "hazard",
+        "fail-state"
+      ]
+    },
+    {
+      "id": "final_gate",
+      "sprite": {
+        "color": "#a78bfa",
+        "layer": "actors",
+        "order": 7,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 352,
+          "y": 112
+        },
+        "size": {
+          "width": 18,
+          "height": 28
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 18,
+            "height": 28
+          },
+          "sensor": true
+        },
+        "trigger": {
+          "id": "enter_final_gate",
+          "kind": "overlap",
+          "targetFlag": "exit_reached",
+          "requiredFlags": [
+            "relay_1_active",
+            "key_collected",
+            "gate_open"
+          ],
+          "onEnter": [
+            {
+              "kind": "setFlag",
+              "flag": "exit_reached",
+              "value": true
+            }
+          ]
+        },
+        "goalFlag": {
+          "flag": "exit_reached",
+          "label": "Reach final gate"
+        }
+      },
+      "tags": [
+        "exit",
+        "gate"
+      ]
+    },
+    {
+      "id": "hud_goal",
+      "sprite": {
+        "color": "#ffffff",
+        "visible": false,
+        "layer": "hud",
+        "order": 1
+      },
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 8
+        },
+        "size": {
+          "width": 220,
+          "height": 12
+        },
+        "uiText": {
+          "text": "Goal: activate relay, collect key, open gate",
+          "role": "hud",
+          "bindFlag": "exit_reached"
+        },
+        "hudValue": {
+          "kind": "goal",
+          "label": "Goal",
+          "value": "Relay -> Key -> Gate",
+          "bindFlag": "exit_reached"
+        }
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "id": "hud_status",
+      "sprite": {
+        "color": "#ffffff",
+        "visible": false,
+        "layer": "hud",
+        "order": 2
+      },
+      "components": {
+        "transform": {
+          "x": 8,
+          "y": 26
+        },
+        "size": {
+          "width": 180,
+          "height": 12
+        },
+        "hudValue": {
+          "kind": "progress",
+          "label": "Relay",
+          "value": "0/1",
+          "bindFlag": "relay_1_active"
+        }
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "id": "floor",
+      "sprite": {
+        "color": "#334155",
+        "layer": "actors",
+        "order": 20,
+        "asset": "signal_gate_sheet"
+      },
+      "components": {
+        "transform": {
+          "x": 0,
+          "y": 132
+        },
+        "size": {
+          "width": 480,
+          "height": 16
+        },
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "size": {
+            "width": 480,
+            "height": 16
+          },
+          "sensor": false
+        }
+      },
+      "tags": [
+        "floor",
+        "solid"
+      ]
+    }
+  ],
+  "renderer": {
+    "version": "1",
+    "camera": {
+      "x": 0,
+      "y": 0
+    },
+    "viewport": {
+      "width": 480,
+      "height": 220
+    },
+    "background": "#111827",
+    "layers": [
+      {
+        "id": "background",
+        "order": -10
+      },
+      {
+        "id": "actors",
+        "order": 0
+      },
+      {
+        "id": "hud",
+        "order": 10
+      }
+    ]
+  },
+  "assetManifest": {
+    "schemaVersion": "1",
+    "id": "signal-gate-relay-runtime-assets",
+    "assets": [
+      {
+        "id": "signal_gate_sheet",
+        "kind": "sprite",
+        "path": "assets/sprites/signal-gate-sheet.png",
+        "metadata": {
+          "source": "asset-manifest.json"
+        }
+      },
+      {
+        "id": "relay_ping",
+        "kind": "audio",
+        "path": "assets/audio/relay-ping.ogg",
+        "metadata": {
+          "source": "asset-manifest.json"
+        }
+      }
+    ]
+  }
+}
