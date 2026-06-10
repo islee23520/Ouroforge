@@ -1,8 +1,11 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const TILEMAP_SOURCE_SCHEMA_VERSION: &str = "ouroforge.tilemap-source.v1";
+pub const TILEMAP_DRAFT_SCHEMA_VERSION: &str = "ouroforge.tilemap-draft.v1";
+pub const TILEMAP_REACHABILITY_SCHEMA_VERSION: &str = "ouroforge.tilemap-reachability.v1";
+pub const TILEMAP_LIVE_REPLAY_SCHEMA_VERSION: &str = "ouroforge.tilemap-live-replay.v1";
 pub const TILEMAP_SOURCE_PATH_PREFIX: &str = "examples/tilemap-authoring-v1/maps/";
 pub const TILEMAP_SOURCE_PATH_SUFFIX: &str = ".tilemap.json";
 
@@ -98,9 +101,7 @@ impl TilemapSourceArtifact {
         if self.path_convention
             != format!("{TILEMAP_SOURCE_PATH_PREFIX}<map-id>{TILEMAP_SOURCE_PATH_SUFFIX}")
         {
-            return Err(anyhow!(
-                "tilemap source pathConvention must name the shared dogfood tilemap path convention"
-            ));
+            return Err(anyhow!("tilemap source pathConvention must name the shared dogfood tilemap path convention"));
         }
         validate_repo_relative_ref("tilemap source tilesetRef", &self.tileset_ref)?;
         if self.width == 0 || self.height == 0 || self.width > 128 || self.height > 128 {
@@ -110,7 +111,8 @@ impl TilemapSourceArtifact {
             return Err(anyhow!("tilemap source tileSize must be 1..=256"));
         }
         let palette = validate_palette(&self.palette)?;
-        validate_layers(self.width, self.height, &palette, &self.layers)?;
+        let layer_ids = validate_layers(self.width, self.height, &palette, &self.layers)?;
+        let _ = layer_ids;
         validate_markers(self.width, self.height, &self.markers)?;
         Ok(())
     }
@@ -127,6 +129,230 @@ impl TilemapSourceArtifact {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapDraftArtifact {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "draftId")]
+    pub draft_id: String,
+    pub target: TilemapDraftTarget,
+    #[serde(rename = "proposedOperations")]
+    pub proposed_operations: Vec<TilemapDraftOperation>,
+    #[serde(rename = "validationStatus")]
+    pub validation_status: TilemapDraftValidationStatus,
+    #[serde(rename = "previewSummary")]
+    pub preview_summary: TilemapDraftPreviewSummary,
+    #[serde(
+        rename = "blockedReasons",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub blocked_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guardrails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapDraftTarget {
+    pub path: String,
+    #[serde(rename = "baseDigest")]
+    pub base_digest: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "op", rename_all = "camelCase", deny_unknown_fields)]
+pub enum TilemapDraftOperation {
+    Paint {
+        #[serde(rename = "operationId")]
+        operation_id: String,
+        #[serde(rename = "layerId")]
+        layer_id: String,
+        x: u32,
+        y: u32,
+        #[serde(rename = "tileId")]
+        tile_id: String,
+    },
+    Erase {
+        #[serde(rename = "operationId")]
+        operation_id: String,
+        #[serde(rename = "layerId")]
+        layer_id: String,
+        x: u32,
+        y: u32,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TilemapDraftValidationStatus {
+    Drafted,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapDraftPreviewSummary {
+    #[serde(rename = "changedCells")]
+    pub changed_cells: Vec<TilemapChangedCell>,
+    #[serde(rename = "affectedCollisionCells")]
+    pub affected_collision_cells: Vec<TilemapGridPoint>,
+    #[serde(rename = "affectedTriggerMarkers")]
+    pub affected_trigger_markers: Vec<String>,
+    #[serde(rename = "generatedPreviewOnly")]
+    pub generated_preview_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapGridPoint {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TilemapChangedCell {
+    #[serde(rename = "layerId")]
+    pub layer_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub before: String,
+    pub after: String,
+}
+
+impl TilemapDraftArtifact {
+    pub fn from_json_str(input: &str) -> Result<Self> {
+        serde_json::from_str(input).context("failed to parse tilemap draft")
+    }
+}
+
+pub fn tilemap_base_digest(input: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in input.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv64:{hash:016x}")
+}
+
+pub fn validate_tilemap_draft_against_base(
+    draft: &TilemapDraftArtifact,
+    base_json: &str,
+) -> Result<TilemapDraftPreviewSummary> {
+    if draft.schema_version != TILEMAP_DRAFT_SCHEMA_VERSION {
+        return Err(anyhow!(
+            "tilemap draft schemaVersion must be {TILEMAP_DRAFT_SCHEMA_VERSION}"
+        ));
+    }
+    validate_identifier("tilemap draft draftId", &draft.draft_id)?;
+    validate_source_path(&draft.target.path)?;
+    let base = TilemapSourceArtifact::from_json_str(base_json)?;
+    if draft.target.path != base.source_path {
+        return Err(anyhow!(
+            "tilemap draft target path must match base tilemap sourcePath"
+        ));
+    }
+    let digest = tilemap_base_digest(base_json);
+    if draft.target.base_digest != digest {
+        return Err(anyhow!("tilemap draft baseDigest is stale"));
+    }
+    if draft.proposed_operations.is_empty() {
+        return Err(anyhow!("tilemap draft requires proposedOperations"));
+    }
+    let mut operation_ids = BTreeSet::new();
+    let mut by_layer = base
+        .layers
+        .iter()
+        .map(|layer| (layer.layer_id.clone(), layer.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let palette = base
+        .palette
+        .iter()
+        .map(|entry| entry.tile_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut changed = Vec::new();
+    let mut collision_points = BTreeSet::new();
+    let mut trigger_markers = BTreeSet::new();
+    for op in &draft.proposed_operations {
+        let (operation_id, layer_id, x, y, after) = match op {
+            TilemapDraftOperation::Paint {
+                operation_id,
+                layer_id,
+                x,
+                y,
+                tile_id,
+            } => {
+                if !palette.contains(tile_id.as_str()) {
+                    return Err(anyhow!(
+                        "tilemap draft paint tileId is not in palette: {tile_id}"
+                    ));
+                }
+                (operation_id, layer_id, *x, *y, tile_id.clone())
+            }
+            TilemapDraftOperation::Erase {
+                operation_id,
+                layer_id,
+                x,
+                y,
+            } => (operation_id, layer_id, *x, *y, ".".to_string()),
+        };
+        validate_identifier("tilemap draft operationId", operation_id)?;
+        if !operation_ids.insert(operation_id.as_str()) {
+            return Err(anyhow!(
+                "duplicate tilemap draft operationId: {operation_id}"
+            ));
+        }
+        if x >= base.width || y >= base.height {
+            return Err(anyhow!(
+                "tilemap draft operation {operation_id} is out of bounds"
+            ));
+        }
+        let layer = by_layer
+            .get_mut(layer_id)
+            .ok_or_else(|| anyhow!("tilemap draft layerId not found: {layer_id}"))?;
+        let before = layer.cells[y as usize][x as usize].clone();
+        if before != after {
+            layer.cells[y as usize][x as usize] = after.clone();
+            changed.push(TilemapChangedCell {
+                layer_id: layer_id.clone(),
+                x,
+                y,
+                before,
+                after,
+            });
+            if layer.kind == TilemapLayerKind::Collision {
+                collision_points.insert(TilemapGridPoint { x, y });
+            }
+            for marker in base
+                .markers
+                .iter()
+                .filter(|m| m.x == x && m.y == y && m.kind == TilemapMarkerKind::Trigger)
+            {
+                trigger_markers.insert(marker.marker_id.clone());
+            }
+        }
+    }
+    let preview = TilemapDraftPreviewSummary {
+        changed_cells: changed,
+        affected_collision_cells: collision_points.into_iter().collect(),
+        affected_trigger_markers: trigger_markers.into_iter().collect(),
+        generated_preview_only: true,
+    };
+    if draft.preview_summary != preview {
+        return Err(anyhow!("tilemap draft previewSummary drift"));
+    }
+    match draft.validation_status {
+        TilemapDraftValidationStatus::Drafted if !draft.blocked_reasons.is_empty() => Err(anyhow!(
+            "drafted tilemap draft must not include blockedReasons"
+        )),
+        TilemapDraftValidationStatus::Blocked if draft.blocked_reasons.is_empty() => {
+            Err(anyhow!("blocked tilemap draft requires blockedReasons"))
+        }
+        _ => Ok(preview),
+    }
+}
 fn validate_palette(values: &[TilemapPaletteEntry]) -> Result<BTreeSet<&str>> {
     if values.is_empty() {
         return Err(anyhow!("tilemap source palette must not be empty"));
@@ -152,14 +378,14 @@ fn validate_layers(
     height: u32,
     palette: &BTreeSet<&str>,
     layers: &[TilemapLayer],
-) -> Result<()> {
+) -> Result<BTreeSet<String>> {
     if layers.is_empty() {
         return Err(anyhow!("tilemap source layers must not be empty"));
     }
     let mut ids = BTreeSet::new();
     for layer in layers {
         validate_identifier("tilemap source layerId", &layer.layer_id)?;
-        if !ids.insert(layer.layer_id.as_str()) {
+        if !ids.insert(layer.layer_id.clone()) {
             return Err(anyhow!(
                 "duplicate tilemap source layerId: {}",
                 layer.layer_id
@@ -188,7 +414,7 @@ fn validate_layers(
             }
         }
     }
-    Ok(())
+    Ok(ids)
 }
 
 fn validate_markers(width: u32, height: u32, markers: &[TilemapMarker]) -> Result<()> {

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "ouroforge.tilemap-draft.v1",
+  "draftId": "draft-valid-dogfood-open-lane",
+  "target": {
+    "path": "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json",
+    "baseDigest": "fnv64:ac6c622f157d32a8"
+  },
+  "proposedOperations": [
+    {
+      "op": "erase",
+      "operationId": "erase-collision-3-1",
+      "layerId": "collision",
+      "x": 3,
+      "y": 1
+    },
+    {
+      "op": "paint",
+      "operationId": "paint-trigger-2-1",
+      "layerId": "triggers",
+      "x": 2,
+      "y": 1,
+      "tileId": "key"
+    }
+  ],
+  "validationStatus": "drafted",
+  "previewSummary": {
+    "changedCells": [
+      {
+        "layerId": "collision",
+        "x": 3,
+        "y": 1,
+        "before": "wall",
+        "after": "."
+      },
+      {
+        "layerId": "triggers",
+        "x": 2,
+        "y": 1,
+        "before": ".",
+        "after": "key"
+      }
+    ],
+    "affectedCollisionCells": [
+      {
+        "x": 3,
+        "y": 1
+      }
+    ],
+    "affectedTriggerMarkers": [
+      "trigger-key"
+    ],
+    "generatedPreviewOnly": true
+  },
+  "guardrails": [
+    "generated preview only; not source",
+    "review-gated apply remains separate"
+  ]
+}

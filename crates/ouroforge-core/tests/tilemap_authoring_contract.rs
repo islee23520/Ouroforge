@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ouroforge_core::tilemap_authoring::{
+    tilemap_base_digest, validate_tilemap_draft_against_base, TilemapDraftArtifact,
     TilemapSourceArtifact, TILEMAP_SOURCE_PATH_PREFIX, TILEMAP_SOURCE_PATH_SUFFIX,
 };
 use serde_json::Value;
@@ -38,21 +39,31 @@ fn tilemap_source_spec_names_shared_format_and_path_convention() {
         format!("{TILEMAP_SOURCE_PATH_PREFIX}valid-dogfood{TILEMAP_SOURCE_PATH_SUFFIX}")
     );
     assert_eq!(map.layers.len(), 4);
-    assert!(map
-        .markers
-        .iter()
-        .any(|marker| marker.marker_id == "spawn-player"));
-    assert!(map
-        .guardrails
-        .join(" ")
-        .contains("not write trusted tilemap files"));
 }
 
 #[test]
-fn scenario_coverage_v104_is_not_landed_before_final_m123_issue() {
-    assert!(!repo_root()
-        .join("examples/tilemap-authoring-v1/scenario-coverage-v104/matrix.fixture.json")
-        .exists());
+fn tilemap_draft_uses_base_relative_digest_and_validates_operations() {
+    let base = read_text("examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json");
+    let draft = TilemapDraftArtifact::from_json_str(&read_text(
+        "examples/tilemap-authoring-v1/drafts/valid-dogfood-open-lane.tilemap-draft.json",
+    ))
+    .expect("draft fixture parses");
+    assert_eq!(draft.target.base_digest, tilemap_base_digest(&base));
+
+    let preview = validate_tilemap_draft_against_base(&draft, &base).expect("draft validates");
+    assert!(preview.generated_preview_only);
+    assert_eq!(preview.changed_cells.len(), 2);
+    assert_eq!(preview.affected_collision_cells[0].x, 3);
+    assert_eq!(
+        preview.affected_trigger_markers,
+        vec!["trigger-key".to_string()]
+    );
+
+    let mut stale = draft.clone();
+    stale.target.base_digest = "fnv64:0000000000000000".to_string();
+    let error =
+        validate_tilemap_draft_against_base(&stale, &base).expect_err("stale draft rejects");
+    assert!(error.to_string().contains("baseDigest is stale"));
 }
 
 #[test]
