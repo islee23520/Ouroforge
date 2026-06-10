@@ -77,3 +77,27 @@ fn backlog_read_model_feeds_future_proposals_and_closure_checklist() {
     assert_eq!(model.future_proposal_candidate_count, 2);
     assert!(model.closure_allowed);
 }
+
+#[test]
+fn sample_dogfood_report_keeps_deferred_blockers_visible_for_handoff() {
+    let (categories, severities) = taxonomy();
+    let backlog = backlog();
+    backlog
+        .validate(&categories, &severities)
+        .expect("valid backlog");
+    let model = backlog.read_model();
+    assert!(
+        model.closure_allowed,
+        "blocking issue is explicitly deferred, not hidden"
+    );
+    assert_eq!(model.future_proposal_candidate_count, 2);
+    assert!(backlog
+        .findings
+        .iter()
+        .any(|finding| finding.blocks_product_observed
+            && finding.status == PlaytestFindingStatus::Deferred));
+    assert!(backlog
+        .findings
+        .iter()
+        .all(|finding| !finding.evidence_refs.is_empty()));
+}
