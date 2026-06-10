@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, mkdir, writeFile, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile, stat, readdir } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -408,13 +408,12 @@ async function buildInventory(bundleDir) {
     }
   }
   const screenshotDir = path.join(bundleDir, 'screenshots');
-  for (const name of ['start.png']) {
-    const file = path.join(screenshotDir, name);
-    try {
-      await stat(file);
+  try {
+    for (const name of (await readdir(screenshotDir)).filter(name => name.endsWith('.png')).sort()) {
+      const file = path.join(screenshotDir, name);
       entries.push({ path: `screenshots/${name}`, kind: 'png', sha256: await sha256(file), required: false });
-    } catch {}
-  }
+    }
+  } catch {}
   return entries;
 }
 
@@ -478,18 +477,23 @@ async function run() {
     await cdp.send('Page.navigate', { url: targetUrl });
     await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 5000))]);
     await new Promise(resolve => setTimeout(resolve, args.waitMs));
+    const startScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    await writeFile(path.join(screenshotDir, 'start.png'), Buffer.from(startScreenshot.data, 'base64'));
     const replayResult = await runInputReplay(cdp, args.replay);
     const runtimeSample = await sampleOuroforgeRuntime(cdp);
-    const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-    await writeFile(path.join(screenshotDir, 'start.png'), Buffer.from(screenshot.data, 'base64'));
+    const checkpointScreenshot = args.replay ? 'final.png' : 'start.png';
+    if (args.replay) {
+      const finalScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+      await writeFile(path.join(screenshotDir, checkpointScreenshot), Buffer.from(finalScreenshot.data, 'base64'));
+    }
     const metrics = await cdp.send('Performance.getMetrics');
     const metricMap = Object.fromEntries((metrics.metrics ?? []).map(metric => [metric.name, metric.value]));
     const sampledFrameStats = runtimeSample?.sample?.frame_stats ?? {};
     await writeFile(path.join(bundleDir, 'frame-stats.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), frame: sampledFrameStats.tick ?? 0, fps: null, delta_ms: sampledFrameStats.fixedDeltaMs ?? null, metrics: { Frames: metricMap.Frames ?? null, Timestamp: metricMap.Timestamp ?? null }, runtime_frame_stats: sampledFrameStats }));
-    await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), ...(runtimeSample?.sample ?? { tick: null, scene_id: null, goal_flags: {}, recent_events: [] }), supported: Boolean(runtimeSample?.supported), diagnostics: runtimeSample?.diagnostics ?? [], screenshot: 'screenshots/start.png' }));
+    await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), ...(runtimeSample?.sample ?? { tick: null, scene_id: null, goal_flags: {}, recent_events: [] }), supported: Boolean(runtimeSample?.supported), diagnostics: runtimeSample?.diagnostics ?? [], screenshot: `screenshots/${checkpointScreenshot}` }));
     await writeFile(path.join(bundleDir, 'events.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, events: [{ timestamp: nowIso(), type: 'page-load', target_url: targetUrl }, ...((runtimeSample?.sample?.recent_events ?? []).map(event => ({ timestamp: nowIso(), type: 'runtime-event-sample', event })))] }, null, 2) + '\n');
     await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, replay: replayResult.name, steps: replayResult.steps, objective_flag_sequence: replayResult.objective_flag_sequence, diagnostics: replayResult.diagnostics }, null, 2) + '\n');
-    await writeFile(path.join(bundleDir, 'verdict.md'), `# Live observability verdict stub\n\nTarget: ${targetUrl}\n\nStatus: contract-pass / product-observed-pending\n\nArtifacts captured: console, frame stats, world sample placeholder, events, input replay, start screenshot.\n`);
+    await writeFile(path.join(bundleDir, 'verdict.md'), `# Live observability verdict stub\n\nTarget: ${targetUrl}\n\nStatus: contract-pass / product-observed-pending\n\nArtifacts captured: console, frame stats, world sample, events, input replay, start/final screenshots when replay is enabled.\n`);
     consoleStream.end();
     await new Promise(resolve => consoleStream.on('finish', resolve));
     await writeFile(path.join(bundleDir, 'manifest.json'), JSON.stringify({

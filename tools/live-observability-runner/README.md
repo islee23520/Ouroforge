@@ -41,7 +41,7 @@ A successful run writes the M116.1 required bundle files:
 - `world-samples.jsonl`
 - `events.json`
 - `input-replay.json`
-- `screenshots/start.png`
+- `screenshots/start.png` and, when replay is enabled, `screenshots/final.png`
 - `verdict.md` stub
 
 Generated bundles remain ignored under `runs/` unless a later issue explicitly promotes a minimal fixture.
@@ -57,9 +57,31 @@ valid observability bundle: run_id=collect-and-exit-2347 run_kind=runtime artifa
 
 Observed artifact facts:
 
-- `screenshots/start.png`: PNG, 756x469.
+- `screenshots/start.png` and, when replay is enabled, `screenshots/final.png`: PNG, 756x469.
 - `frame-stats.jsonl`: captured a CDP performance metric line with `Frames`.
 - `manifest.json`: recorded local target URL, Node version, Chrome/CDP metadata, retry attempts, and digests.
 - `console.jsonl`: present and valid; empty for this run.
 
 This is product-observed harness evidence for capture/validation, not a claim that the game runtime itself is product-observed complete.
+
+
+## Collect-and-exit replay and determinism check
+
+Use `--replay collect-and-exit` to drive the current collect-and-exit scene through existing runtime API keys only. The runner records replay steps and objective flag checkpoints in `input-replay.json`.
+
+For M116.3 PR 3, two consecutive generated bundles were compared by their `input-replay.json.objective_flag_sequence` values:
+
+```text
+collect-and-exit-2348-det-a == collect-and-exit-2348-det-b
+start: key_collected=false, exit_reached=false
+after-key: key_collected=true, door_open=true, exit_reached=false
+after-exit: key_collected=true, door_open=true, exit_reached=true
+```
+
+The same run recorded `observability_api_keys_used` as:
+
+```text
+whenReady,getWorldState,getFrameStats,getEvents,setInput,step
+```
+
+Known live diagnostic preserved in the bundle: `missing_asset` for `collect_and_exit_sheet`; this is runtime/product evidence, not a harness failure.
