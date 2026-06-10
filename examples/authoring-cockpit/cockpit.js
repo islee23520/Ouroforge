@@ -2926,7 +2926,7 @@ const OuroforgeCockpit = (() => {
     return {
       present: Boolean(source?.present ?? true),
       schemaVersion: 'studio-source-generated-browser-v1',
-      status: items.some((item) => item.kind === 'blocked') ? 'blocked' : 'ready',
+      status: items.some((item) => item.kind === 'blocked' || item.kind === 'unsupported') ? 'blocked' : 'ready',
       boundary: source?.boundary || 'Read-only source/generated state browser. Labels are produced by hardened path validation, including explicit backslash rejection; Studio does not write generated roots or blocked paths.',
       items,
       scenarioCoverage: { id: 'v102', issue: '#2364', status: 'landed', suite: 'Scenario Coverage v102 source/generated boundary suite' },
@@ -2943,6 +2943,17 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
+  function liveObservabilityManifestPathViolation(pathValue) {
+    const path = String(pathValue == null ? '' : pathValue);
+    const hardened = studioPathHardenedViolation(path);
+    if (hardened) return hardened;
+    const match = path.match(/^runs\/live-observability\/([^/]+)\/manifest\.json$/);
+    if (!match) return 'manifest path must be runs/live-observability/<safe-run-id>/manifest.json';
+    if (match[1] === '.' || match[1] === '..') return 'manifest run id must be a safe single path segment';
+    if (!/^[A-Za-z0-9._-]+$/.test(match[1])) return 'manifest run id contains unsupported characters';
+    return '';
+  }
+
   function liveObservabilityManifestEvidenceModel(run = {}) {
     const source = run?.live_observability || run?.liveObservability || run?.live_observability_manifests || run?.liveObservabilityManifests || null;
     const rawManifests = Array.isArray(source) ? source
@@ -2956,8 +2967,9 @@ const OuroforgeCockpit = (() => {
         : Array.isArray(manifest?.artifacts) ? manifest.artifacts
         : [];
       const blockedReasons = [];
-      if (!/^runs\/live-observability\/[^/]+\/manifest\.json$/.test(manifestPath)) {
-        blockedReasons.push('manifest path must be runs/live-observability/<run-id>/manifest.json');
+      const manifestViolation = liveObservabilityManifestPathViolation(manifestPath);
+      if (manifestViolation) {
+        blockedReasons.push(manifestViolation);
       }
       const entries = entriesRaw.map((entry, entryIndex) => {
         const path = String(entry?.path || entry?.href || entry?.artifactPath || entry?.artifact_path || '');
@@ -3410,7 +3422,7 @@ const OuroforgeCockpit = (() => {
 
   function entityComponentFieldAllowlisted(name) {
     const field = String(name || '');
-    return ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.includes(field) || ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.some((prefix) => field.startsWith(`${prefix}.`));
+    return ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.includes(field);
   }
 
   function entityComponentSupportedType(type) {
@@ -5590,6 +5602,18 @@ const OuroforgeCockpit = (() => {
     };
   }
 
+  function studioCanvasTransformTargetViolation(pathValue) {
+    const classification = classifyStudioSourceGeneratedPath(pathValue);
+    if (classification.kind !== 'source') {
+      const reason = classification.blockedReasons[0] || 'path is outside allowlisted Studio source roots';
+      return `Target path is not an allowlisted in-project source path: ${reason}`;
+    }
+    const path = classification.path;
+    const isSceneJson = path.endsWith('/scene.json') || path.endsWith('.scene.json') || (/\/scenes\/[^/]+\.json$/.test(path));
+    if (!isSceneJson) return 'Target path must be an allowlisted in-project scene JSON source path.';
+    return '';
+  }
+
   function studioCanvasTransformDraft(target, transform) {
     const reasons = [];
     const finite = (value) => typeof value === 'number' && Number.isFinite(value);
@@ -5618,7 +5642,8 @@ const OuroforgeCockpit = (() => {
       else operations.push({ id: 'set-transform-scale', kind: 'set_component_field', path: 'transform.scale', value: scale.slice(0, 2), baseDigest, summary: `Set scale to ${JSON.stringify(scale.slice(0, 2))} (draft only; base ${baseDigest})` });
     }
     if (!operations.length && !reasons.length) reasons.push('No supported transform (position, rotation, scale) was provided.');
-    if (/(^|[\/])\.\.([\/]|$)/.test(path) || path.startsWith('/') || /[;&|`$<>]/.test(path) || path.includes('\\')) reasons.push('Target path is not an allowlisted in-project source path.');
+    const targetPathViolation = studioCanvasTransformTargetViolation(path);
+    if (targetPathViolation) reasons.push(targetPathViolation);
     const baseTarget = { type: 'scene', path, id, baseDigest, currentDigest, bounds };
     if (reasons.length) {
       return { draftId: `canvas-transform-${id}-blocked`, schemaVersion: 'visual-edit-draft-v1', target: baseTarget, proposedOperations: [], validationStatus: 'blocked', blockedReasons: reasons, requiresSafeSourceApplyHandoff: true, applyCapability: false };

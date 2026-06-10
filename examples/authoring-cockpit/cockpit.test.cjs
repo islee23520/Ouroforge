@@ -2569,6 +2569,13 @@ assert.deepEqual(workspaceSurfaceIds, ['asset-list', 'evidence-browser', 'projec
 for (const surface of workspaceContract.surfaces) {
   assert.match(surface.hostFile, /^examples\/authoring-cockpit\//);
   assert.match(surface.hostSurface, /^render/);
+  for (const hostSurface of surface.hostSurface.split('+').map((part) => part.trim())) {
+    assert.equal(
+      typeof cockpit[hostSurface],
+      'function',
+      `${surface.id} host surface must resolve to an exported renderer: ${hostSurface}`
+    );
+  }
   assert.ok(surface.selector, `${surface.id} selector is recorded`);
   assert.doesNotMatch(surface.stateBoundary, /command bridge enabled|auto-apply enabled|hidden execution enabled/i);
 }
@@ -2603,6 +2610,14 @@ assert.match(cockpit.renderLiveObservabilityEvidenceSurface(liveRun), /browser_c
 const blockedLiveModel = cockpit.liveObservabilityManifestEvidenceModel({ live_observability: { manifests: [{ manifestPath: 'runs/live-observability/live-2/manifest.json', evidence: [{ path: 'runs\\live-observability\\live-2\\bad.json' }] }] } });
 assert.equal(blockedLiveModel.status, 'blocked');
 assert.match(blockedLiveModel.manifests[0].entries[0].blockedReasons.join(' '), /hardened live-observability/);
+for (const unsafeManifestPath of [
+  'runs/live-observability/../manifest.json',
+  'runs/live-observability/live\\evil/manifest.json',
+]) {
+  const unsafeManifestModel = cockpit.liveObservabilityManifestEvidenceModel({ live_observability: { manifests: [{ manifestPath: unsafeManifestPath }] } });
+  assert.equal(unsafeManifestModel.status, 'blocked');
+  assert.match(unsafeManifestModel.manifests[0].blockedReasons.join(' '), /manifest|traversal|backslash/);
+}
 
 // #2364 source/generated state browser and Scenario Coverage v102.
 assert.equal(cockpit.classifyStudioSourceGeneratedPath('examples/game-runtime/scene.json').kind, 'source');
@@ -2621,6 +2636,7 @@ assert.equal(sourceGeneratedModel.schemaVersion, 'studio-source-generated-browse
 assert.equal(sourceGeneratedModel.status, 'blocked');
 assert.equal(sourceGeneratedModel.scenarioCoverage.id, 'v102');
 assert.equal(sourceGeneratedModel.scenarioCoverage.status, 'landed');
+assert.equal(cockpit.studioSourceGeneratedBrowserModel({ source_generated_browser: { items: [{ id: 'unsupported-root', path: 'README.md' }] } }).status, 'blocked');
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /Scenario Coverage: v102 landed/);
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /backslash path separator/);
 
@@ -2657,11 +2673,22 @@ assert.match(staleDigestDraft2366.blockedReasons.join(' '), /Stale target scene 
 const missingDigestDraft2366 = cockpit.studioCanvasTransformDraft({ id: 'player', path: 'examples/game-runtime/scene.json' }, { position: [42, 44] });
 assert.equal(missingDigestDraft2366.validationStatus, 'blocked');
 assert.match(missingDigestDraft2366.blockedReasons.join(' '), /base digest is required/);
+for (const unsafeTransformPath of [
+  'README.md',
+  'runs/live-observability/live-1/manifest.json',
+  'tmp/source-apply/worktree/scene.json',
+]) {
+  const unsafeTransformDraft = cockpit.studioCanvasTransformDraft({ ...transformTarget2366, path: unsafeTransformPath }, { position: [42, 44] });
+  assert.equal(unsafeTransformDraft.validationStatus, 'blocked');
+  assert.match(unsafeTransformDraft.blockedReasons.join(' '), /allowlisted|read-only|outside/);
+}
 
 // #2367 component inspector: Signal Gate allowlist edits only; unsupported fields remain visible read-only.
 assert.ok(cockpit.ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.includes('speed'));
 assert.equal(cockpit.entityComponentFieldAllowlisted('speed'), true);
 assert.equal(cockpit.entityComponentFieldAllowlisted('script_ref'), false);
+assert.equal(cockpit.entityComponentFieldAllowlisted('trigger.target.script_ref'), false);
+assert.equal(cockpit.entityComponentFieldAllowlisted('hud.value.javascript_url'), false);
 const allowlistRun2367 = {
   entity_component_inspector: {
     present: true,
@@ -2687,6 +2714,14 @@ const blockedField2367 = allowlistModel2367.components[0].fields.find((f) => f.n
 const blockedComponentDraft2367 = cockpit.entityComponentDraftEdit({ id: 'player', component: 'SignalGate', path: 'examples/game-runtime/scene.json' }, blockedField2367, 'scripts/other.gd');
 assert.equal(blockedComponentDraft2367.validationStatus, 'blocked');
 assert.match(blockedComponentDraft2367.blockedReasons.join(' '), /allowlist/);
+for (const nestedField of [
+  { name: 'trigger.target.script_ref', type: 'string', value: 'scripts/player.gd', editable: true },
+  { name: 'hud.value.javascript_url', type: 'string', value: 'javascript:alert(1)', editable: true },
+]) {
+  const nestedDraft = cockpit.entityComponentDraftEdit({ id: 'player', component: 'SignalGate', path: 'examples/game-runtime/scene.json' }, nestedField, 'blocked');
+  assert.equal(nestedDraft.validationStatus, 'blocked');
+  assert.match(nestedDraft.blockedReasons.join(' '), /allowlist/);
+}
 
 // #2368 review/apply handoff: consumes #2378, rejects self-approval/stale target, links before/after bundles, v103 landed.
 const handoffDraft2368 = {
