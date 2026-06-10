@@ -20,7 +20,7 @@ const REQUIRED = [
 ];
 
 function parseArgs(argv) {
-  const args = { outRoot: 'runs/live-observability', waitMs: 750, retries: 1, runKind: 'runtime' };
+  const args = { outRoot: 'runs/live-observability', waitMs: 750, retries: 1, runKind: 'runtime', validatorManifest: 'crates/ouroforge-observability/Cargo.toml', validate: true };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--url') args.url = argv[++i];
@@ -30,6 +30,8 @@ function parseArgs(argv) {
     else if (arg === '--wait-ms') args.waitMs = Number(argv[++i]);
     else if (arg === '--retries') args.retries = Number(argv[++i]);
     else if (arg === '--run-kind') args.runKind = argv[++i];
+    else if (arg === '--validator-manifest') args.validatorManifest = argv[++i];
+    else if (arg === '--skip-validation') args.validate = false;
     else if (arg === '--help' || arg === '-h') args.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
@@ -37,7 +39,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return `usage: node tools/live-observability-runner/runner.mjs --url <local-url> [--run-id id] [--out-root runs/live-observability] [--chrome path] [--wait-ms 750] [--retries 1]\n`;
+  return `usage: node tools/live-observability-runner/runner.mjs --url <local-url> [--run-id id] [--out-root runs/live-observability] [--chrome path] [--wait-ms 750] [--retries 1] [--validator-manifest crates/ouroforge-observability/Cargo.toml] [--skip-validation]\n`;
 }
 
 function assertLocalHttpUrl(value) {
@@ -195,6 +197,26 @@ function kindFor(file) {
   return 'other';
 }
 
+
+async function validateBundleWithRust(manifestPath, bundleDir) {
+  const child = spawn('cargo', ['run', '--quiet', '--manifest-path', manifestPath, '--', 'validate', bundleDir], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: process.env,
+  });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const code = await new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', resolve);
+  });
+  if (code !== 0) {
+    throw new Error(`Rust observability validator failed with exit ${code}: ${stderr || stdout}`);
+  }
+  return stdout.trim();
+}
+
 async function run() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.url) {
@@ -250,6 +272,10 @@ async function run() {
       retry_attempts: chrome.attempts,
       artifact_inventory: await buildInventory(bundleDir),
     }, null, 2) + '\n');
+    if (args.validate) {
+      const validation = await validateBundleWithRust(args.validatorManifest, bundleDir);
+      process.stderr.write(`${validation}\n`);
+    }
     cdp.close();
     process.stdout.write(`${bundleDir}\n`);
     return 0;
