@@ -30,6 +30,7 @@ function parseArgs(argv) {
     else if (arg === '--wait-ms') args.waitMs = Number(argv[++i]);
     else if (arg === '--retries') args.retries = Number(argv[++i]);
     else if (arg === '--run-kind') args.runKind = argv[++i];
+    else if (arg === '--replay') args.replay = argv[++i];
     else if (arg === '--validator-manifest') args.validatorManifest = argv[++i];
     else if (arg === '--skip-validation') args.validate = false;
     else if (arg === '--help' || arg === '-h') args.help = true;
@@ -39,7 +40,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return `usage: node tools/live-observability-runner/runner.mjs --url <local-url> [--run-id id] [--out-root runs/live-observability] [--chrome path] [--wait-ms 750] [--retries 1] [--validator-manifest crates/ouroforge-observability/Cargo.toml] [--skip-validation]\n`;
+  return `usage: node tools/live-observability-runner/runner.mjs --url <local-url> [--run-id id] [--out-root runs/live-observability] [--chrome path] [--wait-ms 750] [--retries 1] [--replay collect-and-exit] [--validator-manifest crates/ouroforge-observability/Cargo.toml] [--skip-validation]\n`;
 }
 
 function assertLocalHttpUrl(value) {
@@ -284,6 +285,58 @@ async function evaluateJson(cdp, expression) {
   return result.result?.value;
 }
 
+
+async function runInputReplay(cdp, replayName) {
+  if (!replayName) return { name: null, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [] };
+  if (replayName !== 'collect-and-exit') {
+    return { name: replayName, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [{ code: 'unsupported-target', message: `unknown replay: ${replayName}` }] };
+  }
+  return await evaluateJson(cdp, `
+    (async () => {
+      const api = window.__OUROFORGE__;
+      const used = [];
+      const diagnostics = [];
+      const sequence = [];
+      function need(key) {
+        if (!api || typeof api[key] !== 'function') {
+          diagnostics.push({ code: 'unsupported-target', message: 'window.__OUROFORGE__.' + key + ' is missing' });
+          return false;
+        }
+        used.push(key);
+        return true;
+      }
+      if (typeof api?.whenReady === 'function') {
+        used.push('whenReady');
+        await api.whenReady();
+      }
+      if (!need('getWorldState') || !need('setInput') || !need('step')) {
+        return { name: 'collect-and-exit', used_keys: used, steps: [], objective_flag_sequence: sequence, diagnostics };
+      }
+      function flags(label) {
+        const world = api.getWorldState();
+        const goalFlags = world?.componentModel?.goalFlags ?? {};
+        sequence.push({ label, tick: world?.tick ?? null, goal_flags: goalFlags });
+        return goalFlags;
+      }
+      const steps = [
+        { index: 0, action: 'sample', label: 'start' },
+        { index: 1, action: 'setInput', input: { right: true, keys: { right: true } } },
+        { index: 2, action: 'step', count: 40, label: 'after-key' },
+        { index: 3, action: 'step', count: 45, label: 'after-exit' },
+        { index: 4, action: 'setInput', input: { right: false, keys: { right: false } } }
+      ];
+      flags('start');
+      api.setInput({ right: true, keys: { right: true } });
+      api.step(40);
+      flags('after-key');
+      api.step(45);
+      flags('after-exit');
+      api.setInput({ right: false, keys: { right: false } });
+      return { name: 'collect-and-exit', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics };
+    })()
+  `);
+}
+
 async function sampleOuroforgeRuntime(cdp) {
   return await evaluateJson(cdp, `
     (async () => {
@@ -425,6 +478,7 @@ async function run() {
     await cdp.send('Page.navigate', { url: targetUrl });
     await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 5000))]);
     await new Promise(resolve => setTimeout(resolve, args.waitMs));
+    const replayResult = await runInputReplay(cdp, args.replay);
     const runtimeSample = await sampleOuroforgeRuntime(cdp);
     const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile(path.join(screenshotDir, 'start.png'), Buffer.from(screenshot.data, 'base64'));
@@ -434,7 +488,7 @@ async function run() {
     await writeFile(path.join(bundleDir, 'frame-stats.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), frame: sampledFrameStats.tick ?? 0, fps: null, delta_ms: sampledFrameStats.fixedDeltaMs ?? null, metrics: { Frames: metricMap.Frames ?? null, Timestamp: metricMap.Timestamp ?? null }, runtime_frame_stats: sampledFrameStats }));
     await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), ...(runtimeSample?.sample ?? { tick: null, scene_id: null, goal_flags: {}, recent_events: [] }), supported: Boolean(runtimeSample?.supported), diagnostics: runtimeSample?.diagnostics ?? [], screenshot: 'screenshots/start.png' }));
     await writeFile(path.join(bundleDir, 'events.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, events: [{ timestamp: nowIso(), type: 'page-load', target_url: targetUrl }, ...((runtimeSample?.sample?.recent_events ?? []).map(event => ({ timestamp: nowIso(), type: 'runtime-event-sample', event })))] }, null, 2) + '\n');
-    await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, steps: [] }, null, 2) + '\n');
+    await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, replay: replayResult.name, steps: replayResult.steps, objective_flag_sequence: replayResult.objective_flag_sequence, diagnostics: replayResult.diagnostics }, null, 2) + '\n');
     await writeFile(path.join(bundleDir, 'verdict.md'), `# Live observability verdict stub\n\nTarget: ${targetUrl}\n\nStatus: contract-pass / product-observed-pending\n\nArtifacts captured: console, frame stats, world sample placeholder, events, input replay, start screenshot.\n`);
     consoleStream.end();
     await new Promise(resolve => consoleStream.on('finish', resolve));
@@ -447,9 +501,10 @@ async function run() {
       tool_versions: { runner: 'live-observability-runner-v1', node: process.version, schema: SCHEMA_VERSION },
       browser: { cdp_port: chrome.port, browser: chrome.version?.Browser ?? null, protocol_version: chrome.version?.['Protocol-Version'] ?? null },
       retry_attempts: chrome.attempts,
-      observability_api_keys_used: runtimeSample?.used_keys ?? [],
+      replay: replayResult.name,
+      observability_api_keys_used: Array.from(new Set([...(runtimeSample?.used_keys ?? []), ...(replayResult?.used_keys ?? [])])),
       observability_api_keys_available: runtimeSample?.available_keys ?? [],
-      diagnostics: runtimeSample?.diagnostics ?? [],
+      diagnostics: [...(runtimeSample?.diagnostics ?? []), ...(replayResult?.diagnostics ?? [])],
       artifact_inventory: await buildInventory(bundleDir),
     }, null, 2) + '\n');
     if (args.validate) {
