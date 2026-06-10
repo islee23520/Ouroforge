@@ -2688,6 +2688,45 @@ const blockedComponentDraft2367 = cockpit.entityComponentDraftEdit({ id: 'player
 assert.equal(blockedComponentDraft2367.validationStatus, 'blocked');
 assert.match(blockedComponentDraft2367.blockedReasons.join(' '), /allowlist/);
 
+// #2368 review/apply handoff: consumes #2378, rejects self-approval/stale target, links before/after bundles, v103 landed.
+const handoffDraft2368 = {
+  draftId: 'draft-2368',
+  target: { type: 'scene', path: 'examples/game-runtime/scene.json', id: 'player' },
+  beforeHash: 'sha256:base',
+  proposedOperations: [{ kind: 'set_component_field', path: 'transform.position', value: [10, 10] }],
+  author: { id: 'author-a' },
+};
+const handoffRun2368 = {
+  source_apply_handoff: {
+    present: true,
+    target: { path: 'examples/game-runtime/scene.json', expectedHash: 'sha256:base', stale: false },
+    sandboxProtocol: 'safe-source-apply-temp-worktree-v1 (#2378)',
+    reviewDecision: { authorId: 'author-a', reviewerId: 'reviewer-b' },
+    beforeLiveBundle: 'runs/live-observability/before/manifest.json',
+    afterLiveBundle: 'runs/live-observability/after/manifest.json',
+    mainWorktreeStatus: 'unchanged',
+  },
+};
+const handoffModel2368 = cockpit.studioSourceApplyHandoffModel(handoffDraft2368, handoffRun2368);
+assert.equal(handoffModel2368.apply_status, 'disabled_no_direct_apply');
+assert.match(handoffModel2368.consumed_protocol, /#2378/);
+assert.equal(handoffModel2368.review_decision.selfApprovalRejected, false);
+assert.equal(handoffModel2368.before_live_bundle, 'runs/live-observability/before/manifest.json');
+assert.equal(handoffModel2368.after_live_bundle, 'runs/live-observability/after/manifest.json');
+assert.equal(handoffModel2368.main_worktree_status, 'unchanged');
+assert.equal(handoffModel2368.scenarioCoverage.id, 'v103');
+assert.equal(handoffModel2368.scenarioCoverage.status, 'landed');
+const selfApprovalModel2368 = cockpit.studioSourceApplyHandoffModel(handoffDraft2368, { source_apply_handoff: { ...handoffRun2368.source_apply_handoff, reviewDecision: { authorId: 'author-a', reviewerId: 'author-a' } } });
+assert.equal(selfApprovalModel2368.apply_status, 'rejected_self_approval');
+assert.equal(selfApprovalModel2368.review_decision.selfApprovalRejected, true);
+const staleHandoffModel2368 = cockpit.studioSourceApplyHandoffModel(handoffDraft2368, { source_apply_handoff: { ...handoffRun2368.source_apply_handoff, target: { path: 'examples/game-runtime/scene.json', expectedHash: 'sha256:base', stale: true } } });
+assert.equal(staleHandoffModel2368.apply_status, 'rejected_stale_target');
+const handoffHtml2368 = cockpit.renderStudioSourceApplyHandoffSurface({ studio_draft_authoring: { drafts: [handoffDraft2368] }, ...handoffRun2368 });
+assert.match(handoffHtml2368, /#2378 already landed/);
+assert.match(handoffHtml2368, /Scenario Coverage: v103 landed/);
+assert.match(handoffHtml2368, /Main worktree status: unchanged/);
+assert.doesNotMatch(handoffHtml2368, /<button|<form|data-action=|auto-apply|self-approve enabled/i);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);

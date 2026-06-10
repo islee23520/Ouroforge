@@ -2163,6 +2163,18 @@ const OuroforgeCockpit = (() => {
       ? staleRaw
       : (guardStatus ? !/fresh|current|matches/i.test(String(guardStatus)) : null);
 
+    const reviewDecision = (exported && typeof exported.reviewDecision === 'object' && exported.reviewDecision)
+      || (exported && typeof exported.review_decision === 'object' && exported.review_decision)
+      || (draft && typeof draft.reviewDecision === 'object' && draft.reviewDecision)
+      || {};
+    const authorId = reviewDecision.authorId || reviewDecision.author_id || draft?.author?.id || draft?.authorId || 'unknown-author';
+    const reviewerId = reviewDecision.reviewerId || reviewDecision.reviewer_id || reviewDecision.reviewer || 'unknown-reviewer';
+    const selfApprovalRejected = authorId !== 'unknown-author' && reviewerId !== 'unknown-reviewer' && authorId === reviewerId;
+    const beforeLiveBundle = exported?.before_live_bundle || exported?.beforeLiveBundle || exported?.beforeBundle || null;
+    const afterLiveBundle = exported?.after_live_bundle || exported?.afterLiveBundle || exported?.afterBundle || null;
+    const mainWorktreeStatus = exported?.main_worktree_status || exported?.mainWorktreeStatus || 'unverified';
+    const consumedProtocol = exported?.sandbox_protocol || exported?.sandboxProtocol || 'safe-source-apply-temp-worktree-v1 (#2378)';
+
     const operations = (draft && Array.isArray(draft.proposedOperations)) ? draft.proposedOperations
       : (draft && Array.isArray(draft.proposed_operations)) ? draft.proposed_operations : [];
     const draftDiffSummary = exported?.draft_diff_summary || exported?.draftDiffSummary
@@ -2191,8 +2203,14 @@ const OuroforgeCockpit = (() => {
       rollback_required: true,
       evidence_required: true,
       apply_capability: false,
-      apply_status: 'disabled_no_direct_apply',
-      apply_boundary: 'Studio produces Safe Source Apply preview inputs only. Apply, merge, and self-approve are disabled and handled by the Safe Source Apply review gates outside the browser.',
+      apply_status: selfApprovalRejected ? 'rejected_self_approval' : inferredStale === true ? 'rejected_stale_target' : 'disabled_no_direct_apply',
+      apply_boundary: 'Studio produces Safe Source Apply preview inputs only and consumes the #2378 temp-worktree sandbox protocol. Apply, merge, and self-approve are disabled and handled by the Safe Source Apply review gates outside the browser.',
+      consumed_protocol: consumedProtocol,
+      review_decision: { authorId, reviewerId, selfApprovalRejected },
+      before_live_bundle: beforeLiveBundle,
+      after_live_bundle: afterLiveBundle,
+      main_worktree_status: mainWorktreeStatus,
+      scenarioCoverage: { id: 'v103', issue: '#2368', status: 'landed', suite: 'Scenario Coverage v103 scene-editor apply handoff suite' },
       forbidden_actions: FORBIDDEN,
       verification_hints: verificationHints,
     };
@@ -2211,9 +2229,13 @@ const OuroforgeCockpit = (() => {
     const staleLabel = model.target.stale === true ? 'stale (target drifted; re-preview required)'
       : model.target.stale === false ? 'fresh (target matches expected before hash)'
       : 'unknown (no stale-target guard evidence)';
+    const directApplyLabel = model.apply_status === 'disabled_no_direct_apply' ? 'disabled · no direct apply' : model.apply_status;
     return `<section id="studio-source-apply-handoff" class="panel"><h2>Studio source apply handoff</h2>
       <p class="hint">${escapeText(model.apply_boundary)}</p>
-      <p>Direct apply: ${surfaceState(false, 'disabled · no direct apply')}</p>
+      <p>Direct apply: ${surfaceState(false, directApplyLabel)}</p>
+      <p class="hint">Protocol ordering: #2378 already landed; Studio consumes ${escapeText(model.consumed_protocol)} and does not define a divergent sandbox protocol. Scenario Coverage: ${escapeText(model.scenarioCoverage.id)} ${escapeText(model.scenarioCoverage.status)}.</p>
+      <p class="hint">Review actors: author ${escapeText(model.review_decision.authorId)} · reviewer ${escapeText(model.review_decision.reviewerId)} · self-approval rejected: ${escapeText(String(model.review_decision.selfApprovalRejected))}.</p>
+      <p class="hint">Before live bundle: ${escapeText(model.before_live_bundle || 'missing')} · After live bundle: ${escapeText(model.after_live_bundle || 'missing')} · Main worktree status: ${escapeText(model.main_worktree_status)}.</p>
       <div class="surface-row">
         <strong>${escapeText(model.target.path)}</strong> ${surfaceState(model.target.stale === false, staleLabel)}<br>
         <small>Expected hash: ${escapeText(model.target.expected_hash)}</small><br>
