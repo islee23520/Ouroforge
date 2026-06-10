@@ -124,6 +124,12 @@ impl ProductionUsabilityGate {
                 ));
             }
             phase.validate()?;
+            if phase.verdict != ProductionUsabilityVerdict::ProductObservedComplete {
+                return Err(anyhow!(
+                    "product-observed-complete gate cannot include non-complete phase #{}",
+                    phase.issue
+                ));
+            }
         }
         if self.anchors_remain_open != vec![1, 23] {
             return Err(anyhow!(
@@ -185,6 +191,13 @@ impl ProductionUsabilityPhase {
                 if self.comparison_verdict.is_none() {
                     return Err(anyhow!(
                         "#2392 requires an improvement or regression comparison verdict"
+                    ));
+                }
+                if self.comparison_verdict == Some(ComparisonVerdict::Regression)
+                    && self.verdict == ProductionUsabilityVerdict::ProductObservedComplete
+                {
+                    return Err(anyhow!(
+                        "#2392 regression comparison cannot be product-observed-complete"
                     ));
                 }
             }

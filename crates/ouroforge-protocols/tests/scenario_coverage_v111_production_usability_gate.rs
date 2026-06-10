@@ -81,6 +81,31 @@ fn scenario_coverage_v111_requires_2392_comparison_verdict() {
 }
 
 #[test]
+fn scenario_coverage_v111_rejects_regression_greenwashed_as_complete() {
+    let mut gate = valid_gate();
+    let phase = gate.phases.iter_mut().find(|p| p.issue == 2392).unwrap();
+    phase.comparison_verdict = Some(ComparisonVerdict::Regression);
+    phase.verdict = ProductionUsabilityVerdict::ProductObservedComplete;
+    assert!(gate
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("#2392 regression comparison cannot be product-observed-complete"));
+}
+
+#[test]
+fn scenario_coverage_v111_complete_gate_rejects_non_complete_phase() {
+    let mut gate = valid_gate();
+    let phase = gate.phases.iter_mut().find(|p| p.issue == 2391).unwrap();
+    phase.verdict = ProductionUsabilityVerdict::ProductObservedFail;
+    assert!(gate
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("product-observed-complete gate cannot include non-complete phase #2391"));
+}
+
+#[test]
 fn scenario_coverage_v111_requires_2393_local_package_refs() {
     let mut gate = valid_gate();
     gate.phases
