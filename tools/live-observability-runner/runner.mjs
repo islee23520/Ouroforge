@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
@@ -90,8 +90,8 @@ async function launchChrome({ chrome, retries }) {
       ], { stdio: ['ignore', 'ignore', 'pipe'] });
       child.stderr.on('data', () => {});
       try {
-        await waitForJsonVersion(port, 8000);
-        return { child, port, profile, attempts: attempt };
+        const version = await waitForJsonVersion(port, 8000);
+        return { child, port, profile, attempts: attempt, version };
       } catch (error) {
         lastError = error;
         child.kill('SIGTERM');
@@ -119,6 +119,113 @@ async function createPage(port) {
   if (!response.ok) throw new Error(`failed to create CDP target: HTTP ${response.status}`);
   const target = await response.json();
   return target.webSocketDebuggerUrl;
+}
+
+
+class WebSocket {
+  constructor(wsUrl) {
+    this.url = new URL(wsUrl);
+    this.listeners = new Map();
+    this.buffer = Buffer.alloc(0);
+    this.handshakeDone = false;
+    this.socket = net.createConnection({ host: this.url.hostname, port: Number(this.url.port) }, () => this.handshake());
+    this.socket.on('data', chunk => this.onData(chunk));
+    this.socket.on('error', error => this.dispatch('error', error));
+    this.socket.on('close', () => this.dispatch('close', {}));
+  }
+  addEventListener(type, handler, options = {}) {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type).push({ handler, once: Boolean(options.once) });
+  }
+  dispatch(type, event) {
+    const listeners = this.listeners.get(type) ?? [];
+    this.listeners.set(type, listeners.filter(listener => {
+      listener.handler(event);
+      return !listener.once;
+    }));
+  }
+  handshake() {
+    const key = randomBytes(16).toString('base64');
+    const request = [
+      `GET ${this.url.pathname}${this.url.search} HTTP/1.1`,
+      `Host: ${this.url.host}`,
+      'Upgrade: websocket',
+      'Connection: Upgrade',
+      `Sec-WebSocket-Key: ${key}`,
+      'Sec-WebSocket-Version: 13',
+      '',
+      '',
+    ].join('\r\n');
+    this.socket.write(request);
+  }
+  onData(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    if (!this.handshakeDone) {
+      const end = this.buffer.indexOf('\r\n\r\n');
+      if (end === -1) return;
+      const header = this.buffer.subarray(0, end).toString('utf8');
+      if (!header.includes(' 101 ')) {
+        this.dispatch('error', new Error(`WebSocket handshake failed: ${header.split('\r\n')[0]}`));
+        return;
+      }
+      this.handshakeDone = true;
+      this.buffer = this.buffer.subarray(end + 4);
+      this.dispatch('open', {});
+    }
+    while (this.buffer.length >= 2) {
+      const first = this.buffer[0];
+      const opcode = first & 0x0f;
+      const second = this.buffer[1];
+      let length = second & 0x7f;
+      let offset = 2;
+      if (length === 126) {
+        if (this.buffer.length < 4) return;
+        length = this.buffer.readUInt16BE(2);
+        offset = 4;
+      } else if (length === 127) {
+        if (this.buffer.length < 10) return;
+        const big = this.buffer.readBigUInt64BE(2);
+        if (big > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error('WebSocket frame too large');
+        length = Number(big);
+        offset = 10;
+      }
+      const masked = Boolean(second & 0x80);
+      const maskOffset = offset;
+      if (masked) offset += 4;
+      if (this.buffer.length < offset + length) return;
+      let payload = this.buffer.subarray(offset, offset + length);
+      if (masked) {
+        const mask = this.buffer.subarray(maskOffset, maskOffset + 4);
+        payload = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
+      }
+      this.buffer = this.buffer.subarray(offset + length);
+      if (opcode === 1) this.dispatch('message', { data: payload.toString('utf8') });
+      else if (opcode === 8) this.close();
+    }
+  }
+  send(text) {
+    const payload = Buffer.from(text);
+    const mask = randomBytes(4);
+    let header;
+    if (payload.length < 126) {
+      header = Buffer.from([0x81, 0x80 | payload.length]);
+    } else if (payload.length < 65536) {
+      header = Buffer.alloc(4);
+      header[0] = 0x81;
+      header[1] = 0x80 | 126;
+      header.writeUInt16BE(payload.length, 2);
+    } else {
+      header = Buffer.alloc(10);
+      header[0] = 0x81;
+      header[1] = 0x80 | 127;
+      header.writeBigUInt64BE(BigInt(payload.length), 2);
+    }
+    const masked = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
+    this.socket.write(Buffer.concat([header, mask, masked]));
+  }
+  close() {
+    if (!this.socket.destroyed) this.socket.end();
+  }
 }
 
 class CdpClient {
@@ -171,12 +278,14 @@ async function buildInventory(bundleDir) {
   const entries = [];
   for (const required of REQUIRED) {
     const full = path.join(bundleDir, required.replace(/\/$/, ''));
-    if (required.endsWith('/')) {
+    if (required === 'manifest.json') {
+      entries.push({ path: required, kind: 'json', required: true });
+    } else if (required.endsWith('/')) {
       await stat(full);
       entries.push({ path: required, kind: 'directory', required: true });
     } else {
       await stat(full);
-      entries.push({ path: required, kind: kindFor(required), sha256: required === 'manifest.json' ? undefined : await sha256(full), required: true });
+      entries.push({ path: required, kind: kindFor(required), sha256: await sha256(full), required: true });
     }
   }
   const screenshotDir = path.join(bundleDir, 'screenshots');
@@ -268,7 +377,7 @@ async function run() {
       target_url: targetUrl,
       run_kind: args.runKind,
       tool_versions: { runner: 'live-observability-runner-v1', node: process.version, schema: SCHEMA_VERSION },
-      browser: { cdp_port: chrome.port },
+      browser: { cdp_port: chrome.port, browser: chrome.version?.Browser ?? null, protocol_version: chrome.version?.['Protocol-Version'] ?? null },
       retry_attempts: chrome.attempts,
       artifact_inventory: await buildInventory(bundleDir),
     }, null, 2) + '\n');
