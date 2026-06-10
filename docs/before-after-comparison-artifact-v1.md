@@ -52,3 +52,20 @@ paths and authority-expanding text.
 This report is data-only. It does not run a browser, execute commands, compute
 unstable pixel diffs, mutate source, auto-apply, auto-merge, publish, deploy,
 install dependencies, or write trusted files.
+
+## M126.2 handoff and Scenario Coverage v107
+
+`M126ControlledFixComparisonHandoff` is the integration seam for #2379's final
+controlled-failure PR. It requires:
+
+- owner issue `2379`;
+- controlled failure, proposal, review decision, sandbox apply, rerun, and
+  comparison artifact refs;
+- a non-inconclusive comparison verdict; and
+- `scenario-coverage-v107`.
+
+Scenario Coverage v107 is landed in
+`crates/ouroforge-protocols/tests/scenario_coverage_v107_before_after_comparison.rs`.
+It proves deterministic same-input output, before/after artifact linking,
+M127-journal markdown availability, and fail-closed rejection of inconclusive
+handoffs.

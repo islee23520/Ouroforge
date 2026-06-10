@@ -146,6 +146,97 @@ pub struct ComparisonDimension {
     pub after_refs: Vec<BeforeAfterEvidenceRef>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct M126ControlledFixComparisonHandoff {
+    #[serde(rename = "handoffId")]
+    pub handoff_id: String,
+    #[serde(rename = "ownerIssue")]
+    pub owner_issue: String,
+    #[serde(rename = "controlledFailureRef")]
+    pub controlled_failure_ref: BeforeAfterEvidenceRef,
+    #[serde(rename = "proposalRef")]
+    pub proposal_ref: BeforeAfterEvidenceRef,
+    #[serde(rename = "reviewDecisionRef")]
+    pub review_decision_ref: BeforeAfterEvidenceRef,
+    #[serde(rename = "sandboxApplyRef")]
+    pub sandbox_apply_ref: BeforeAfterEvidenceRef,
+    #[serde(rename = "rerunRef")]
+    pub rerun_ref: BeforeAfterEvidenceRef,
+    #[serde(rename = "comparisonArtifact")]
+    pub comparison_artifact: BeforeAfterComparisonArtifact,
+    #[serde(rename = "scenarioCoverageSuite")]
+    pub scenario_coverage_suite: String,
+}
+
+impl M126ControlledFixComparisonHandoff {
+    pub fn validate(&self) -> Result<()> {
+        require_local_id("M126 comparison handoff handoffId", &self.handoff_id)?;
+        if self.owner_issue != "2379" {
+            return Err(anyhow!(
+                "M126 comparison handoff ownerIssue must be 2379 for the controlled failure final PR"
+            ));
+        }
+        for (label, reference) in [
+            ("controlledFailureRef", &self.controlled_failure_ref),
+            ("proposalRef", &self.proposal_ref),
+            ("reviewDecisionRef", &self.review_decision_ref),
+            ("sandboxApplyRef", &self.sandbox_apply_ref),
+            ("rerunRef", &self.rerun_ref),
+        ] {
+            reference.validate(&format!("M126 comparison handoff {label}"))?;
+        }
+        self.comparison_artifact.validate_report_ready()?;
+        if self.comparison_artifact.verdict == BeforeAfterVerdict::Inconclusive {
+            return Err(anyhow!(
+                "M126 comparison handoff must not hide an inconclusive fixed-run comparison"
+            ));
+        }
+        if self.scenario_coverage_suite != "scenario-coverage-v107" {
+            return Err(anyhow!(
+                "M126 comparison handoff must declare scenario-coverage-v107"
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn journal_markdown(&self) -> Result<String> {
+        self.validate()?;
+        let mut out = String::new();
+        out.push_str(&format!(
+            "# M126 Controlled Fix Comparison Handoff `{}`\n\n",
+            self.handoff_id
+        ));
+        out.push_str("- Owner issue: #2379\n");
+        out.push_str(&format!(
+            "- Scenario coverage: `{}`\n",
+            self.scenario_coverage_suite
+        ));
+        out.push_str(&format!(
+            "- Controlled failure: `{}` `{}`\n",
+            self.controlled_failure_ref.run_id, self.controlled_failure_ref.path
+        ));
+        out.push_str(&format!(
+            "- Proposal: `{}` `{}`\n",
+            self.proposal_ref.run_id, self.proposal_ref.path
+        ));
+        out.push_str(&format!(
+            "- Review: `{}` `{}`\n",
+            self.review_decision_ref.run_id, self.review_decision_ref.path
+        ));
+        out.push_str(&format!(
+            "- Sandbox apply: `{}` `{}`\n",
+            self.sandbox_apply_ref.run_id, self.sandbox_apply_ref.path
+        ));
+        out.push_str(&format!(
+            "- Rerun: `{}` `{}`\n\n",
+            self.rerun_ref.run_id, self.rerun_ref.path
+        ));
+        out.push_str(&self.comparison_artifact.render_markdown()?);
+        Ok(out)
+    }
+}
+
 impl BeforeAfterComparisonInput {
     pub fn from_json_str(input: &str) -> Result<Self> {
         let artifact: Self = serde_json::from_str(input)
@@ -799,6 +890,27 @@ mod tests {
             err.contains("must stay inside the local artifact root"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn m126_handoff_declares_2379_owner_and_v107_suite() {
+        let comparison_artifact = planted_input(true).compare().unwrap();
+        let handoff = M126ControlledFixComparisonHandoff {
+            handoff_id: "handoff-m126-controlled-fix".to_string(),
+            owner_issue: "2379".to_string(),
+            controlled_failure_ref: reference("run-before", "m126/failure.json", "sha256:failure"),
+            proposal_ref: reference("run-proposal", "m126/proposal.json", "sha256:proposal"),
+            review_decision_ref: reference("run-review", "m126/review.json", "sha256:review"),
+            sandbox_apply_ref: reference("run-apply", "m126/sandbox-apply.json", "sha256:apply"),
+            rerun_ref: reference("run-after", "m126/rerun.json", "sha256:rerun"),
+            comparison_artifact,
+            scenario_coverage_suite: "scenario-coverage-v107".to_string(),
+        };
+        handoff.validate().unwrap();
+        let markdown = handoff.journal_markdown().unwrap();
+        assert!(markdown.contains("Owner issue: #2379"));
+        assert!(markdown.contains("scenario-coverage-v107"));
+        assert!(markdown.contains("Before/After Comparison"));
     }
 
     fn planted_input(improved: bool) -> BeforeAfterComparisonInput {
