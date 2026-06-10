@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "m130-local-package-provenance-v1",
+  "issue": 2393,
+  "packageId": "signal-gate-relay-local-web",
+  "exportProfileRef": "examples/playable-demo-v2/collect-and-exit/export/export-profile.json",
+  "sourceProjectRef": "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
+  "packageRoot": "dist/local-web/signal-gate-relay/",
+  "checksumsRef": "dist/local-web/signal-gate-relay/checksums.sha256",
+  "runtimeProbePreserved": true,
+  "localSmokeRef": "runs/m130/2393-local-package/smoke.json",
+  "nonGoals": ["native export", "store upload", "signing", "public release automation", "new export engine"]
+}

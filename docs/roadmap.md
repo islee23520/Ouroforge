@@ -3178,6 +3178,8 @@ See `docs/product-observed-completion.md` for contract-complete vs product-obser
 
 Historical ✅ milestones remain contract-complete unless later marked 🟩 with live dogfood evidence.
 
-Current corrective open issues (#2343–#2394) address the gap between fixture/probe reality and practical game-production engine (Eras S–W per #1).
+Current corrective issue range (#2343–#2394) addresses the gap between fixture/probe reality and practical game-production engine (Eras S–W per #1).
+
+M130 Production Usability Gate v1 (#2391–#2394) is recorded through `docs/production-usability-gate-v1.md`, Scenario Coverage v111, and the M115 ledger entry `era-w-m130-production-usability-gate`. The status is `product-observed complete` for the bounded local Signal Gate Relay dogfood workflow only: seed/GDD → scaffold → first playable, Studio edit/proposal/rerun comparison, local web package smoke/provenance, and evidence-first postmortem. It does not claim commercial readiness, native export, hosted collaboration, secure sandboxing, Godot parity, or public release automation.
 
 #1 and #23 remain open governance anchors.

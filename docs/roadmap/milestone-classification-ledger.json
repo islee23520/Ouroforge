@@ -384,6 +384,22 @@
       ],
       "gapNotes": "Current page is useful contract/runtime fixture evidence but is not product-observed practical engine usability under M115 semantics.",
       "rationale": "Satisfies #2344 requirement to classify collect-and-exit as contract evidence only."
+    },
+    {
+      "id": "era-w-m130-production-usability-gate",
+      "era": "W",
+      "milestoneRange": "M130 (#2391-#2394)",
+      "title": "Production Usability Gate v1",
+      "classification": "product-observed complete",
+      "confidence": "medium",
+      "evidenceRefs": [
+        "docs/production-usability-gate-v1.md",
+        "docs/scenario-coverage-v111-production-usability-gate.md",
+        "examples/production-usability-gate-v111/gate.fixture.json",
+        "examples/playable-demo-v2/signal-gate-dogfood/README.md"
+      ],
+      "gapNotes": "The gate proves the bounded local Signal Gate Relay dogfood workflow with generated evidence refs and explicit manual-step backlog. It does not claim commercial readiness, native export, hosted collaboration, secure sandboxing, Godot parity, or public release automation.",
+      "rationale": "Records the final M130 product-observed usability gate using M115 semantics and the v111 evidence-index regression suite."
     }
   ]
 }

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "m130-studio-edit-proposal-v1",
+  "issue": 2392,
+  "proposalId": "signal-gate-pacing-hud-improvement",
+  "target": "examples/playable-demo-v2/signal-gate-dogfood/hud-feedback.json",
+  "changeSummary": "Clarify relay/key/gate objective copy and rerun the dogfood loop.",
+  "reviewGate": {
+    "humanReviewerRequired": true,
+    "selfApprovalAllowed": false,
+    "safeApplyBoundary": "scene/data fixture only; no command bridge or browser trusted write"
+  },
+  "comparison": {
+    "artifactRef": "runs/m130/2392-studio-edit/comparison.json",
+    "verdict": "improvement",
+    "basis": "M126 before/after comparison artifact semantics from #2380 lineage"
+  },
+  "journalRef": "runs/m130/2392-studio-edit/production-journal.json"
+}

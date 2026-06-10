@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "production-usability-gate-v1",
+  "gateId": "m130-production-usability-gate-v111",
+  "scenarioCoverageSuite": "scenario-coverage-v111",
+  "targetClassification": "product-observed-complete",
+  "phases": [
+    {
+      "issue": 2391,
+      "kind": "new-game-workflow",
+      "verdict": "product-observed-complete",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
+        "examples/playable-demo-v2/signal-gate-dogfood/scenarios/signal-gate-relay-core.json",
+        "runs/m130/2391-first-playable/bundle.json"
+      ],
+      "screenshotRefs": [
+        "runs/m130/2391-first-playable/screenshots/state-start.png"
+      ],
+      "workflowTranscriptRefs": [
+        "runs/m130/2391-first-playable/workflow-transcript.md"
+      ],
+      "manualGaps": [
+        {
+          "gapId": "m130-2391-manual-studio-launch",
+          "ownerIssue": "#2394",
+          "summary": "Studio launch and reviewer observation remain manual local steps; the gate records the transcript rather than claiming hidden automation.",
+          "followUp": "Keep the step in the final postmortem backlog unless a later explicit issue automates product-surface capture."
+        },
+        {
+          "gapId": "m130-2391-win-state-browser-screenshot",
+          "ownerIssue": "#2394",
+          "summary": "Win-state is proven by deterministic live-evidence smoke, but only the start state was captured as a Chrome screenshot in this run.",
+          "followUp": "Keep browser win-state capture as an explicit postmortem backlog item instead of claiming a screenshot that was not generated."
+        }
+      ]
+    },
+    {
+      "issue": 2392,
+      "kind": "studio-edit-rerun",
+      "verdict": "product-observed-complete",
+      "evidenceRefs": [
+        "examples/production-usability-gate-v111/studio-edit-proposal.fixture.json",
+        "runs/m130/2392-studio-edit/comparison.json"
+      ],
+      "screenshotRefs": [
+        "runs/m130/2392-studio-edit/screenshots/before.png",
+        "runs/m130/2392-studio-edit/screenshots/after.png"
+      ],
+      "workflowTranscriptRefs": [
+        "runs/m130/2392-studio-edit/review-apply-rerun-transcript.md"
+      ],
+      "manualGaps": [],
+      "comparisonVerdict": "improvement"
+    },
+    {
+      "issue": 2393,
+      "kind": "local-package-export",
+      "verdict": "product-observed-complete",
+      "evidenceRefs": [
+        "examples/playable-demo-v2/collect-and-exit/export/export-profile.json",
+        "examples/production-usability-gate-v111/local-package-provenance.fixture.json",
+        "runs/studio-local-package-smoke-v1/smoke.json",
+        "runs/m130/2393-local-package/smoke.json"
+      ],
+      "screenshotRefs": [
+        "runs/m130/2393-local-package/screenshots/package-start.png"
+      ],
+      "workflowTranscriptRefs": [
+        "runs/m130/2393-local-package/export-transcript.md"
+      ],
+      "manualGaps": [],
+      "packageRefs": [
+        "dist/local-web/signal-gate-relay/manifest.json",
+        "dist/local-web/signal-gate-relay/checksums.sha256"
+      ]
+    },
+    {
+      "issue": 2394,
+      "kind": "postmortem-governance",
+      "verdict": "product-observed-complete",
+      "evidenceRefs": [
+        "docs/production-usability-gate-v1.md",
+        "docs/scenario-coverage-v111-production-usability-gate.md"
+      ],
+      "screenshotRefs": [],
+      "workflowTranscriptRefs": [
+        "runs/m130/2394-postmortem/evidence-review-transcript.md"
+      ],
+      "manualGaps": [
+        {
+          "gapId": "m130-2394-commercial-readiness-not-claimed",
+          "ownerIssue": "#1",
+          "summary": "The dogfood gate proves one local product-observed workflow, not commercial-grade readiness, native export, hosted collaboration, or Godot parity.",
+          "followUp": "Carry as backlog candidates in the #1 final status rather than marketing copy."
+        }
+      ],
+      "governanceRefs": [
+        "#1 final M130 status comment/body update",
+        "docs/roadmap/milestone-classification-ledger.json"
+      ]
+    }
+  ],
+  "generatedStateRoots": [
+    "runs",
+    "screenshots",
+    "browser-profiles",
+    "dist"
+  ],
+  "anchorsRemainOpen": [
+    1,
+    23
+  ],
+  "guardrails": [
+    "no new distribution scope; reuse existing local web export/package machinery only",
+    "no marketing overclaims; record product-observed evidence and gaps first",
+    "no browser trusted writes, command bridge, auto-apply, auto-merge, or self-approval",
+    "generated runs, screenshots, browser profiles, and package outputs stay ignored unless fixture-scoped"
+  ]
+}
