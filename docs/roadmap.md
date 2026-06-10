@@ -7,7 +7,11 @@
 
 Practical Ouroforge engine, Studio, gameplay, asset-workflow, export, and
 agentic-loop claims now use the canonical completion terms in
-[`docs/product-observed-completion.md`](product-observed-completion.md).
+[`docs/product-observed-completion.md`](product-observed-completion.md). Historical
+milestone classifications are tracked in
+[`docs/roadmap/milestone-classification-ledger.md`](roadmap/milestone-classification-ledger.md)
+with machine-readable source at
+[`docs/roadmap/milestone-classification-ledger.json`](roadmap/milestone-classification-ledger.json).
 Historical milestones remain preserved as contract-complete unless their linked
 evidence satisfies the product-observed checklist owned by M115.3. Future issue
 and PR closures must state either `contract-complete` or `product-observed
