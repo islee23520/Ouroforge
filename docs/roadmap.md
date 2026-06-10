@@ -3,6 +3,18 @@
 ## Current status
 
 
+## Product-Observed Rebaseline completion semantics
+
+Practical Ouroforge engine, Studio, gameplay, asset-workflow, export, and
+agentic-loop claims now use the canonical completion terms in
+[`docs/product-observed-completion.md`](product-observed-completion.md).
+Historical milestones remain preserved as contract-complete unless their linked
+evidence satisfies the product-observed checklist owned by M115.3. Future issue
+and PR closures must state either `contract-complete` or `product-observed
+complete`, record gaps honestly, and preserve #1 and #23 as open governance
+anchors unless a later explicit governance issue changes that.
+
+
 ## Era O 2D migration on-ramp governance
 
 Era O — External-Engine 2D Migration On-Ramp (Godot/Unity) — is recorded as **complete on merged evidence** for Milestones 88-94 plus the M95 governance refresh. The completed evidence chain covers the M88 scope/IR/legal gate (#2167), M89 Godot source-text adapter to IR (#2168-#2171 / Scenario Coverage v78), M90 IR-to-Ouroforge mapping and fidelity classifier (#2172-#2175 / Scenario Coverage v79), M91 logic touchpoint detection and clean-room Era R hand-off (#2176-#2178 / Scenario Coverage v80), M92 import verification and fidelity report (#2179-#2181 / Scenario Coverage v81), M93 Unity Force-Text adapter to IR (#2182-#2185 / Unity Scenario Coverage v81), M94 local Studio Migration UX (#2186-#2189 / Scenario Coverage v82), and this M95 governance refresh (#2190). The governance contract is recorded in [`docs/era-o-migration-on-ramp-governance-refresh.md`](era-o-migration-on-ramp-governance-refresh.md).
