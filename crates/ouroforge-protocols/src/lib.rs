@@ -6,4 +6,5 @@
 
 pub mod before_after_comparison;
 pub mod behavior_authoring_spec;
+pub mod behavior_parameter_preview;
 pub mod proposal_workbench_model;

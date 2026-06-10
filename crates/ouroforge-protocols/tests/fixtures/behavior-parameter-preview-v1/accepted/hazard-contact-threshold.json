@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "behavior-parameter-draft-v1",
+  "draftId": "hazard-threshold-preview",
+  "behaviorModelId": "hazard-route-timing-demo",
+  "behaviorKind": "hazard-route-timing",
+  "parameterDrafts": [
+    {
+      "name": "contactFrameThreshold",
+      "before": { "type": "integer", "value": 20 },
+      "after": { "type": "integer", "value": 140 }
+    }
+  ],
+  "replayApi": {
+    "apiVersion": "119.2.0",
+    "requiredMethods": ["runReplay", "replayStateDigest", "compareReplayDigest"],
+    "scenePath": "examples/game-runtime/scene.json",
+    "replayPath": "runs/session-h-2373/hazard-replay.json",
+    "deterministicSeed": 42
+  },
+  "sourceEvidenceRefs": [
+    {
+      "runId": "run-before",
+      "path": "runs/session-h-2373/replay-digest.json",
+      "digest": "sha256:replay"
+    }
+  ],
+  "guardrails": ["draft-only preview; Safe Source Apply review required"]
+}
