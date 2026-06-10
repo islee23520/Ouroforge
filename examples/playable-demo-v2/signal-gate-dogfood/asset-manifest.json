@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "asset-manifest-v1",
+  "id": "signal-gate-relay-assets",
+  "assets": [
+    {
+      "id": "signal_gate_sheet",
+      "kind": "sprite",
+      "path": "assets/sprites/signal-gate-sheet.png",
+      "license": "local-fixture-placeholder",
+      "metadata": { "source": "source-like local fixture", "issue": 2385 }
+    },
+    {
+      "id": "relay_ping",
+      "kind": "audio",
+      "path": "assets/audio/relay-ping.ogg",
+      "license": "local-fixture-placeholder",
+      "metadata": { "source": "source-like local fixture", "issue": 2385 }
+    }
+  ],
+  "boundary": "Local source-like asset references only; no generated asset root or remote/proprietary asset generation is committed."
+}

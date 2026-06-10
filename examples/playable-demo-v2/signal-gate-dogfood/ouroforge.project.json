@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "project-manifest-v1",
+  "project": {
+    "id": "signal_gate_relay_dogfood",
+    "name": "Signal Gate Relay Dogfood",
+    "issue": 2385,
+    "gdd": "docs/dogfood-mini-game-gdd-v1.md"
+  },
+  "scenes": [
+    {
+      "id": "signal-gate-relay-core",
+      "path": "scenes/signal-gate-relay.scene.json"
+    }
+  ],
+  "seeds": [
+    {
+      "id": "signal-gate-relay",
+      "path": "seeds/signal-gate-relay.yaml"
+    }
+  ],
+  "scenarioPacks": [
+    {
+      "id": "signal-gate-relay-core",
+      "path": "scenarios/signal-gate-relay-core.json"
+    }
+  ],
+  "levelSets": [
+    {
+      "id": "signal-gate-relay-levels",
+      "path": "levels/signal-gate-relay-level-set.json"
+    }
+  ],
+  "assetRoots": ["assets"],
+  "runsRoot": "runs",
+  "generated": {
+    "roots": ["runs", "target", "dashboard-data", "screenshots", "browser-profiles", "dist"]
+  },
+  "governance": {
+    "classification": "product-observed-pending-live-evidence",
+    "anchorsRemainOpen": [1, 23],
+    "nonGoals": [
+      "commercial release",
+      "production-ready claim",
+      "browser trusted writes",
+      "command bridge",
+      "auto-apply",
+      "auto-merge",
+      "self-approval"
+    ]
+  }
+}

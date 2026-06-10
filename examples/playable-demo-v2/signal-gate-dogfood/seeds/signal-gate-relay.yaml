@@ -1,0 +1,19 @@
+schemaVersion: seed-v1
+id: signal-gate-relay-dogfood
+issue: 2385
+title: Signal Gate Relay Dogfood Core Loop
+classification: product-observed-pending-live-evidence
+gdd: docs/dogfood-mini-game-gdd-v1.md
+objective: >-
+  Restore relay signal power, collect the signal key, open the final gate, and
+  reach the exit while preserving visible fail/restart states.
+acceptance:
+  - local project manifest follows playable-demo-v2 conventions
+  - runtime scene exposes player, relay, key, gate, blocked, win, and restart states
+  - evidence bundle records first playable loop under ignored runs/
+  - human fun/feel verdict remains separate from deterministic pass/fail
+guardrails:
+  - '#1 and #23 remain open'
+  - no browser trusted writes
+  - no command bridge or hidden execution
+  - generated artifacts stay in ignored roots
