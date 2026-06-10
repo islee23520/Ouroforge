@@ -62,3 +62,18 @@ fn blocking_findings_must_be_deferred_before_product_observed_closure() {
         .to_string();
     assert!(error.contains("explicitly deferred"), "{error}");
 }
+
+#[test]
+fn backlog_read_model_feeds_future_proposals_and_closure_checklist() {
+    let (categories, severities) = taxonomy();
+    let backlog = backlog();
+    backlog
+        .validate(&categories, &severities)
+        .expect("valid backlog");
+    let model = backlog.read_model();
+    assert_eq!(model.finding_count, 2);
+    assert_eq!(model.blocking_deferred_count, 1);
+    assert_eq!(model.open_non_blocking_count, 1);
+    assert_eq!(model.future_proposal_candidate_count, 2);
+    assert!(model.closure_allowed);
+}

@@ -41,6 +41,25 @@ pub struct PlaytestFinding {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct PlaytestGapBacklogReadModel {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: String,
+    #[serde(rename = "backlogId")]
+    pub backlog_id: String,
+    #[serde(rename = "findingCount")]
+    pub finding_count: usize,
+    #[serde(rename = "blockingDeferredCount")]
+    pub blocking_deferred_count: usize,
+    #[serde(rename = "openNonBlockingCount")]
+    pub open_non_blocking_count: usize,
+    #[serde(rename = "futureProposalCandidateCount")]
+    pub future_proposal_candidate_count: usize,
+    #[serde(rename = "closureAllowed")]
+    pub closure_allowed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct PlaytestGapBacklog {
     #[serde(rename = "schemaVersion")]
     pub schema_version: String,
@@ -52,6 +71,39 @@ pub struct PlaytestGapBacklog {
 }
 
 impl PlaytestGapBacklog {
+    pub fn read_model(&self) -> PlaytestGapBacklogReadModel {
+        let blocking_deferred_count = self
+            .findings
+            .iter()
+            .filter(|finding| {
+                finding.blocks_product_observed && finding.status == PlaytestFindingStatus::Deferred
+            })
+            .count();
+        let open_non_blocking_count = self
+            .findings
+            .iter()
+            .filter(|finding| {
+                !finding.blocks_product_observed && finding.status == PlaytestFindingStatus::Open
+            })
+            .count();
+        let unresolved_blocking_open = self.findings.iter().any(|finding| {
+            finding.blocks_product_observed && finding.status != PlaytestFindingStatus::Deferred
+        });
+        PlaytestGapBacklogReadModel {
+            schema_version: PLAYTEST_GAP_BACKLOG_SCHEMA_VERSION.to_string(),
+            backlog_id: self.backlog_id.clone(),
+            finding_count: self.findings.len(),
+            blocking_deferred_count,
+            open_non_blocking_count,
+            future_proposal_candidate_count: self
+                .findings
+                .iter()
+                .filter(|finding| finding.status != PlaytestFindingStatus::Resolved)
+                .count(),
+            closure_allowed: !unresolved_blocking_open,
+        }
+    }
+
     pub fn validate(
         &self,
         allowed_categories: &BTreeSet<String>,
