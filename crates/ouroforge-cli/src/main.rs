@@ -26,17 +26,17 @@ use ouroforge_core::{
     reject_generated_artifact_source_collision, reject_transaction_output_target_collision,
     run_browser_smoke, run_browser_smoke_pool, run_command_context_for_run,
     run_dogfood_campaign_harness, run_evolve_demo_lifecycle_from_path, run_scenarios, show_journal,
-    source_patch_preview_read_model, update_journal, validate_scene_reload,
-    validate_source_patch_preview_artifact, validate_visual_edit_draft_review_preflight,
-    write_agent_handoff_contract_from_path, write_regression_promotion_draft,
-    write_run_comparison_artifact, write_scene_edit_transaction_artifact, BrowserSmokeConfig,
-    BrowserSmokePoolConfig, DogfoodCampaignHarnessConfig, DogfoodFrictionObservation,
-    MutationProposalInput, MutationReviewReviewerType, MutationReviewState,
-    PatchDiffIntegrityLimits, ProjectAssetManifest, ProjectAssetType, ProjectManifest,
-    ProjectSceneMutationContext, RuntimeFrameBudgetStatus, ScenarioRunConfig, SceneEdit,
-    SceneOnlyMutationOperation, Seed, SourcePatchPreviewArtifact,
-    VisualEditDraftApplyCommandContext, VisualEditDraftArtifact, VisualEditDraftTargetType,
-    WorkerId,
+    simulate_scene_physics_step, source_patch_preview_read_model, update_journal,
+    validate_scene_reload, validate_source_patch_preview_artifact,
+    validate_visual_edit_draft_review_preflight, write_agent_handoff_contract_from_path,
+    write_regression_promotion_draft, write_run_comparison_artifact,
+    write_scene_edit_transaction_artifact, BrowserSmokeConfig, BrowserSmokePoolConfig,
+    DogfoodCampaignHarnessConfig, DogfoodFrictionObservation, MutationProposalInput,
+    MutationReviewReviewerType, MutationReviewState, PatchDiffIntegrityLimits,
+    ProjectAssetManifest, ProjectAssetType, ProjectManifest, ProjectSceneMutationContext,
+    RuntimeFrameBudgetStatus, ScenarioRunConfig, SceneEdit, SceneOnlyMutationOperation, Seed,
+    SourcePatchPreviewArtifact, VisualEditDraftApplyCommandContext, VisualEditDraftArtifact,
+    VisualEditDraftTargetType, WorkerId,
 };
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -412,6 +412,11 @@ enum SceneCommand {
     },
     ReloadValidate {
         scene_path: PathBuf,
+    },
+    PhysicsStep {
+        scene_path: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        tick: u64,
     },
     Edit {
         scene_path: PathBuf,
@@ -1413,6 +1418,13 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&read_scene(scene_path)?)?
             );
+        }
+        Commands::Scene {
+            command: SceneCommand::PhysicsStep { scene_path, tick },
+        } => {
+            let mut scene = read_scene(scene_path)?;
+            let evidence = simulate_scene_physics_step(&mut scene, tick)?;
+            println!("{}", serde_json::to_string_pretty(&evidence)?);
         }
         Commands::RuntimeDebug {
             command:

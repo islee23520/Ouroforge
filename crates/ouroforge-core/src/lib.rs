@@ -17,6 +17,11 @@ pub use ouroforge_core_types::*;
 
 pub mod behavior_runtime;
 pub mod complexity_ladder;
+pub mod physics_2d;
+pub use physics_2d::{
+    simulate_scene_physics_step, Physics2dBlockedMovement, Physics2dCollisionEvent,
+    Physics2dStepEvidence, Physics2dVector,
+};
 pub mod diagnosis_correction;
 pub mod engine_growth_justification;
 pub use ouroforge_gdd::gdd_asset_placeholder_plan;

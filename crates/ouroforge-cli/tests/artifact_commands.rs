@@ -5,6 +5,90 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ouroforge_core::{hash_scene_document, read_scene};
 
+#[test]
+fn scene_physics_step_reports_deterministic_solver_evidence_without_writing_scene() {
+    let temp = unique_temp_dir("ouroforge-cli-physics-step-test");
+    fs::create_dir_all(&temp).expect("temp dir exists");
+    let scene_path = temp.join("physics.scene.json");
+    fs::write(
+        &scene_path,
+        r##"{
+  "schemaVersion": "1",
+  "id": "cli-physics-step",
+  "bounds": { "width": 64, "height": 64 },
+  "collisionRules": {
+    "version": "2",
+    "defaultLayer": "world",
+    "layers": [
+      { "id": "world", "solid": true, "collidesWith": ["actors"] },
+      { "id": "actors", "solid": true, "collidesWith": ["world"] }
+    ]
+  },
+  "entities": [
+    {
+      "id": "player",
+      "sprite": { "color": "#5eead4" },
+      "components": {
+        "transform": { "x": 8, "y": 32 },
+        "velocity": { "x": 0, "y": 12 },
+        "size": { "width": 16, "height": 16 },
+        "controllable": true,
+        "collider": {
+          "shape": "aabb",
+          "body": "dynamic",
+          "size": { "width": 16, "height": 16 },
+          "collisionGroup": "actors",
+          "collisionMask": ["world"]
+        }
+      }
+    },
+    {
+      "id": "floor",
+      "sprite": { "color": "#475569" },
+      "components": {
+        "transform": { "x": 0, "y": 48 },
+        "velocity": { "x": 0, "y": 0 },
+        "size": { "width": 64, "height": 16 },
+        "controllable": false,
+        "collider": {
+          "shape": "aabb",
+          "body": "static",
+          "size": { "width": 64, "height": 16 },
+          "collisionGroup": "world",
+          "collisionMask": ["actors"]
+        }
+      }
+    }
+  ]
+}"##,
+    )
+    .expect("scene writes");
+    let before = fs::read_to_string(&scene_path).expect("scene reads before");
+
+    let output = run_cli(
+        &temp,
+        &[
+            "scene",
+            "physics-step",
+            scene_path.to_str().expect("scene path utf8"),
+            "--tick",
+            "3",
+        ],
+    );
+
+    let evidence: serde_json::Value = serde_json::from_str(&output).expect("evidence parses");
+    assert_eq!(evidence["schemaVersion"], "physics-2d-step-evidence-v1");
+    assert_eq!(evidence["sceneId"], "cli-physics-step");
+    assert_eq!(evidence["contactEvents"][0]["pairId"], "floor:player");
+    assert_eq!(evidence["grounded"]["player"], true);
+    assert_eq!(
+        fs::read_to_string(&scene_path).expect("scene reads after"),
+        before,
+        "physics-step is an evidence command and must not write source scenes"
+    );
+    fs::remove_dir_all(temp).ok();
+}
+
 const VALID_SEED: &str = r#"
 id: platformer.v0
 title: Platformer Harness Seed
