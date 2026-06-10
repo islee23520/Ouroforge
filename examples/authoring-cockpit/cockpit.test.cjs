@@ -4210,3 +4210,26 @@ assert.match(exportMalformedPlanSurface, /unknown step/, 'null/primitive plan st
 assert.match(exportMalformedPlanSurface, /plan-step-a/, 'object plan step label preserved');
 assert.match(exportMalformedPlanSurface, /literal-plan-step/, 'string plan step preserved');
 console.log('cockpit export-package null-plan-step regression test passed');
+
+
+const tilemapSource = require('../tilemap-authoring-v1/maps/valid-dogfood.tilemap.json');
+const tilePainterModel = cockpit.tilemapPainterModel({
+  tilemap: tilemapSource,
+  baseDigest: 'fnv64:testdigest',
+  selectedLayerId: 'collision',
+  selectedTileId: 'wall',
+});
+assert.equal(tilePainterModel.present, true);
+assert.equal(tilePainterModel.sourcePath, 'examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json');
+assert.equal(tilePainterModel.width, 5);
+assert.equal(tilePainterModel.palette.some((entry) => entry.tileId === 'wall' && entry.solid), true);
+const paintDraft = cockpit.tilemapPaintDraftOperation(tilePainterModel, 3, 1, '.');
+assert.equal(paintDraft.schemaVersion, 'ouroforge.tilemap-draft.v1');
+assert.equal(paintDraft.validationStatus, 'drafted');
+assert.equal(paintDraft.target.baseDigest, 'fnv64:testdigest');
+assert.equal(paintDraft.previewSummary.generatedPreviewOnly, true);
+assert.equal(paintDraft.proposedOperations[0].op, 'erase');
+assert.equal(cockpit.tilemapPaintDraftOperation(tilePainterModel, 99, 99, 'wall').validationStatus, 'blocked');
+assert.match(cockpit.renderTilemapPainterSurface({ tilemap: tilemapSource, baseDigest: 'fnv64:testdigest' }), /Tile painter/);
+assert.match(cockpit.renderTilemapPainterSurface({ tilemap: tilemapSource, baseDigest: 'fnv64:testdigest' }), /Generated preview is not source/);
+assert.match(cockpit.renderIntegration({ summary: { id: 'tilemap-smoke', verdict_status: 'passed' }, evidence: [], tilemap_painter: { tilemap: tilemapSource, baseDigest: 'fnv64:testdigest' } }), /id="tilemap-painter"/);
