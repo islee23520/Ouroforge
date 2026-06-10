@@ -242,8 +242,20 @@ impl SourceApplySandboxWorktreeProtocol {
                 self.apply_state
             ));
         }
-        if self.cleanup_state == SourceApplySandboxCleanupState::Incomplete {
-            blocked.push("sandbox cleanup is incomplete".to_string());
+        if self.apply_state == SourceApplySandboxApplyState::Applied
+            && self.cleanup_state != SourceApplySandboxCleanupState::Complete
+        {
+            blocked.push(
+                "applied sandbox mutations must record complete cleanup metadata".to_string(),
+            );
+        }
+        if self.main_status_before.worktree_path != self.context.trusted_worktree_path
+            || self.main_status_after.worktree_path != self.context.trusted_worktree_path
+        {
+            blocked.push(
+                "trusted/main worktree status snapshots must reference the trusted worktree path"
+                    .to_string(),
+            );
         }
         if self.main_status_before.git_status_short != self.main_status_after.git_status_short {
             blocked.push(
@@ -700,5 +712,109 @@ mod tests {
             SourceApplySandboxProtocolStatus::Valid
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+    #[test]
+    fn unsafe_path_is_blocked_before_sandbox_write() {
+        let request = smoke_request("before\n", "after\n", "../trusted.md");
+        let err = apply_sandbox_utf8_mutations(request)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("must stay inside the local worktree"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn stale_target_hash_is_blocked() {
+        let mut request = smoke_request("before\n", "after\n", "docs/spec.md");
+        request.mutations[0].expected_before_hash = fnv1a64_utf8_digest("older\n");
+        let err = apply_sandbox_utf8_mutations(request)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("before hash is stale"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn evaluation_blocks_changed_main_status_and_incomplete_cleanup() {
+        let mut request = smoke_request("before\n", "after\n", "docs/spec.md");
+        request.main_status_after.git_status_short = " M docs/changed.md".to_string();
+        request.cleanup_state = SourceApplySandboxCleanupState::Incomplete;
+        let artifact = apply_sandbox_utf8_mutations(request).unwrap();
+        let evaluation = artifact.evaluate();
+        assert_eq!(evaluation.status, SourceApplySandboxProtocolStatus::Blocked);
+        assert!(evaluation
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("trusted/main worktree status changed")));
+        assert!(evaluation
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason.contains("complete cleanup metadata")));
+        assert!(evaluation
+            .evidence_summary
+            .iter()
+            .any(|line| line.contains("audit:")));
+        assert!(artifact.rollback_snapshot_ref.ends_with("rollback.json"));
+    }
+
+    fn smoke_request(
+        before: &str,
+        after: &str,
+        mutation_path: &str,
+    ) -> SourceApplySandboxApplyRequest {
+        let unique = format!(
+            "ouroforge-sandbox-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(unique);
+        let main = root.join("main");
+        let sandbox = root.join("sandbox");
+        std::fs::create_dir_all(main.join("docs")).unwrap();
+        std::fs::create_dir_all(sandbox.join("docs")).unwrap();
+        std::fs::write(main.join("docs/spec.md"), before).unwrap();
+        std::fs::write(sandbox.join("docs/spec.md"), before).unwrap();
+
+        SourceApplySandboxApplyRequest {
+            protocol_id: "sandbox-protocol-smoke".to_string(),
+            patch_preview_id: "preview-smoke".to_string(),
+            apply_transaction_id: "tx-smoke".to_string(),
+            review_decision_ref: "evidence/review.json".to_string(),
+            rollback_snapshot_ref: "evidence/rollback.json".to_string(),
+            context: SourceApplySandboxWorktreeContext {
+                sandbox_worktree_path: sandbox.display().to_string(),
+                trusted_worktree_path: main.display().to_string(),
+                base_revision: "abc123".to_string(),
+                created_at: "2026-06-10T00:00:00Z".to_string(),
+                evidence_root: "target/sandbox-smoke".to_string(),
+                cargo_target_dir: "/tmp/ouroforge-sandbox-target-smoke".to_string(),
+            },
+            main_status_before: SourceApplySandboxStatusSnapshot {
+                snapshot_id: "main-before".to_string(),
+                worktree_path: main.display().to_string(),
+                git_status_short: " M README.md".to_string(),
+            },
+            main_status_after: SourceApplySandboxStatusSnapshot {
+                snapshot_id: "main-after".to_string(),
+                worktree_path: main.display().to_string(),
+                git_status_short: " M README.md".to_string(),
+            },
+            mutations: vec![SourceApplySandboxMutation {
+                path: mutation_path.to_string(),
+                file_class: SourceApplySandboxFileClass::SpecDocument,
+                expected_before_hash: fnv1a64_utf8_digest(before),
+                expected_after_hash: fnv1a64_utf8_digest(after),
+                replacement_utf8: after.to_string(),
+            }],
+            cleanup_state: SourceApplySandboxCleanupState::Complete,
+            audit_ledger_ref: "evidence/audit.json".to_string(),
+            guardrails: vec!["reuse Safe Source Apply v1".to_string()],
+        }
     }
 }
