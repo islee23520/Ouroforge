@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "signal-gate-hud-feedback-v1",
+  "issue": 2387,
+  "hudStates": [
+    { "state": "start", "objective": "Activate the relay", "relay": "0/1", "key": "missing", "gate": "locked", "message": "Follow the cyan relay marker." },
+    { "state": "relay-1", "objective": "Collect the signal key", "relay": "1/1", "key": "missing", "gate": "locked", "message": "Relay online; key is enabled." },
+    { "state": "gate-open", "objective": "Reach the final gate", "relay": "1/1", "key": "collected", "gate": "open", "message": "Gate open; avoid hazards." },
+    { "state": "fail/blocked", "objective": "Restart and retry", "relay": "preserved", "key": "preserved", "gate": "preserved", "message": "Hazard contact: restart from checkpoint." },
+    { "state": "win/exit", "objective": "Complete", "relay": "1/1", "key": "collected", "gate": "open", "message": "Signal restored." }
+  ],
+  "feedbackEvents": [
+    { "id": "relay_ping", "trigger": "relay_1_active", "intent": "confirm relay activation", "observable": "HUD relay count changes to 1/1" },
+    { "id": "key_chime", "trigger": "key_collected", "intent": "confirm key pickup", "observable": "key status changes to collected" },
+    { "id": "gate_open", "trigger": "gate_open", "intent": "confirm route unlocked", "observable": "gate status changes to open" },
+    { "id": "hazard_fail", "trigger": "player_alive=false", "intent": "make failure visible", "observable": "fail message instructs restart" },
+    { "id": "win_sting", "trigger": "exit_reached", "intent": "confirm completion", "observable": "win/exit message is visible" }
+  ],
+  "boundary": "Audio is deterministic intent evidence only; no remote/proprietary asset generation and no automated fun verdict."
+}
