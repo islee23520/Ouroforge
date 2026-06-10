@@ -23,6 +23,8 @@
     ['nextRandom', 'stable', 'Advance the deterministic seeded RNG stream.'],
     ['pause', 'stable', 'Pause runtime stepping.'],
     ['replayStateDigest', 'stable', 'Capture a deterministic final state digest evidence record.'],
+    ['replayDeterminismCheck', 'stable', 'Run the same scene+seed replay repeatedly and emit diagnostics on digest divergence.'],
+    ['runReplay', 'stable', 'Run a deterministic key/action replay sequence and return final state digest evidence.'],
     ['restore', 'stable', 'Restore an in-memory snapshot by id.'],
     ['resume', 'stable', 'Resume runtime stepping.'],
     ['rngState', 'stable', 'Read seeded RNG state used by replay digesting.'],
@@ -2130,6 +2132,150 @@
     return evidence;
   }
 
+  function replayDiagnostic(code, message, details = {}) {
+    const diagnostic = {
+      schemaVersion: 'ouroforge.runtime-replay-diagnostic.v1',
+      code,
+      severity: code === 'replay_determinism_diverged' ? 'error' : 'warning',
+      message,
+      sceneId: world.sceneId,
+      tick: world.tick,
+      details: clone(details),
+    };
+    record('runtime.replay.diagnostic', diagnostic);
+    return diagnostic;
+  }
+
+  function replayActionInputPatch(action) {
+    const patch = {};
+    const source = action && typeof action === 'object' ? action : {};
+    const directionSource = source.input && typeof source.input === 'object' ? source.input : source;
+    for (const key of Object.keys(input)) {
+      if (Object.prototype.hasOwnProperty.call(directionSource, key)) patch[key] = Boolean(directionSource[key]);
+    }
+    if (source.keys && typeof source.keys === 'object' && !Array.isArray(source.keys)) patch.keys = clone(source.keys);
+    if (source.actions && typeof source.actions === 'object' && !Array.isArray(source.actions)) patch.actions = clone(source.actions);
+    return patch;
+  }
+
+  function replayStepCount(action) {
+    const source = action && typeof action === 'object' ? action : {};
+    const value = Number.isFinite(source.steps) ? source.steps : (Number.isFinite(source.step) ? source.step : 0);
+    return Math.max(0, Math.floor(value));
+  }
+
+  function runReplay(replay = {}) {
+    if (!replay || typeof replay !== 'object' || Array.isArray(replay)) {
+      const diagnostic = replayDiagnostic('replay_invalid_request', 'Replay request must be an object.', { replayType: typeof replay });
+      throw new Error(diagnostic.message);
+    }
+    const sequence = Array.isArray(replay.sequence) ? replay.sequence : (Array.isArray(replay.actions) ? replay.actions : []);
+    const label = safeEvidenceStem(replay.label || replay.finalFrameId || `replay-${world.tick}`, 'runtime replay label');
+    if (replay.scene && typeof replay.scene === 'object' && !Array.isArray(replay.scene)) {
+      const scene = clone(replay.scene);
+      if (replay.seed !== undefined) scene.seed = replay.seed;
+      loadScene(scene);
+    } else if (replay.seed !== undefined) {
+      seedRng(replay.seed);
+    }
+    const checkpoints = [];
+    try {
+      sequence.forEach((action, index) => {
+        if (!action || typeof action !== 'object' || Array.isArray(action)) {
+          throw new Error(`replay action ${index} must be an object`);
+        }
+        const patch = replayActionInputPatch(action);
+        if (Object.keys(patch).length > 0) setInput(patch);
+        const steps = replayStepCount(action);
+        if (steps > 0) step(steps);
+        if (action.checkpoint || action.label) {
+          const checkpointLabel = safeEvidenceStem(action.checkpoint || action.label, 'runtime replay checkpoint label');
+          checkpoints.push(replayStateDigest(`${label}-${checkpointLabel}`));
+        }
+      });
+    } catch (error) {
+      const diagnostic = replayDiagnostic('replay_sequence_failed', 'Replay sequence failed before final digest.', {
+        label,
+        error: String(error && error.message ? error.message : error),
+      });
+      throw new Error(`${diagnostic.message} ${diagnostic.details.error}`);
+    }
+    const finalDigest = replayStateDigest(label);
+    const evidence = {
+      schemaVersion: 'ouroforge.runtime-replay-run-v1',
+      label,
+      sceneId: finalDigest.sceneId,
+      seed: world.rng ? world.rng.seed : null,
+      actionCount: sequence.length,
+      tick: finalDigest.tick,
+      flags: clone(world.goalFlags || {}),
+      finalStateDigest: clone(finalDigest),
+      checkpoints,
+      diagnostics: [],
+    };
+    record('runtime.replay.completed', {
+      label,
+      seed: evidence.seed,
+      actionCount: evidence.actionCount,
+      finalDigest: evidence.finalStateDigest.digest,
+    });
+    return evidence;
+  }
+
+  function replayDeterminismCheck(request = {}) {
+    const runs = Number.isFinite(request.runs) ? Math.max(3, Math.floor(request.runs)) : 3;
+    const label = safeEvidenceStem(request.label || 'determinism', 'runtime replay determinism label');
+    const results = [];
+    const diagnostics = [];
+    for (let index = 0; index < runs; index += 1) {
+      try {
+        results.push(runReplay({
+          scene: request.scene,
+          seed: request.seed,
+          sequence: request.sequence || request.actions || [],
+          label: `${label}-run-${index + 1}`,
+        }));
+      } catch (error) {
+        diagnostics.push(replayDiagnostic('replay_run_failed', 'Replay run failed during determinism check.', {
+          label,
+          runIndex: index + 1,
+          error: String(error && error.message ? error.message : error),
+        }));
+      }
+    }
+    const digests = results.map((result) => result.finalStateDigest.digest.value);
+    const expected = digests[0] || null;
+    const divergenceIndex = expected ? digests.findIndex((digest) => digest !== expected) : -1;
+    if (divergenceIndex >= 0) {
+      diagnostics.push(replayDiagnostic('replay_determinism_diverged', 'Replay determinism check produced different final state digests.', {
+        label,
+        expected,
+        actual: digests[divergenceIndex],
+        runIndex: divergenceIndex + 1,
+        digests,
+      }));
+    }
+    const evidence = {
+      schemaVersion: 'ouroforge.runtime-replay-determinism-v1',
+      label,
+      sceneId: results[0] ? results[0].sceneId : world.sceneId,
+      seed: results[0] ? results[0].seed : (world.rng ? world.rng.seed : null),
+      runs,
+      status: diagnostics.length ? 'failed' : 'matched',
+      finalStateDigests: results.map((result) => result.finalStateDigest.digest),
+      results,
+      diagnostics,
+    };
+    record('runtime.replay.determinism_checked', {
+      label,
+      status: evidence.status,
+      runs,
+      digests: evidence.finalStateDigests,
+      diagnosticCount: diagnostics.length,
+    });
+    return evidence;
+  }
+
 
   function compositionDebugState(entities) {
     return {
@@ -2408,6 +2554,8 @@
     loadSave,
     replayStateDigest,
     compareReplayDigest,
+    runReplay,
+    replayDeterminismCheck,
     loadScene,
     reload,
     transition,
