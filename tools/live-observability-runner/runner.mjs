@@ -270,6 +270,72 @@ class CdpClient {
   close() { this.ws.close(); }
 }
 
+
+async function evaluateJson(cdp, expression) {
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+    userGesture: false,
+  });
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.text ?? 'Runtime.evaluate failed');
+  }
+  return result.result?.value;
+}
+
+async function sampleOuroforgeRuntime(cdp) {
+  return await evaluateJson(cdp, `
+    (async () => {
+      const api = window.__OUROFORGE__;
+      if (!api || typeof api !== 'object') {
+        return {
+          supported: false,
+          available_keys: [],
+          used_keys: [],
+          diagnostics: [{ code: 'unsupported-target', message: 'window.__OUROFORGE__ is missing' }]
+        };
+      }
+      const available = Object.keys(api).sort();
+      const used = [];
+      const diagnostics = [];
+      function need(key) {
+        if (typeof api[key] !== 'function') {
+          diagnostics.push({ code: 'unsupported-target', message: 'window.__OUROFORGE__.' + key + ' is missing' });
+          return false;
+        }
+        used.push(key);
+        return true;
+      }
+      if (typeof api.whenReady === 'function') {
+        used.push('whenReady');
+        await api.whenReady();
+      }
+      if (!need('getWorldState') || !need('getFrameStats') || !need('getEvents')) {
+        return { supported: false, available_keys: available, used_keys: used, diagnostics };
+      }
+      const world = api.getWorldState();
+      const frameStats = api.getFrameStats();
+      const events = api.getEvents();
+      return {
+        supported: true,
+        available_keys: available,
+        used_keys: used,
+        diagnostics,
+        sample: {
+          tick: world?.tick ?? world?.runtimeState?.tick ?? null,
+          scene_id: world?.sceneId ?? world?.runtimeState?.sceneId ?? null,
+          player: world?.object ?? null,
+          goal_flags: world?.componentModel?.goalFlags ?? {},
+          recent_events: Array.isArray(events) ? events.slice(-10) : [],
+          frame_stats: frameStats ?? null,
+          runtime_diagnostics: world?.runtimeDiagnostics ?? [],
+        }
+      };
+    })()
+  `);
+}
+
 function nowIso() { return new Date().toISOString(); }
 function jsonLine(value) { return `${JSON.stringify(value)}\n`; }
 async function sha256(file) { return createHash('sha256').update(await readFile(file)).digest('hex'); }
@@ -359,13 +425,15 @@ async function run() {
     await cdp.send('Page.navigate', { url: targetUrl });
     await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 5000))]);
     await new Promise(resolve => setTimeout(resolve, args.waitMs));
+    const runtimeSample = await sampleOuroforgeRuntime(cdp);
     const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile(path.join(screenshotDir, 'start.png'), Buffer.from(screenshot.data, 'base64'));
     const metrics = await cdp.send('Performance.getMetrics');
     const metricMap = Object.fromEntries((metrics.metrics ?? []).map(metric => [metric.name, metric.value]));
-    await writeFile(path.join(bundleDir, 'frame-stats.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), frame: 0, fps: null, delta_ms: null, metrics: { Frames: metricMap.Frames ?? null, Timestamp: metricMap.Timestamp ?? null } }));
-    await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), tick: null, scene_id: null, goal_flags: {}, recent_events: [], screenshot: 'screenshots/start.png' }));
-    await writeFile(path.join(bundleDir, 'events.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, events: [{ timestamp: nowIso(), type: 'page-load', target_url: targetUrl }] }, null, 2) + '\n');
+    const sampledFrameStats = runtimeSample?.sample?.frame_stats ?? {};
+    await writeFile(path.join(bundleDir, 'frame-stats.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), frame: sampledFrameStats.tick ?? 0, fps: null, delta_ms: sampledFrameStats.fixedDeltaMs ?? null, metrics: { Frames: metricMap.Frames ?? null, Timestamp: metricMap.Timestamp ?? null }, runtime_frame_stats: sampledFrameStats }));
+    await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), ...(runtimeSample?.sample ?? { tick: null, scene_id: null, goal_flags: {}, recent_events: [] }), supported: Boolean(runtimeSample?.supported), diagnostics: runtimeSample?.diagnostics ?? [], screenshot: 'screenshots/start.png' }));
+    await writeFile(path.join(bundleDir, 'events.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, events: [{ timestamp: nowIso(), type: 'page-load', target_url: targetUrl }, ...((runtimeSample?.sample?.recent_events ?? []).map(event => ({ timestamp: nowIso(), type: 'runtime-event-sample', event })))] }, null, 2) + '\n');
     await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, steps: [] }, null, 2) + '\n');
     await writeFile(path.join(bundleDir, 'verdict.md'), `# Live observability verdict stub\n\nTarget: ${targetUrl}\n\nStatus: contract-pass / product-observed-pending\n\nArtifacts captured: console, frame stats, world sample placeholder, events, input replay, start screenshot.\n`);
     consoleStream.end();
@@ -379,6 +447,9 @@ async function run() {
       tool_versions: { runner: 'live-observability-runner-v1', node: process.version, schema: SCHEMA_VERSION },
       browser: { cdp_port: chrome.port, browser: chrome.version?.Browser ?? null, protocol_version: chrome.version?.['Protocol-Version'] ?? null },
       retry_attempts: chrome.attempts,
+      observability_api_keys_used: runtimeSample?.used_keys ?? [],
+      observability_api_keys_available: runtimeSample?.available_keys ?? [],
+      diagnostics: runtimeSample?.diagnostics ?? [],
       artifact_inventory: await buildInventory(bundleDir),
     }, null, 2) + '\n');
     if (args.validate) {

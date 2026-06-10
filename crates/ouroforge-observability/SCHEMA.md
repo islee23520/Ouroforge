@@ -37,6 +37,9 @@ Required fields:
 | `browser` | object | Records browser family/channel/version when known. |
 | `retry_attempts` | number | Browser launch/connect attempts used by the runner. |
 | `artifact_inventory` | array | Each required artifact path with digest metadata. |
+| `observability_api_keys_used` | array | Optional for M116.3+ runtime sampling; exact `window.__OUROFORGE__` keys called by the sampler/replay bridge. |
+| `observability_api_keys_available` | array | Optional for M116.3+ runtime sampling; keys observed on `window.__OUROFORGE__` at capture time. |
+| `diagnostics` | array | Optional diagnostics such as `unsupported-target` when required runtime keys are absent. |
 
 Artifact inventory entries require:
 
@@ -66,7 +69,7 @@ Recommended current fields: `frame`, `fps`, `delta_ms`, `dropped_frames`.
 
 ### World sample line fields
 
-Recommended current fields: `tick`, `scene_id`, `player`, `goal_flags`, `recent_events`, `screenshot`.
+Recommended current fields: `tick`, `scene_id`, `player`, `goal_flags`, `recent_events`, `frame_stats`, `runtime_diagnostics`, `screenshot`. Missing `window.__OUROFORGE__` or missing required keys must be recorded as `diagnostic.code = unsupported-target`, not patched by injecting page JavaScript.
 
 ## `events.json`
 
