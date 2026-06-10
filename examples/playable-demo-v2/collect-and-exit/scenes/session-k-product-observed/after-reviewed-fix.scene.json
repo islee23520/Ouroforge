@@ -1,0 +1,663 @@
+{
+  "assetManifest": {
+    "assets": [
+      {
+        "id": "collect_and_exit_sheet",
+        "kind": "sprite",
+        "metadata": {
+          "projectAssetId": "collect_and_exit_sheet",
+          "source": "asset-manifest.json"
+        },
+        "path": "assets/sprites/collect-and-exit-sheet.png"
+      },
+      {
+        "id": "collect_sound",
+        "kind": "audio",
+        "metadata": {
+          "projectAssetId": "collect_sound",
+          "source": "asset-manifest.json"
+        },
+        "path": "assets/audio/collect.ogg"
+      }
+    ],
+    "id": "collect-and-exit-runtime-assets",
+    "metadata": {
+      "purpose": "#340 AP1.9.2 read-only runtime asset refs; project asset manifest remains Rust-trusted"
+    },
+    "schemaVersion": "1"
+  },
+  "bounds": {
+    "height": 180,
+    "width": 320
+  },
+  "componentDefaults": {
+    "controllable": false,
+    "size": {
+      "height": 16,
+      "width": 16
+    },
+    "status": {
+      "flags": [],
+      "hitPoints": 1,
+      "maxHitPoints": 1,
+      "states": []
+    },
+    "velocity": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "entities": [
+    {
+      "components": {
+        "animation": {
+          "clips": [
+            {
+              "frameDuration": 2,
+              "frames": [
+                {
+                  "asset": "collect_and_exit_sheet",
+                  "color": "#5eead4"
+                },
+                {
+                  "asset": "collect_and_exit_sheet",
+                  "color": "#2dd4bf"
+                }
+              ],
+              "id": "idle",
+              "loop": true
+            }
+          ],
+          "currentClip": "idle",
+          "frameDuration": 2,
+          "mode": "sprite_frame",
+          "state": {
+            "currentClip": "idle",
+            "elapsedFrames": 0,
+            "frameIndex": 0
+          }
+        },
+        "audio": {
+          "events": [
+            {
+              "action": "play",
+              "asset": "collect_sound",
+              "name": "player_spawn",
+              "trigger": "scene_loaded"
+            }
+          ]
+        },
+        "cameraTarget": {
+          "deadZone": {
+            "height": 32,
+            "width": 64
+          },
+          "weight": 1
+        },
+        "collider": {
+          "body": "dynamic",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "sensor": false,
+          "shape": "aabb",
+          "size": {
+            "height": 16,
+            "width": 16
+          }
+        },
+        "controllable": true,
+        "input": {
+          "allowedActions": [
+            "move",
+            "jump"
+          ],
+          "jumpImpulse": 8,
+          "moveSpeed": 3,
+          "scheme": "keyboard"
+        },
+        "size": {
+          "height": 16,
+          "width": 16
+        },
+        "status": {
+          "flags": [
+            "player_alive"
+          ],
+          "hitPoints": 3,
+          "maxHitPoints": 3,
+          "states": [
+            "grounded"
+          ]
+        },
+        "transform": {
+          "x": 32,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "player",
+      "sprite": {
+        "asset": "collect_and_exit_sheet",
+        "color": "#5eead4",
+        "layer": "actors",
+        "order": 0
+      },
+      "tags": [
+        "player",
+        "controllable"
+      ]
+    },
+    {
+      "components": {
+        "collider": {
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "sensor": true,
+          "shape": "aabb",
+          "size": {
+            "height": 12,
+            "width": 12
+          }
+        },
+        "controllable": false,
+        "goalFlag": {
+          "flag": "key_collected",
+          "label": "Collect key"
+        },
+        "size": {
+          "height": 12,
+          "width": 12
+        },
+        "transform": {
+          "x": 128,
+          "y": 80
+        },
+        "trigger": {
+          "id": "collect_key",
+          "kind": "overlap",
+          "onEnter": [
+            {
+              "flag": "key_collected",
+              "kind": "setFlag",
+              "value": true
+            },
+            {
+              "flag": "door_open",
+              "kind": "setFlag",
+              "value": true
+            },
+            {
+              "entityId": "key",
+              "kind": "hideEntity"
+            }
+          ],
+          "targetFlag": "key_collected"
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "key",
+      "sprite": {
+        "asset": "collect_and_exit_sheet",
+        "color": "#facc15",
+        "layer": "actors",
+        "order": 5
+      },
+      "tags": [
+        "collectible",
+        "key"
+      ]
+    },
+    {
+      "components": {
+        "collider": {
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "sensor": true,
+          "shape": "aabb",
+          "size": {
+            "height": 24,
+            "width": 16
+          }
+        },
+        "controllable": false,
+        "goalFlag": {
+          "flag": "exit_reached",
+          "label": "Exit through door"
+        },
+        "size": {
+          "height": 24,
+          "width": 16
+        },
+        "transform": {
+          "x": 256,
+          "y": 80
+        },
+        "trigger": {
+          "id": "enter_exit",
+          "kind": "overlap",
+          "onEnter": [
+            {
+              "flag": "exit_reached",
+              "kind": "setFlag",
+              "value": true
+            }
+          ],
+          "requiredFlags": [
+            "door_open"
+          ],
+          "targetFlag": "exit_reached"
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "door",
+      "sprite": {
+        "asset": "collect_and_exit_sheet",
+        "color": "#a78bfa",
+        "layer": "actors",
+        "order": 6
+      },
+      "tags": [
+        "exit",
+        "door"
+      ]
+    },
+    {
+      "components": {
+        "collider": {
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "sensor": false,
+          "shape": "aabb",
+          "size": {
+            "height": 32,
+            "width": 16
+          }
+        },
+        "controllable": false,
+        "size": {
+          "height": 32,
+          "width": 16
+        },
+        "transform": {
+          "x": 304,
+          "y": 80
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "wall",
+      "sprite": {
+        "asset": "collect_and_exit_sheet",
+        "color": "#64748b",
+        "layer": "actors",
+        "order": 20
+      },
+      "tags": [
+        "wall",
+        "solid"
+      ]
+    },
+    {
+      "components": {
+        "controllable": false,
+        "hudValue": {
+          "bindFlag": "exit_reached",
+          "kind": "goal",
+          "label": "Goal",
+          "value": "Collect key and exit"
+        },
+        "size": {
+          "height": 12,
+          "width": 128
+        },
+        "transform": {
+          "x": 8,
+          "y": 8
+        },
+        "uiText": {
+          "bindFlag": "exit_reached",
+          "role": "hud",
+          "text": "Goal: collect key and exit"
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "hud_goal",
+      "sprite": {
+        "color": "#ffffff",
+        "layer": "hud",
+        "order": 0,
+        "visible": false
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "components": {
+        "controllable": false,
+        "hudValue": {
+          "bindFlag": "key_collected",
+          "kind": "key_count",
+          "label": "Key",
+          "value": "0/1"
+        },
+        "size": {
+          "height": 12,
+          "width": 96
+        },
+        "transform": {
+          "x": 8,
+          "y": 24
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "hud_key",
+      "sprite": {
+        "color": "#ffffff",
+        "layer": "hud",
+        "order": 1,
+        "visible": false
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "components": {
+        "controllable": false,
+        "hudValue": {
+          "bindFlag": "player_alive",
+          "kind": "health",
+          "label": "HP",
+          "value": "3/3"
+        },
+        "size": {
+          "height": 12,
+          "width": 64
+        },
+        "transform": {
+          "x": 8,
+          "y": 40
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "hud_health",
+      "sprite": {
+        "color": "#ffffff",
+        "layer": "hud",
+        "order": 2,
+        "visible": false
+      },
+      "tags": [
+        "hud"
+      ]
+    },
+    {
+      "components": {
+        "collider": {
+          "body": "static",
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "sensor": false,
+          "shape": "aabb",
+          "size": {
+            "height": 16,
+            "width": 320
+          }
+        },
+        "controllable": false,
+        "size": {
+          "height": 16,
+          "width": 320
+        },
+        "transform": {
+          "x": 0,
+          "y": 96
+        },
+        "velocity": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "id": "floor",
+      "sprite": {
+        "asset": "collect_and_exit_sheet",
+        "color": "#334155",
+        "layer": "actors",
+        "order": 19
+      },
+      "tags": [
+        "floor",
+        "solid"
+      ]
+    }
+  ],
+  "gameplayRules": {
+    "flags": [
+      {
+        "id": "key_collected",
+        "initial": false,
+        "label": "Key collected"
+      },
+      {
+        "id": "door_open",
+        "initial": false,
+        "label": "Door open"
+      },
+      {
+        "id": "exit_reached",
+        "initial": false,
+        "label": "Exit reached"
+      },
+      {
+        "id": "player_alive",
+        "initial": true,
+        "label": "Player alive"
+      }
+    ],
+    "version": "1"
+  },
+  "id": "collect-and-exit-scene",
+  "metadata": {
+    "fixture": "playable-demo-v2-collect-and-exit",
+    "runContext": {
+      "evidenceBoundary": "source-like fixture only; generated runs and dashboard exports remain untracked",
+      "issue": 591,
+      "prUnit": "P2D8.11.1"
+    },
+    "runtimeDebug": {
+      "frameBudget": {
+        "evidenceMs": 4,
+        "renderMs": 16,
+        "totalMs": 20,
+        "updateMs": 8
+      },
+      "frameTimings": {
+        "evidenceMs": 1,
+        "renderMs": 6,
+        "totalMs": 9,
+        "updateMs": 2
+      }
+    },
+    "scenarioId": "collect-and-exit-source-smoke",
+    "scope": "one-screen source fixture; generated run evidence is intentionally untracked",
+    "startState": {
+      "checkpointSlot": "demo-start",
+      "initialFlags": {
+        "door_open": false,
+        "exit_reached": false,
+        "key_collected": false,
+        "player_alive": true
+      },
+      "playerEntityId": "player",
+      "spawn": {
+        "x": 32,
+        "y": 80
+      }
+    },
+    "title": "Collect and Exit Vertical Slice Demo"
+  },
+  "renderer": {
+    "background": "#172532",
+    "camera": {
+      "x": 0,
+      "y": 0
+    },
+    "layers": [
+      {
+        "id": "background",
+        "order": -10
+      },
+      {
+        "id": "actors",
+        "order": 0
+      },
+      {
+        "id": "hud",
+        "order": 10
+      }
+    ],
+    "version": "1",
+    "viewport": {
+      "height": 180,
+      "width": 320
+    }
+  },
+  "schemaVersion": "1",
+  "tilemaps": [
+    {
+      "grid": {
+        "height": 6,
+        "width": 10
+      },
+      "id": "collect_and_exit_level",
+      "layers": [
+        {
+          "data": [
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "empty",
+            "key_marker",
+            "empty",
+            "empty",
+            "empty",
+            "exit_marker",
+            "empty",
+            "empty",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground",
+            "ground"
+          ],
+          "id": "terrain"
+        }
+      ],
+      "tileSize": {
+        "height": 16,
+        "width": 16
+      },
+      "tiles": [
+        {
+          "color": "#0f172a",
+          "id": "empty"
+        },
+        {
+          "asset": "collect_and_exit_sheet",
+          "color": "#334155",
+          "id": "ground"
+        },
+        {
+          "asset": "collect_and_exit_sheet",
+          "color": "#facc15",
+          "id": "key_marker",
+          "trigger": "key_collected"
+        },
+        {
+          "asset": "collect_and_exit_sheet",
+          "color": "#a78bfa",
+          "goal": true,
+          "id": "exit_marker"
+        }
+      ]
+    }
+  ]
+}

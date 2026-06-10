@@ -1,0 +1,130 @@
+{
+  "bundles": {
+    "after": {
+      "diagnostic": "missing_asset collect_and_exit_sheet assets/sprites/collect-and-exit-sheet.png Image load failed",
+      "mechanical_contract": "contract-pass",
+      "objective_flag_sequence": [
+        {
+          "goal_flags": {
+            "exit_reached": false,
+            "key_collected": false,
+            "player_alive": true
+          },
+          "label": "start",
+          "tick": 0
+        },
+        {
+          "goal_flags": {
+            "door_open": true,
+            "exit_reached": false,
+            "key_collected": true,
+            "player_alive": true
+          },
+          "label": "after-key",
+          "tick": 40
+        },
+        {
+          "goal_flags": {
+            "door_open": true,
+            "exit_reached": true,
+            "key_collected": true,
+            "player_alive": true
+          },
+          "label": "after-exit",
+          "tick": 85
+        }
+      ],
+      "observability_api_keys_used": [
+        "whenReady",
+        "getWorldState",
+        "getFrameStats",
+        "getEvents",
+        "setInput",
+        "step"
+      ],
+      "path": "runs/session-k-product-observed/live-observability/session-k-after-reviewed-fix-examples",
+      "product_observation": "product-observed FAIL",
+      "replay": "collect-and-exit",
+      "run_id": "session-k-after-reviewed-fix-examples",
+      "scene_fixture": "/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/after-reviewed-fix.scene.json",
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/final.png"
+      ],
+      "target_url": "http://127.0.0.1:8873/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/after-reviewed-fix.scene.json"
+    },
+    "before": {
+      "diagnostic": "missing_asset collect_and_exit_sheet assets/sprites/collect-and-exit-sheet.png Image load failed",
+      "mechanical_contract": "contract-fail",
+      "objective_flag_sequence": [
+        {
+          "goal_flags": {
+            "exit_reached": false,
+            "key_collected": false,
+            "player_alive": true
+          },
+          "label": "start",
+          "tick": 0
+        },
+        {
+          "goal_flags": {
+            "door_open": true,
+            "exit_reached": false,
+            "key_collected": true,
+            "player_alive": true
+          },
+          "label": "after-key",
+          "tick": 40
+        },
+        {
+          "goal_flags": {
+            "door_open": true,
+            "exit_reached": false,
+            "key_collected": true,
+            "player_alive": true
+          },
+          "label": "after-exit",
+          "tick": 85
+        }
+      ],
+      "observability_api_keys_used": [
+        "whenReady",
+        "getWorldState",
+        "getFrameStats",
+        "getEvents",
+        "setInput",
+        "step"
+      ],
+      "path": "runs/session-k-product-observed/live-observability/session-k-before-controlled-failure-examples",
+      "product_observation": "product-observed FAIL",
+      "replay": "collect-and-exit",
+      "run_id": "session-k-before-controlled-failure-examples",
+      "scene_fixture": "/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/before-controlled-failure.scene.json",
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/final.png"
+      ],
+      "target_url": "http://127.0.0.1:8873/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/before-controlled-failure.scene.json"
+    }
+  },
+  "classification": "contract-complete_with_product-observed_gap",
+  "comparison": {
+    "after_final_exit_reached": true,
+    "before_final_exit_reached": false,
+    "mechanical_improvement_observed": true,
+    "usability_gap": "The after bundle still reports missing_asset for collect_and_exit_sheet, so product-observed remains failed."
+  },
+  "generated_from_ignored_bundles": true,
+  "issue": 2490,
+  "product_observed_complete": false,
+  "review_apply_evidence": {
+    "blocked_gap_test": "missing_real_file_or_regression_blocks_product_observed_ready_claim",
+    "real_sandbox_file_test": "controlled_failure_flow_uses_real_sandbox_file_and_links_before_after_comparison",
+    "scenario_coverage": "crates/ouroforge-core/tests/scenario_coverage_v107_controlled_failure_flow.rs",
+    "self_approval_rejection_test": "self_approval_rejection_path_is_exercised_before_flow_passes",
+    "source_contract": "crates/ouroforge-source-apply/src/source_apply_controlled_failure_flow.rs",
+    "status": "passed",
+    "targeted_command": "CARGO_TARGET_DIR=$PWD/target-session-k-po cargo test -p ouroforge-core --test scenario_coverage_v107_controlled_failure_flow"
+  },
+  "schema_version": "session-k-product-observed-evidence-upgrade-v1"
+}
