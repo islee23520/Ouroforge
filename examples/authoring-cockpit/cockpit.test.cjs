@@ -2604,6 +2604,26 @@ const blockedLiveModel = cockpit.liveObservabilityManifestEvidenceModel({ live_o
 assert.equal(blockedLiveModel.status, 'blocked');
 assert.match(blockedLiveModel.manifests[0].entries[0].blockedReasons.join(' '), /hardened live-observability/);
 
+// #2364 source/generated state browser and Scenario Coverage v102.
+assert.equal(cockpit.classifyStudioSourceGeneratedPath('examples/game-runtime/scene.json').kind, 'source');
+assert.equal(cockpit.classifyStudioSourceGeneratedPath('runs/live-observability/live-1/manifest.json').kind, 'generated');
+assert.equal(cockpit.classifyStudioSourceGeneratedPath('tmp/source-apply/worktree/status.json').kind, 'temp');
+assert.equal(cockpit.classifyStudioSourceGeneratedPath('../secrets.json').kind, 'blocked');
+const backslashClass = cockpit.classifyStudioSourceGeneratedPath('runs\\live-observability\\live-1\\manifest.json');
+assert.equal(backslashClass.kind, 'blocked');
+assert.match(backslashClass.blockedReasons.join(' '), /backslash/);
+const sourceGeneratedModel = cockpit.studioSourceGeneratedBrowserModel({ source_generated_browser: { items: [
+  { id: 'source-scene', path: 'examples/game-runtime/scene.json' },
+  { id: 'generated-manifest', path: 'runs/live-observability/live-1/manifest.json' },
+  { id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' },
+] } });
+assert.equal(sourceGeneratedModel.schemaVersion, 'studio-source-generated-browser-v1');
+assert.equal(sourceGeneratedModel.status, 'blocked');
+assert.equal(sourceGeneratedModel.scenarioCoverage.id, 'v102');
+assert.equal(sourceGeneratedModel.scenarioCoverage.status, 'landed');
+assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /Scenario Coverage: v102 landed/);
+assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /backslash path separator/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
