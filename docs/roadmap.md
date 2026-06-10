@@ -12,6 +12,10 @@ milestone classifications are tracked in
 [`docs/roadmap/milestone-classification-ledger.md`](roadmap/milestone-classification-ledger.md)
 with machine-readable source at
 [`docs/roadmap/milestone-classification-ledger.json`](roadmap/milestone-classification-ledger.json).
+Product-observed closure artifacts are governed by
+[`docs/product-observed-closure-checklist.md`](product-observed-closure-checklist.md),
+and M115 regression coverage is locked by
+[`docs/scenario-coverage-v96-product-observed-rebaseline.md`](scenario-coverage-v96-product-observed-rebaseline.md).
 Historical milestones remain preserved as contract-complete unless their linked
 evidence satisfies the product-observed checklist owned by M115.3. Future issue
 and PR closures must state either `contract-complete` or `product-observed

@@ -5,9 +5,8 @@ Product-Observed Rebaseline. It governs future Ouroforge issue, PR, roadmap, and
 closure wording until a later governance issue replaces it.
 
 Ownership boundary: this document defines **completion semantics** and the
-**closure-comment template**. The artifact-level checklist is owned by the
-M115.3 product-observed checklist and must be cross-linked from here once that
-issue lands.
+**closure-comment template**. The artifact-level checklist is owned by
+[`docs/product-observed-closure-checklist.md`](product-observed-closure-checklist.md).
 
 Historical classification for earlier milestones is seeded in [`m115-historical-classification-ledger.md`](m115-historical-classification-ledger.md) and should be updated or superseded by later governance evidence rather than used for practical usability overclaims.
 
