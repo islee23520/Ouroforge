@@ -17,7 +17,9 @@ pub use ouroforge_core_types::*;
 
 pub mod behavior_runtime;
 pub mod complexity_ladder;
+pub mod live_failure_classifier;
 pub mod physics_2d;
+pub mod product_gap_taxonomy;
 pub use physics_2d::{
     simulate_scene_physics_step, Physics2dBlockedMovement, Physics2dCollisionEvent,
     Physics2dStepEvidence, Physics2dVector,
