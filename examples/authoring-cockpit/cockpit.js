@@ -5551,25 +5551,31 @@ const OuroforgeCockpit = (() => {
     const finite = (value) => typeof value === 'number' && Number.isFinite(value);
     const t = transform && typeof transform === 'object' ? transform : {};
     const operations = [];
+    const path = String((target && (target.path || target.source_path)) || 'unknown');
+    const id = (target && (target.id || target.entity_id)) || 'unknown';
+    const bounds = (target && typeof target.bounds === 'object' && target.bounds) || { minX: 0, minY: 0, maxX: 1024, maxY: 768 };
+    const baseDigest = (target && (target.baseDigest || target.base_digest || target.expectedDigest || target.expected_digest)) || 'unknown';
+    const currentDigest = (target && (target.currentDigest || target.current_digest || target.actualDigest || target.actual_digest)) || baseDigest;
+    if (baseDigest === 'unknown') reasons.push('Target scene base digest is required for stale-target rejection.');
+    if (currentDigest !== baseDigest) reasons.push('Stale target scene digest; re-open the scene before drafting transform changes.');
     if ('position' in t) {
       const pos = t.position;
       if (!Array.isArray(pos) || pos.length < 2 || !pos.every(finite)) reasons.push('Position transform requires a finite [x, y] tuple.');
-      else operations.push({ id: 'set-transform-position', kind: 'set_component_field', path: 'transform.position', value: pos.slice(0, 2), summary: `Set position to ${JSON.stringify(pos.slice(0, 2))} (draft only)` });
+      else if (pos[0] < bounds.minX || pos[0] > bounds.maxX || pos[1] < bounds.minY || pos[1] > bounds.maxY) reasons.push('Position transform is out of scene bounds.');
+      else operations.push({ id: 'set-transform-position', kind: 'set_component_field', path: 'transform.position', value: pos.slice(0, 2), baseDigest, summary: `Set position to ${JSON.stringify(pos.slice(0, 2))} (draft only; base ${baseDigest})` });
     }
     if ('rotation' in t) {
       if (!finite(t.rotation)) reasons.push('Rotation transform requires a finite number.');
-      else operations.push({ id: 'set-transform-rotation', kind: 'set_component_field', path: 'transform.rotation', value: t.rotation, summary: `Set rotation to ${t.rotation} (draft only)` });
+      else operations.push({ id: 'set-transform-rotation', kind: 'set_component_field', path: 'transform.rotation', value: t.rotation, baseDigest, summary: `Set rotation to ${t.rotation} (draft only; base ${baseDigest})` });
     }
     if ('scale' in t) {
       const scale = t.scale;
-      if (!Array.isArray(scale) || scale.length < 2 || !scale.every(finite)) reasons.push('Scale transform requires a finite [x, y] tuple.');
-      else operations.push({ id: 'set-transform-scale', kind: 'set_component_field', path: 'transform.scale', value: scale.slice(0, 2), summary: `Set scale to ${JSON.stringify(scale.slice(0, 2))} (draft only)` });
+      if (!Array.isArray(scale) || scale.length < 2 || !scale.every(finite) || scale.some((value) => value <= 0)) reasons.push('Scale transform requires a positive finite [x, y] tuple.');
+      else operations.push({ id: 'set-transform-scale', kind: 'set_component_field', path: 'transform.scale', value: scale.slice(0, 2), baseDigest, summary: `Set scale to ${JSON.stringify(scale.slice(0, 2))} (draft only; base ${baseDigest})` });
     }
     if (!operations.length && !reasons.length) reasons.push('No supported transform (position, rotation, scale) was provided.');
-    const path = String((target && (target.path || target.source_path)) || 'unknown');
-    if (/(^|[\\/])\.\.([\\/]|$)/.test(path) || path.startsWith('/') || /[;&|`$<>]/.test(path)) reasons.push('Target path is not an allowlisted in-project source path.');
-    const id = (target && (target.id || target.entity_id)) || 'unknown';
-    const baseTarget = { type: 'scene', path, id };
+    if (/(^|[\/])\.\.([\/]|$)/.test(path) || path.startsWith('/') || /[;&|`$<>]/.test(path) || path.includes('\\')) reasons.push('Target path is not an allowlisted in-project source path.');
+    const baseTarget = { type: 'scene', path, id, baseDigest, currentDigest, bounds };
     if (reasons.length) {
       return { draftId: `canvas-transform-${id}-blocked`, schemaVersion: 'visual-edit-draft-v1', target: baseTarget, proposedOperations: [], validationStatus: 'blocked', blockedReasons: reasons, requiresSafeSourceApplyHandoff: true, applyCapability: false };
     }
@@ -5577,10 +5583,11 @@ const OuroforgeCockpit = (() => {
       draftId: `canvas-transform-${id}`,
       schemaVersion: 'visual-edit-draft-v1',
       target: baseTarget,
+      baseDigest,
       proposedOperations: operations,
       validationStatus: 'validated',
       blockedReasons: [],
-      expectedAfterSummary: `Draft proposes ${operations.length} transform change(s); no trusted write without Safe Source Apply review.`,
+      expectedAfterSummary: `Draft proposes ${operations.length} base-relative transform change(s) against ${baseDigest}; no trusted write without Safe Source Apply review.`,
       requiresSafeSourceApplyHandoff: true,
       applyCapability: false,
       linkedEvidence: [],

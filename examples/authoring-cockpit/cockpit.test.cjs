@@ -2639,6 +2639,25 @@ assert.match(specHtml, /base-relative/);
 assert.match(specHtml, /cumulative simulation: false/);
 assert.match(specHtml, /Safe Source Apply handoff only/);
 
+// #2366 entity selection and transform draft: base digest + stale/out-of-bounds fail closed.
+const transformTarget2366 = { id: 'player', path: 'examples/game-runtime/scene.json', baseDigest: 'sha256:base-scene', currentDigest: 'sha256:base-scene', bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 } };
+const transformDraft2366 = cockpit.studioCanvasTransformDraft(transformTarget2366, { position: [42, 44], rotation: 0, scale: [1, 1] });
+assert.equal(transformDraft2366.validationStatus, 'validated');
+assert.equal(transformDraft2366.target.baseDigest, 'sha256:base-scene');
+assert.equal(transformDraft2366.target.currentDigest, 'sha256:base-scene');
+assert.equal(transformDraft2366.baseDigest, 'sha256:base-scene');
+assert.equal(transformDraft2366.applyCapability, false);
+assert.match(transformDraft2366.expectedAfterSummary, /base-relative/);
+const outOfBoundsDraft2366 = cockpit.studioCanvasTransformDraft(transformTarget2366, { position: [142, 44] });
+assert.equal(outOfBoundsDraft2366.validationStatus, 'blocked');
+assert.match(outOfBoundsDraft2366.blockedReasons.join(' '), /out of scene bounds/);
+const staleDigestDraft2366 = cockpit.studioCanvasTransformDraft({ ...transformTarget2366, currentDigest: 'sha256:changed' }, { position: [42, 44] });
+assert.equal(staleDigestDraft2366.validationStatus, 'blocked');
+assert.match(staleDigestDraft2366.blockedReasons.join(' '), /Stale target scene digest/);
+const missingDigestDraft2366 = cockpit.studioCanvasTransformDraft({ id: 'player', path: 'examples/game-runtime/scene.json' }, { position: [42, 44] });
+assert.equal(missingDigestDraft2366.validationStatus, 'blocked');
+assert.match(missingDigestDraft2366.blockedReasons.join(' '), /base digest is required/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
@@ -2994,13 +3013,13 @@ assert.match(canvasMarkup, /Safe Source Apply handoff/);
 assert.doesNotMatch(canvasMarkup, /<button|<form|onclick|localStorage|fetch\(|auto-merge|auto-apply/i);
 assert.match(cockpit.renderStudioSceneCanvasSurface({}), /No scene canvas read model/);
 // Transform interactions produce draft operations only
-const canvasTarget = { id: 'player', path: 'scenes/main.scene.json' };
-const transformDraft = cockpit.studioCanvasTransformDraft(canvasTarget, { position: [96, 64], rotation: 90, scale: [1, 1] });
-assert.strictEqual(transformDraft.validationStatus, 'validated');
-assert.strictEqual(transformDraft.applyCapability, false);
-assert.strictEqual(transformDraft.requiresSafeSourceApplyHandoff, true);
-assert.strictEqual(transformDraft.proposedOperations.length, 3);
-assert.ok(transformDraft.proposedOperations.every((op) => op.kind === 'set_component_field'));
+const canvasTarget = { id: 'player', path: 'examples/game-runtime/scene.json', baseDigest: 'sha256:canvas-base', currentDigest: 'sha256:canvas-base' };
+const transformDraftCanvas = cockpit.studioCanvasTransformDraft(canvasTarget, { position: [96, 64], rotation: 90, scale: [1, 1] });
+assert.strictEqual(transformDraftCanvas.validationStatus, 'validated');
+assert.strictEqual(transformDraftCanvas.applyCapability, false);
+assert.strictEqual(transformDraftCanvas.requiresSafeSourceApplyHandoff, true);
+assert.strictEqual(transformDraftCanvas.proposedOperations.length, 3);
+assert.ok(transformDraftCanvas.proposedOperations.every((op) => op.kind === 'set_component_field'));
 const badTransform = cockpit.studioCanvasTransformDraft(canvasTarget, { position: ['x', 64] });
 assert.strictEqual(badTransform.validationStatus, 'blocked');
 assert.strictEqual(badTransform.proposedOperations.length, 0);
