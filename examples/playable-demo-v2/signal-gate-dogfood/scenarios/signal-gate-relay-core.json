@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "scenario-pack-v1",
+  "id": "signal-gate-relay-core",
+  "issue": 2385,
+  "classification": "product-observed-local-runtime-smoke",
+  "scenarios": [
+    {
+      "id": "first-playable-loop",
+      "scene": "scenes/signal-gate-relay.scene.json",
+      "states": ["start", "relay-1", "key-collected", "gate-open", "restarted", "win/exit"],
+      "replay": [
+        { "label": "start", "input": {}, "frames": 1 },
+        { "label": "relay-1", "input": { "right": true }, "frames": 28 },
+        { "label": "key-collected-gate-open", "input": { "right": true }, "frames": 30 },
+        { "label": "win-exit", "input": { "right": true }, "frames": 65 }
+      ]
+    },
+    {
+      "id": "fail-and-restart",
+      "scene": "scenes/signal-gate-relay.scene.json",
+      "states": ["fail/blocked", "restarted"],
+      "replay": [
+        { "label": "hazard-contact", "input": { "right": true, "up": true }, "frames": 78 },
+        { "label": "restart", "action": "load-checkpoint", "checkpoint": "signal-yard-start" }
+      ]
+    }
+  ],
+  "guardrails": [
+    "generated evidence bundles are written under ignored runs/ during live execution",
+    "scenario pass is not an automated fun/feel verdict",
+    "no browser trusted writes or command bridge"
+  ]
+}
