@@ -137,3 +137,30 @@ frame-budget evidence, trigger path, and `demo-start` save/load checkpoint. This
 keeps the demo observable through the existing runtime probe without adding
 browser-side writes, command execution, generated evidence commits, or broader
 engine systems.
+
+## Runtime Shell UX evidence (M118)
+
+`runtime-shell-ux.md` defines the canonical shell states and screenshot names
+used by the M118/M120 work: `start`, `key-collected`, `gate-open`, `win`,
+`fail`, `paused`, and `restarted`, with generated bundle paths of the form
+`screenshots/state-<name>.png`.
+
+For #2353, the runtime page is a playable shell first: the canvas is framed,
+scene/controls/HUD/status regions are visible, and raw world-state JSON is kept
+inside the collapsed `Evidence / debug JSON` panel. `window.__OUROFORGE__` is not
+removed or narrowed; shell rendering reads the same runtime world-state evidence
+model and updates page DOM additively.
+
+Measured baseline for `components-v2.test.cjs` on the clean `origin/main` used by
+#2353 was exit code 0. The focused shell DOM smoke is:
+
+```bash
+node examples/game-runtime/game-ui.test.cjs
+node examples/game-runtime/components-v2.test.cjs
+```
+
+Live start-state screenshot capture is generated under ignored `runs/` roots,
+for example `runs/session-f-2353/screenshots/state-start.png`. The local Chrome
+headless run produced the start screenshot in this path; Chrome process stderr
+contained browser infrastructure shutdown/network messages after termination, so
+page-console fatal-error proof is not upgraded beyond the DOM smoke in #2353.

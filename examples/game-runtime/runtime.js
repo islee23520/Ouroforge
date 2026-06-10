@@ -1745,10 +1745,90 @@
     renderer.drawRuntime({ canvas, context, world, renderer: rendererState, assets, animation, tilemap });
   }
 
+  function setShellText(id, value) {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  }
+
+  function setHudValue(id, value, tone = '') {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.textContent = value;
+    const base = 'hud-value';
+    node.className = tone ? `${base} ${tone}` : base;
+  }
+
+  function latestObjectiveEvent(state) {
+    const runtimeEvents = Array.isArray(state.runtimeEvents) ? state.runtimeEvents : [];
+    const latest = runtimeEvents.slice().reverse().find((event) => {
+      const type = event && event.type ? String(event.type) : '';
+      return type.includes('trigger') || type.includes('scene.loaded') || type.includes('paused') || type.includes('resumed');
+    });
+    if (!latest) return 'Scene loaded';
+    const type = String(latest.type || 'event').replace(/^runtime\./, '');
+    if (type === 'scene.loaded') return 'Scene loaded';
+    if (type === 'trigger.entered') return 'Objective updated';
+    if (type === 'paused') return 'Paused';
+    if (type === 'resumed') return 'Resumed';
+    return type.replace(/[._-]+/g, ' ');
+  }
+
+  function shellFlag(state, names, fallback = false) {
+    const flags = state && state.componentModel && state.componentModel.goalFlags
+      ? state.componentModel.goalFlags
+      : {};
+    for (const name of names) {
+      if (Object.prototype.hasOwnProperty.call(flags, name)) return flags[name] === true;
+    }
+    return fallback;
+  }
+
+  function playerAlive(state) {
+    const flags = state && state.componentModel && state.componentModel.goalFlags
+      ? state.componentModel.goalFlags
+      : {};
+    if (Object.prototype.hasOwnProperty.call(flags, 'player_alive')) return flags.player_alive === true;
+    if (Object.prototype.hasOwnProperty.call(flags, 'alive')) return flags.alive === true;
+    return true;
+  }
+
+  function renderShell(state) {
+    if (!state || typeof document === 'undefined' || !document.getElementById) return;
+    const sceneLabel = activeSceneSource || state.sceneId || 'scene.json';
+    const hasKey = shellFlag(state, ['key_collected', 'coin_collected', 'has_key']);
+    const gateOpen = shellFlag(state, ['gate_open', 'door_open', 'exit_open']);
+    const exitReached = shellFlag(state, ['exit_reached', 'level_complete', 'won']);
+    const alive = playerAlive(state);
+    const paused = state.paused === true;
+    const runState = paused ? 'Paused' : exitReached ? 'Win' : !alive ? 'Fail' : gateOpen ? 'Gate open' : hasKey ? 'Key collected' : 'Start';
+    const status = paused
+      ? 'Paused: resume when ready or restart the scene.'
+      : exitReached
+        ? 'Win: objective complete. Restart to play again.'
+        : !alive
+          ? 'Fail: the player is blocked or down. Restart to retry.'
+          : gateOpen
+            ? 'Gate open: reach the exit to win.'
+            : hasKey
+              ? 'Key collected: the gate is ready to open.'
+              : 'Start: collect the key, open the gate, and reach the exit.';
+    setShellText('scene-name', sceneLabel);
+    setShellText('run-state', runState);
+    setShellText('status-message', status);
+    setHudValue('hud-key', hasKey ? 'Collected' : 'Missing', hasKey ? 'good' : 'warn');
+    setHudValue('hud-gate', gateOpen ? 'Open' : 'Closed', gateOpen ? 'good' : 'warn');
+    setHudValue('hud-exit', exitReached ? 'Reached' : gateOpen ? 'Ready' : 'Locked', exitReached ? 'good' : gateOpen ? 'good' : 'warn');
+    setHudValue('hud-player', alive ? 'Alive' : 'Down', alive ? 'good' : 'bad');
+    setHudValue('hud-tick', String(state.tick || 0));
+    setHudValue('hud-event', latestObjectiveEvent(state));
+  }
+
   function renderDebug() {
     renderCanvas();
+    const state = api.getWorldState();
+    renderShell(state);
     const debug = document.getElementById('debug');
-    if (debug) debug.textContent = JSON.stringify(api.getWorldState(), null, 2);
+    if (debug) debug.textContent = JSON.stringify(state, null, 2);
   }
 
   function loadScene(scene, options = {}) {
