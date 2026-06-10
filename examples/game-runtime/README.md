@@ -212,3 +212,19 @@ node examples/game-runtime/scenario-coverage-v99.test.cjs
 The suite is contract-complete deterministic runtime evidence. Browser pixel
 screenshots remain generated evidence under ignored `runs/` bundles and are not
 committed as trusted source.
+
+### Visual Rubric Report (M120.2)
+
+`visual-rubric-report.test.cjs` applies the M120.1 rubric to the four #2360
+canonical report states: `start`, `key-collected`, `win`, and `fail`. The report
+references live-bundle screenshot names (`screenshots/state-<name>.png`) and
+cross-checks deterministic HUD/world evidence before marking criteria pass.
+
+Run it with:
+
+```bash
+node examples/game-runtime/visual-rubric-report.test.cjs
+```
+
+This is a rubric report over deterministic source/runtime evidence. Browser
+pixel screenshots remain generated evidence under ignored `runs/` bundles.
