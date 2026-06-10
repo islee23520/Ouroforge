@@ -3000,7 +3000,10 @@ const OuroforgeCockpit = (() => {
       { id: 'live-manifest', path: 'runs/live-observability/live-1/manifest.json' },
     ];
     const items = defaultItems.map((item, index) => {
-      const classification = classifyStudioSourceGeneratedPath(item?.path || item);
+      const pathValue = item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'path')
+        ? item.path
+        : item;
+      const classification = classifyStudioSourceGeneratedPath(pathValue);
       return {
         id: item?.id || `path-${index + 1}`,
         ...classification,

@@ -2636,6 +2636,16 @@ assert.equal(sourceGeneratedModel.schemaVersion, 'studio-source-generated-browse
 assert.equal(sourceGeneratedModel.status, 'blocked');
 assert.equal(sourceGeneratedModel.scenarioCoverage.id, 'v102');
 assert.equal(sourceGeneratedModel.scenarioCoverage.status, 'landed');
+const emptySourceGeneratedModel = cockpit.studioSourceGeneratedBrowserModel({ source_generated_browser: { items: [
+  { id: 'empty-path', path: '' },
+] } });
+assert.equal(emptySourceGeneratedModel.status, 'blocked');
+assert.equal(emptySourceGeneratedModel.items[0].kind, 'blocked');
+assert.equal(emptySourceGeneratedModel.items[0].path, '');
+assert.match(emptySourceGeneratedModel.items[0].blockedReasons.join(' '), /empty path/);
+const emptySourceGeneratedPathsModel = cockpit.studioSourceGeneratedBrowserModel({ source_generated_browser: { paths: [''] } });
+assert.equal(emptySourceGeneratedPathsModel.items[0].kind, 'blocked');
+assert.equal(emptySourceGeneratedPathsModel.items[0].path, '');
 assert.equal(cockpit.studioSourceGeneratedBrowserModel({ source_generated_browser: { items: [{ id: 'unsupported-root', path: 'README.md' }] } }).status, 'blocked');
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /Scenario Coverage: v102 landed/);
 assert.match(cockpit.renderStudioSourceGeneratedBrowserSurface({ source_generated_browser: { items: [{ id: 'bad-backslash', path: 'examples\\game-runtime\\scene.json' }] } }), /backslash path separator/);
