@@ -1800,7 +1800,7 @@
     const exitReached = shellFlag(state, ['exit_reached', 'level_complete', 'won']);
     const alive = playerAlive(state);
     const paused = state.paused === true;
-    const runState = paused ? 'Paused' : exitReached ? 'Win' : !alive ? 'Fail' : gateOpen ? 'Gate open' : hasKey ? 'Key collected' : 'Start';
+    const runState = paused ? 'Paused' : exitReached ? 'Win' : !alive ? 'Fail' : gateOpen ? 'Gate open' : hasKey ? 'Key collected' : shellRestarted ? 'Restarted' : 'Start';
     const status = paused
       ? 'Paused: resume when ready or restart the scene.'
       : exitReached
@@ -1811,7 +1811,9 @@
             ? 'Gate open: reach the exit to win.'
             : hasKey
               ? 'Key collected: the gate is ready to open.'
-              : 'Start: collect the key, open the gate, and reach the exit.';
+              : shellRestarted
+                ? 'Restarted: objective flags returned to their initial values.'
+                : 'Start: collect the key, open the gate, and reach the exit.';
     setShellText('scene-name', sceneLabel);
     setShellText('run-state', runState);
     setShellText('status-message', status);
@@ -1820,11 +1822,59 @@
     setHudValue('hud-exit', exitReached ? 'Reached' : gateOpen ? 'Ready' : 'Locked', exitReached ? 'good' : gateOpen ? 'good' : 'warn');
     setHudValue('hud-player', alive ? 'Alive' : 'Down', alive ? 'good' : 'bad');
     setHudValue('hud-tick', String(state.tick || 0));
-    setHudValue('hud-event', latestObjectiveEvent(state));
+    setHudValue('hud-event', shellRestarted ? 'Restarted' : latestObjectiveEvent(state));
+    const pauseToggle = document.getElementById('pause-toggle');
+    if (pauseToggle) pauseToggle.textContent = paused ? 'Resume' : 'Pause';
+  }
+
+  function attachShellControls() {
+    if (shellControlsAttached || typeof document === 'undefined' || !document.getElementById) return;
+    const pauseToggle = document.getElementById('pause-toggle');
+    const restartButton = document.getElementById('restart-button');
+    if (pauseToggle) {
+      pauseToggle.addEventListener('click', () => {
+        shellRestarted = false;
+        if (world.paused) api.resume();
+        else api.pause();
+        renderDebug();
+      });
+    }
+    if (restartButton) {
+      restartButton.addEventListener('click', () => {
+        if (shellStartSave) {
+          loadSave(shellStartSave);
+          shellRestarted = true;
+          world.paused = false;
+          renderDebug();
+        }
+      });
+    }
+    if (typeof addEventListener === 'function') {
+      addEventListener('keydown', (event) => {
+        const key = String(event && event.key ? event.key : '').toLowerCase();
+        if (key === 'p') {
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          shellRestarted = false;
+          if (world.paused) api.resume();
+          else api.pause();
+          renderDebug();
+        } else if (key === 'r') {
+          if (event && typeof event.preventDefault === 'function') event.preventDefault();
+          if (shellStartSave) {
+            loadSave(shellStartSave);
+            shellRestarted = true;
+            world.paused = false;
+            renderDebug();
+          }
+        }
+      });
+    }
+    shellControlsAttached = true;
   }
 
   function renderDebug() {
     renderCanvas();
+    attachShellControls();
     const state = api.getWorldState();
     renderShell(state);
     const debug = document.getElementById('debug');
@@ -1908,6 +1958,7 @@
     seedRng(scene && scene.seed !== undefined ? scene.seed : 0);
     scene3dAnimationSummary({ advanceFrames: 0, frameId: 'tick-0' });
     if (options.sceneSource) activeSceneSource = options.sceneSource;
+    shellRestarted = false;
     const assetMetadata = assets.load(world, world.assetManifest, { resolvePath: sceneRelativeAssetPath });
     const assetDiagnostics = assetMetadata.concat(typeof assets.metadata === 'function' ? assets.metadata() : []);
     const reportedAssets = new Set();
@@ -1961,6 +2012,7 @@
         }
       }
     }
+    shellStartSave = createSave('runtime-shell-start');
     record('runtime.scene.loaded', {
       schemaVersion: world.schemaVersion,
       sceneId: world.sceneId,
@@ -2692,6 +2744,9 @@
 
   let sceneReady = Promise.resolve();
   let activeSceneSource = 'scene.json';
+  let shellStartSave = null;
+  let shellRestarted = false;
+  let shellControlsAttached = false;
 
   function assetBaseForSceneSource(sceneSource) {
     if (typeof sceneSource !== 'string' || !sceneSource) return '';

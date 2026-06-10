@@ -168,6 +168,11 @@
       font-weight: 700;
     }
     .shell-button:hover { border-color: var(--accent); }
+    .control-buttons {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .status-card {
       padding: 14px 16px;
       display: grid;
@@ -225,7 +230,11 @@
           <canvas id="game" width="320" height="180" aria-label="Ouroforge playable 2D runtime canvas"></canvas>
         </div>
         <div id="controls" class="controls-row">
-          <span>Move: Arrow keys / WASD · Jump: Space/Up</span>
+          <span>Move: Arrow keys / WASD · Jump: Space/Up · P: pause/resume · R: restart</span>
+          <span class="control-buttons" aria-label="Game loop controls">
+            <button type="button" class="shell-button" id="pause-toggle">Pause</button>
+            <button type="button" class="shell-button" id="restart-button">Restart</button>
+          </span>
           <span id="fps" aria-live="polite"></span>
         </div>
       </div>
