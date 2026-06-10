@@ -79,3 +79,26 @@ fn tilemap_source_fixture_json_shape_is_stable_for_m128_content() {
         "examples/tilemap-authoring-v1/maps/valid-dogfood.tilemap.json"
     );
 }
+
+#[test]
+fn tilemap_draft_preview_evidence_is_generated_not_source() {
+    let evidence =
+        read_json("examples/tilemap-authoring-v1/evidence/valid-dogfood-draft-preview.json");
+    assert_eq!(
+        evidence["schemaVersion"],
+        "ouroforge.tilemap-draft-preview-evidence.v1"
+    );
+    assert_eq!(evidence["issueRef"], "#2370");
+    assert_eq!(evidence["generatedPreviewOnly"], true);
+    assert_eq!(evidence["changedCells"].as_array().unwrap().len(), 2);
+    assert!(evidence["boundary"]
+        .as_str()
+        .unwrap()
+        .contains("not browser trusted write"));
+    assert!(repo_root()
+        .join(evidence["draftRef"].as_str().unwrap())
+        .exists());
+    assert!(repo_root()
+        .join(evidence["targetTilemapRef"].as_str().unwrap())
+        .exists());
+}
