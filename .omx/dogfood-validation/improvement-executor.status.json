@@ -1,22 +1,23 @@
 {
   "status": "ready_for_verifier",
-  "selected_blocker": "B4 \u2014 export/release readiness evidence is not yet durable on origin/main",
-  "branch": "dogfood/b4-export-readiness-20260610002739",
-  "worktree": "/Users/jh0927/Ouroforge-dogfood-b4-export-readiness-20260610002739",
-  "message": "Focused B4 local/manual export-readiness handoff is ready for focused verifier; no publishing, signing, upload, credential, release automation, hosted, Steam, or Era Q full-3D scope added.",
+  "selected_blocker": "B5 \u2014 gameplay/runtime stress evidence is not yet durable on origin/main",
+  "branch": "dogfood/b5-gameplay-runtime-stress-20260610005954",
+  "worktree": "/Users/jh0927/Ouroforge-dogfood-b5-runtime-stress-20260610005954",
+  "message": "Focused B5 bounded local gameplay/runtime stress evidence handoff is ready for verifier; no product feature, hosted, trusted-write, release, auto-port, foreign-runtime, or Era Q full-3D scope added.",
   "tracked_artifacts": [
-    ".omx/dogfood-validation/export-release-readiness.md",
-    ".omx/dogfood-validation/export-release-readiness.status.json",
-    "examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs",
+    ".omx/dogfood-validation/gameplay-runtime-stress.md",
+    ".omx/dogfood-validation/gameplay-runtime-stress.status.json",
+    "examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs",
     ".omx/dogfood-validation/improvement-executor.status.json",
     ".omx/dogfood-validation/improvement-executor-report.md"
   ],
   "verification": [
-    "node --test examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs \u2014 passed",
-    "node --test examples/godot-plus-demo-performance-v794/performance-budget-smoke.test.cjs \u2014 passed",
-    "cargo test -p ouroforge-core --test build_export_packaging_demo --jobs 2 \u2014 passed",
+    "node --test examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs \u2014 passed",
+    "node --test collect-and-exit e2e/gameplay/behavior/hud/level-set/scenario-matrix/qa-playtest/qa-swarm \u2014 passed 8/8",
+    "cargo test -p ouroforge-core --test runtime_frame_budget_contract --jobs 2 \u2014 passed 3/3",
+    "cargo test -p ouroforge-core --test behavior_contracts behavior_runtime_contract --jobs 2 \u2014 passed 22 targeted tests",
     "git diff --check origin/main...HEAD \u2014 passed"
   ],
-  "updated_at": "2026-06-10T00:32:32.542897Z",
-  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2337"
+  "updated_at": "2026-06-10T01:06:03.232464Z",
+  "pr_url": "https://github.com/shaun0927/Ouroforge/pull/2339"
 }

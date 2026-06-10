@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "dogfood-gameplay-runtime-stress-status-v1",
+  "blocker": "B5",
+  "status": "ready_for_verifier",
+  "evidenceClassification": "bounded-local-runtime-stress-evidence",
+  "demoIdentity": "collect-and-exit-local-rc-candidate",
+  "protectedIssues": {
+    "1": "OPEN",
+    "23": "OPEN"
+  },
+  "mergedPrerequisites": [
+    {
+      "blocker": "B1",
+      "pr": 2334,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/claim-coverage-matrix.md"
+    },
+    {
+      "blocker": "B2",
+      "pr": 2335,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/demo-game-spec.md"
+    },
+    {
+      "blocker": "B3",
+      "pr": 2336,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/pipeline-dry-run.md"
+    },
+    {
+      "blocker": "B4",
+      "pr": 2337,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/export-release-readiness.md"
+    }
+  ],
+  "trackedArtifacts": [
+    ".omx/dogfood-validation/gameplay-runtime-stress.md",
+    ".omx/dogfood-validation/gameplay-runtime-stress.status.json",
+    "examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs"
+  ],
+  "runtimeEvidence": {
+    "fixtureRoot": "examples/playable-demo-v2/collect-and-exit",
+    "scenarioMatrix": "examples/playable-demo-v2/collect-and-exit/scenarios/demo-scenario-matrix.json",
+    "scene": "examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+    "qaPlaytestPlan": "examples/playable-demo-v2/collect-and-exit/qa-playtest-plan.json",
+    "qaSwarmPlan": "examples/playable-demo-v2/collect-and-exit/qa/qa-swarm-plan.json",
+    "nodeRuntimeSmokesPassed": 8,
+    "runtimeFrameBudgetRustTestsPassed": 3,
+    "behaviorRuntimeTargetedTestsPassed": 22,
+    "boundedFailures": [
+      "hazard_contact_loss",
+      "objective_blocked",
+      "designed-gameplay-failure"
+    ],
+    "generatedStatePolicy": "temp_or_ignored_only_no_committed_runtime_outputs"
+  },
+  "forbiddenScopeIntroduced": false,
+  "forbiddenScope": [
+    "product feature implementation",
+    "Era Q M102-M106 implementation",
+    "hosted/cloud/multi-user behavior",
+    "trusted browser/source writes",
+    "auto-port",
+    "live bridge",
+    "foreign-runtime embedding",
+    "release automation",
+    "signing",
+    "upload",
+    "publishing",
+    "credential flow",
+    "Steam depot flow"
+  ],
+  "verification": [
+    "node --test examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs",
+    "node --test examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/behavior-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/hud-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/level-set-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/scenario-matrix-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/qa-playtest-smoke.test.cjs examples/playable-demo-v2/collect-and-exit/qa-swarm-smoke.test.cjs",
+    "cargo test -p ouroforge-core --test runtime_frame_budget_contract --jobs 2",
+    "cargo test -p ouroforge-core --test behavior_contracts behavior_runtime_contract --jobs 2",
+    "git diff --check origin/main...HEAD"
+  ]
+}

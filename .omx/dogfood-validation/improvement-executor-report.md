@@ -1,43 +1,53 @@
-# Dogfood Improvement Executor Report — B4 Export / Release Readiness
+# Dogfood Improvement Executor Report — B5 Gameplay / Runtime Stress
 
-PR: https://github.com/shaun0927/Ouroforge/pull/2337
+PR: https://github.com/shaun0927/Ouroforge/pull/2339
 
-Updated: `2026-06-10T00:32:32.542897Z`
+Updated: `2026-06-10T01:06:03.232464Z`
 
 ## Selection
 
-Governor iteration 20 selected **B4 — export/release readiness evidence is not yet durable on origin/main**. B1, B2, and B3 are accepted via merged PRs #2334, #2335, and #2336. No open B4 PR existed before this branch was created.
+Governor iteration 25 selected **B5 — gameplay/runtime stress evidence is not yet durable on origin/main**. B1 through B4 are accepted by merged PR/origin evidence, and no B5 PR existed before this branch was created.
 
 ## Scope delivered
 
-Focused evidence-only B4 handoff from fresh `origin/main`:
+Focused evidence-only B5 handoff from fresh `origin/main`:
 
-- Added `.omx/dogfood-validation/export-release-readiness.md`.
-- Added `.omx/dogfood-validation/export-release-readiness.status.json`.
-- Added `examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs`.
+- Added `.omx/dogfood-validation/gameplay-runtime-stress.md`.
+- Added `.omx/dogfood-validation/gameplay-runtime-stress.status.json`.
+- Added `examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs`.
 - Updated executor status/report for the current handoff.
 
-The report ties B4 to merged B1/B2/B3 artifacts, records local/manual package fixture refs, makes the retained release-candidate package artifact an explicit gap, joins pipeline evidence to package metadata/profile evidence, and cites package probe/performance boundaries.
+The report cites B1 claim matrix, B2 compact demo spec, B3 pipeline evidence, and B4 export readiness; records scenario pass/fail evidence, stress limits, command/output refs, bounded failure cases, and generated-state boundaries.
 
 ## Guardrails preserved
 
 - #1 remains OPEN and #23 remains OPEN.
 - Era Q M102–M106 remain deferred/non-goal; no full-3D implementation was added.
-- No release automation, signing, notarization, upload, publishing, Steam depot flow, credential flow, hosted/cloud/multi-user behavior, trusted browser/source writes, auto-port, or foreign-runtime embedding was added.
+- No product feature implementation, hosted/cloud/multi-user scope, trusted browser/source writes, auto-port, live bridge, foreign-runtime embedding, release automation, signing, upload, publishing, credential flow, or Steam depot flow was added.
 - No production-ready, store-ready, commercial release, native export, Godot replacement, full Godot parity, or shipped-game maturity claim was made.
-- Generated package outputs remain generated/ignored; no generated package artifact was committed.
+- Generated runtime/playtest outputs remain temp or ignored; no generated runtime artifact was committed.
 
 ## Verification
 
-Passed:
+Passed before final PR creation:
 
 ```bash
-node --test examples/dogfood-export-release-readiness-v1/export-release-readiness-smoke.test.cjs
-node --test examples/godot-plus-demo-performance-v794/performance-budget-smoke.test.cjs
-cargo test -p ouroforge-core --test build_export_packaging_demo --jobs 2
-git diff --check origin/main...HEAD
+node --test examples/dogfood-gameplay-runtime-stress-v1/gameplay-runtime-stress-smoke.test.cjs
+node --test \
+  examples/playable-demo-v2/collect-and-exit/e2e-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/gameplay-loop-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/behavior-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/hud-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/level-set-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/scenario-matrix-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/qa-playtest-smoke.test.cjs \
+  examples/playable-demo-v2/collect-and-exit/qa-swarm-smoke.test.cjs
+cargo test -p ouroforge-core --test runtime_frame_budget_contract --jobs 2
+cargo test -p ouroforge-core --test behavior_contracts behavior_runtime_contract --jobs 2
 ```
+
+Final diff hygiene passed: `git diff --check origin/main...HEAD`.
 
 ## Verifier handoff
 
-Verifier should inspect that the PR payload is tracked, the B4 smoke passes, and the report wording stays conservative: local/manual release-candidate evidence only, not public release or store readiness.
+Verifier should inspect that the PR payload is tracked, the B5 smoke passes, targeted runtime/playtest evidence passes, and the report wording stays conservative: bounded local gameplay/runtime stress evidence only, not production/game quality or broad engine readiness.
