@@ -5,7 +5,7 @@ Linked issue claim source: [#1](https://github.com/shaun0927/Ouroforge/issues/1)
 Issue #1 state at capture: **OPEN**.
 Issue #23 state at capture: **OPEN**.
 Matrix version: `dogfood-claim-coverage-v1`
-Updated: `2026-06-09T21:16:00Z`
+Updated: `2026-06-09T21:54:00Z`
 
 ## Purpose
 
@@ -25,16 +25,16 @@ Allowed gap classifications: `verified`, `unverified`, `deferred`, `non-goal`.
 | OF-005 | Local-first Phoenix LiveView Studio posture is documented; hosted/multi-user remains deferred. | https://github.com/shaun0927/Ouroforge/issues/1 | Studio UX validation | docs/roadmap/architecture.md; docs/distributed-elixir-design.md | verified | verified | Local-first posture is documented; hosted/multi-user is not claimed active. |
 | OF-006 | Era Q M101 is DEFER and M102–M106 remain GO-gated, deferred, and unimplemented absent future explicit GO. | https://github.com/shaun0927/Ouroforge/issues/1 | Roadmap governance | docs/roadmap/active/era-q.md; docs/roadmap/progress.json | deferred | deferred | This protects against accidentally treating full-3D M102–M106 as active implementation work. |
 | OF-007 | External-engine on-ramp scope is source-only/clean-room; no auto-port, live bridge, or runtime embedding is claimed. | https://github.com/shaun0927/Ouroforge/issues/1 | Migration/on-ramp | docs/roadmap/active/era-p.md; docs/roadmap/milestones/era-r.md | verified | verified | Existing roadmap docs keep source-only and clean-room boundaries explicit. |
-| OF-008 | Compact dogfood demo release-candidate evidence is not yet complete until dependent lane reports exist. | https://github.com/shaun0927/Ouroforge/issues/1 | Dogfood integration | .omx/dogfood-validation/blocker-driven-pr-plan.md | unverified | unverified | B2–B5 remain required; this row prevents overclaiming production/store readiness. |
-| OF-009 | Pipeline dry-run evidence for the compact demo must exist before claiming reproducible local pipeline readiness. | https://github.com/shaun0927/Ouroforge/issues/1 | Pipeline dry-run | .omx/dogfood-validation/blocker-driven-pr-plan.md | unverified | unverified | B3 remains open work after this PR. |
+| OF-008 | Compact dogfood demo release-candidate evidence is not yet complete until dependent lane reports exist. | https://github.com/shaun0927/Ouroforge/issues/1 | Dogfood integration | .omx/dogfood-validation/blocker-driven-pr-plan.md | unverified | unverified | B2 and B3 now have evidence; B4–B5 remain required and this row prevents overclaiming production/store readiness. |
+| OF-009 | Pipeline dry-run evidence for the compact demo must exist before claiming reproducible local pipeline readiness. | https://github.com/shaun0927/Ouroforge/issues/1 | Pipeline dry-run | .omx/dogfood-validation/pipeline-dry-run.md | verified | verified | B3 evidence exists and is classified failed; it is evidence completeness, not green runtime/readiness. |
 | OF-010 | Runtime stress evidence for the compact demo must exist before claiming runtime stability/scenario stress readiness. | https://github.com/shaun0927/Ouroforge/issues/1 | Gameplay runtime stress | .omx/dogfood-validation/blocker-driven-pr-plan.md | unverified | unverified | B5 remains open work after this PR. |
 | PROTECT-001 | #1 remains open; this PR must not close or mutate it. | https://github.com/shaun0927/Ouroforge/issues/1 | Integration lead | .omx/dogfood-validation/claim-coverage-matrix.md | verified | non-goal | Guardrail row: the PR body must not contain closing keywords for #1. |
 | PROTECT-002 | #23 remains open; this PR must not close or mutate it. | https://github.com/shaun0927/Ouroforge/issues/23 | Integration lead | .omx/dogfood-validation/claim-coverage-matrix.md | verified | non-goal | Guardrail row: the PR body must not contain closing keywords for #23. |
 
 ## Gap register
 
-- B2: `.omx/dogfood-validation/demo-game-spec.md` remains missing; compact demo target scope is unverified.
-- B3: `.omx/dogfood-validation/pipeline-dry-run.md` remains missing; local pipeline dry-run evidence is unverified.
+- B2: `.omx/dogfood-validation/demo-game-spec.md` exists and defines the compact demo target scope.
+- B3: `.omx/dogfood-validation/pipeline-dry-run.md` exists and records failed-classified local dry-run evidence; downstream runtime/scenario fixes remain separate work.
 - B4: `.omx/dogfood-validation/export-release-readiness.md` remains missing; local/manual release readiness evidence is unverified.
 - B5: `.omx/dogfood-validation/gameplay-runtime-stress.md` remains missing; runtime stress evidence is unverified.
 - Era Q M102–M106: deferred/non-goal for this PR; no full-3D implementation is added.
