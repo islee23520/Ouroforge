@@ -3378,6 +3378,19 @@ const OuroforgeCockpit = (() => {
 
   const ENTITY_COMPONENT_SUPPORTED_TYPES = ['string', 'number', 'boolean', 'enum', 'vector'];
 
+  const ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST = [
+    'speed', 'visible', 'facing', 'position',
+    'transform.position', 'transform.rotation', 'transform.scale',
+    'status.enabled', 'status.locked', 'status.visible',
+    'trigger.enabled', 'trigger.target', 'trigger.kind',
+    'hud.label', 'hud.text', 'hud.visible', 'hud.value',
+  ];
+
+  function entityComponentFieldAllowlisted(name) {
+    const field = String(name || '');
+    return ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.includes(field) || ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.some((prefix) => field.startsWith(`${prefix}.`));
+  }
+
   function entityComponentSupportedType(type) {
     return ENTITY_COMPONENT_SUPPORTED_TYPES.includes(String(type || ''));
   }
@@ -3404,17 +3417,25 @@ const OuroforgeCockpit = (() => {
     const components = Array.isArray(source.components) ? source.components.map((component, cIndex) => {
       const fields = Array.isArray(component?.fields) ? component.fields.map((field, fIndex) => {
         const type = String(field?.type || 'unknown');
+        const name = field?.name || `field-${fIndex + 1}`;
         const supported = entityComponentSupportedType(type);
-        const editable = field?.editable !== false && field?.unsafe !== true && supported;
+        const allowlisted = entityComponentFieldAllowlisted(name);
+        const unsafe = field?.unsafe === true;
+        const editable = field?.editable !== false && !unsafe && supported && allowlisted;
+        const reason = field?.reason
+          || (!supported ? `Field type "${type}" is outside primitive draft editing.`
+            : !allowlisted ? `Field "${name}" is outside the Signal Gate component edit allowlist and is read-only.`
+              : '');
         return {
-          name: field?.name || `field-${fIndex + 1}`,
+          name,
           type,
           value: field?.value,
           options: Array.isArray(field?.options) ? field.options : [],
           supported,
+          allowlisted,
           editable,
-          unsafe: field?.unsafe === true,
-          reason: field?.reason || (supported ? '' : `Field type "${type}" is outside primitive draft editing.`),
+          unsafe,
+          reason,
         };
       }) : [];
       return {
@@ -3443,6 +3464,7 @@ const OuroforgeCockpit = (() => {
       reasons.push(`Unsupported field type "${type}" is outside primitive draft editing.`);
       return reasons;
     }
+    if (!entityComponentFieldAllowlisted(field?.name)) reasons.push(field?.reason || `Field "${field?.name || 'unknown'}" is outside the Signal Gate component edit allowlist and is read-only.`);
     if (field?.editable === false) reasons.push('Field is read-only and cannot produce a draft edit.');
     if (field?.unsafe === true) reasons.push(field?.reason || 'Field is flagged unsafe and is blocked.');
     switch (type) {
@@ -3531,7 +3553,7 @@ const OuroforgeCockpit = (() => {
           const fieldRows = component.fields.length
             ? component.fields.map((field) => {
                 const valueText = field.value === undefined ? '(no value)' : JSON.stringify(field.value);
-                const editLabel = field.editable ? 'editable (draft only)' : (field.unsafe ? 'unsafe · blocked' : (field.supported ? 'read-only' : 'unsupported type · blocked'));
+                const editLabel = field.editable ? 'editable (draft only)' : (field.unsafe ? 'unsafe · blocked' : (!field.supported ? 'unsupported type · blocked' : (!field.allowlisted ? 'unsupported by Signal Gate allowlist · read-only' : 'read-only')));
                 const optionsText = field.type === 'enum' && field.options.length ? ` · options: ${field.options.join(', ')}` : '';
                 const reasonText = !field.editable && field.reason ? `<br><small class="warn">${escapeText(field.reason)}</small>` : '';
                 const control = field.editable
@@ -3545,7 +3567,7 @@ const OuroforgeCockpit = (() => {
       : '<p class="empty compact">No components recorded for the selected entity.</p>';
     return `<section id="entity-component-inspector" class="panel"><h2>Entity / component inspector</h2>
       <p class="hint">${escapeText(model.boundary)} Selection and inputs are presentation-only; valid primitive edits produce draft operations consumed by the Studio draft authoring model, never trusted writes. Trusted apply requires Safe Source Apply handoff.</p>
-      <p class="hint">Supported primitive field types: ${escapeText(model.supportedTypes.join(', '))}.</p>
+      <p class="hint">Supported primitive field types: ${escapeText(model.supportedTypes.join(', '))}. Signal Gate edit allowlist: ${escapeText(ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.join(', '))}.</p>
       <h4>Entities (selection is read-only)</h4><ul>${entityRows}</ul>
       <h4>Components and primitive fields</h4>${componentRows}
     </section>`;
@@ -5980,7 +6002,7 @@ const OuroforgeCockpit = (() => {
     </section>`;
   }
 
-  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderProvenanceAuditPanel, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, classifyStudioSourceGeneratedPath, studioSourceGeneratedBrowserModel, renderStudioSourceGeneratedBrowserSurface, liveObservabilityManifestEvidenceModel, renderLiveObservabilityEvidenceSurface, renderFullStudioEditorDemoSurface, fullStudioEditorDemoModel, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, loopCoverageInspectionModel, renderLoopCoverageInspectionSurface, trustGradientInspectionModel, renderTrustGradientInspectionSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioPluginPanelModel, renderStudioPluginPanelSurface, studioExportPackageInspectionModel, renderStudioExportPackageInspectionSurface, studioScenarioPanelModel, renderStudioScenarioPanelSurface, studioAssetBrowserModel, renderStudioAssetBrowserSurface, filterStudioAssets, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, studioSceneEditorInteractionSpec, renderStudioSceneEditorInteractionSpecSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioWorkspaceUxContract, renderWorkspaceUxContractSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
+  return { EDITABLE_FIELDS, READ_ONLY_FIELDS, applyEdit, artifactHref, buildEvidenceTimelineModel, callPreviewProbe, cliCommand, compareRunsCommand, dashboardExportCommand, escapeText, getValue, init, latestRun, studioPerformanceBudget, evaluateStudioPerformanceBudget, renderStudioPerformanceBudgetSurface, loadDashboardData, normalizeStudioLevelDesignInspection, previewWindow, projectRunCommand, projectValidateCommand, qaCommand, qaTransactionCommand, readPreviewProbe, reloadPreview, renderAgentHandoffSurface, renderAgentRoleModelSurface, renderAgentWorkPackageSurface, renderQaSwarmInspectionSurface, renderOwnershipPolicySurface, renderProductionTaskBoardSurface, renderProductionEvidenceBundleSurface, prototypePlanningInspectionModel, renderPrototypePlanningInspectionSurface, renderReviewCriticGateSurface, renderQaAgentWorkQueueSurface, renderPerformanceRegressionLaneSurface, renderAssetPreviewEvidenceSurface, renderBehaviorEvidenceLifecycleSurface, renderPluginRegistryBrowserSurface, renderAuthoringProvenanceSurface, renderProvenanceAuditPanel, renderCameraLayerInspectionSurface, renderCommandGenerationPanel, renderComparisonSurface, renderEngineExpansionSurface, renderStudio3dInspectionSurface, renderEvidenceBrowser, classifyStudioSourceGeneratedPath, studioSourceGeneratedBrowserModel, renderStudioSourceGeneratedBrowserSurface, liveObservabilityManifestEvidenceModel, renderLiveObservabilityEvidenceSurface, renderFullStudioEditorDemoSurface, fullStudioEditorDemoModel, renderEvidenceFidelitySurface, renderEvidencePane, renderEvidenceTimelineSurface, renderEvidenceDiagnosticsSurface, renderEvidenceComparisonView, fidelityStatusClass, renderExpressiveComponentHudSurface, renderRenderBreakdownInspectionSurface, renderInputActionInspectionSurface, renderRuntimeEventInspectionSurface, renderRuntimeProfilerInspectionSurface, renderRuntimeStateInspectionSurface, renderRuntimeAssetLoadingSurface, renderVisualDiffPreviewSurface, renderVisualComparisonEvidenceSurface, renderEvaluatorDepthInspectionSurface, renderStudioLevelDesignInspectionSurface, behaviorDraftReadModel, behaviorDraftPreviewCommand, behaviorInspectionModel, renderBehaviorDraftStatusSurface, renderBehaviorListPanel, renderBehaviorEventSignalPanel, renderBehaviorStateMachinePanel, renderBehaviorAbilityActionPanel, renderBehaviorReviewApplyStatusSurface, renderTilemapDraftControl, renderTilemapDraftPreviewSurface, renderInspector, renderIntegration, renderJournalSurface, renderLoopDryRunSurface, renderLoopExecutionSurface, renderLoopEvidenceBundleSurface, renderLoopRecoverySurface, renderStudioLoopCockpitSurface, loopCoverageInspectionModel, renderLoopCoverageInspectionSurface, trustGradientInspectionModel, renderTrustGradientInspectionSurface, renderStudioMultiAgentPipelineInspectionSurface, renderMutationReviewSurface, renderEvolveDepthInspectionSurface, renderStudioSceneTreeInspectorSurface, studioPluginPanelModel, renderStudioPluginPanelSurface, studioExportPackageInspectionModel, renderStudioExportPackageInspectionSurface, studioScenarioPanelModel, renderStudioScenarioPanelSurface, studioAssetBrowserModel, renderStudioAssetBrowserSurface, filterStudioAssets, studioSceneCanvasModel, renderStudioSceneCanvasSurface, studioCanvasTransformDraft, studioCommandRegistry, filterStudioCommands, isBlockedStudioCommand, resolveStudioCommand, renderStudioCommandPaletteSurface, renderProposalRationaleSurface, renderReviewDecisionSurface, renderRegressionMatrixSurface, renderRegressionPromotionSurface, renderProjectRunSurface, renderProjectWorkspaceSurface, renderPreview, renderPreviewControls, renderQaPanel, renderReadOnlyFields, renderReviewCockpitStageCard, renderStudioReviewCockpitCards, renderRunCommandContext, renderSemanticComparisonSummary, renderSourcePatchEvidenceBundleSurface, renderSourcePatchApplyTransactionSurface, renderSourcePatchStaleTargetGuardSurface, sourceApplyReviewReadModel, renderSourceApplyReviewSurface, exportInspectionReadModel, renderExportInspectionSurface, projectOverviewReadModel, renderProjectOverviewSurface, renderSourceApplyWorktreeContextSurface, renderRouteAttemptEvidenceSurface, runtimeReloadPayloadCommand, sceneMutationApplyCommand, renderSceneMutationLifecycleSurface, renderStudioAssetInspectorSurface, studioSceneEditorInteractionSpec, renderStudioSceneEditorInteractionSpecSurface, renderStudioDraftAuthoringSurface, renderStudioSourceApplyHandoffSurface, studioWorkspaceUxContract, renderWorkspaceUxContractSurface, studioSourceApplyHandoffModel, studioDraftOperationModel, renderStudioDraftOperationModelSurface, validateStudioDraftOperation, studioDraftOperationPreviewDiff, ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST, entityComponentFieldAllowlisted, entityComponentInspectorModel, renderEntityComponentInspectorSurface, entityComponentDraftEdit, entityComponentValidateValue, studioDraftAuthoringState, studioDraftControlModel, studioDraftPreviewCommand, sceneReloadValidateCommand, seedValidateCommand, sceneValidateCommand, transactionCommand, renderReplaySurface, renderStudioAccessibilityNavSurface, renderStudioGaps, renderStudioNavigation, renderTree, resolvePreviewProbe, studioKeyboardNavModel, nextStudioFocus, restoreStudioFocus, renderStudioDiagnosticsSurface, studioDiagnosticsModel, studioDiagnosticsCounts, studioErrorBoundary, studioSurfaceSummary, validateEdit, WORKSPACE_LAYOUT_STORAGE_KEY, WORKSPACE_LAYOUT_VERSION, defaultWorkspaceLayout, normalizeWorkspaceLayout, loadWorkspaceLayout, saveWorkspaceLayout, resetWorkspaceLayout };
 })();
 
 if (typeof window !== 'undefined') {

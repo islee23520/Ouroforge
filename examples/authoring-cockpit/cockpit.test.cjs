@@ -2658,6 +2658,36 @@ const missingDigestDraft2366 = cockpit.studioCanvasTransformDraft({ id: 'player'
 assert.equal(missingDigestDraft2366.validationStatus, 'blocked');
 assert.match(missingDigestDraft2366.blockedReasons.join(' '), /base digest is required/);
 
+// #2367 component inspector: Signal Gate allowlist edits only; unsupported fields remain visible read-only.
+assert.ok(cockpit.ENTITY_COMPONENT_SIGNAL_GATE_ALLOWLIST.includes('speed'));
+assert.equal(cockpit.entityComponentFieldAllowlisted('speed'), true);
+assert.equal(cockpit.entityComponentFieldAllowlisted('script_ref'), false);
+const allowlistRun2367 = {
+  entity_component_inspector: {
+    present: true,
+    selected_entity: 'player',
+    entities: [{ id: 'player', name: 'Player', selected: true }],
+    components: [{ entity_id: 'player', component: 'SignalGate', path: 'examples/game-runtime/scene.json', fields: [
+      { name: 'speed', type: 'number', value: 4, editable: true },
+      { name: 'script_ref', type: 'string', value: 'scripts/player.gd', editable: true },
+      { name: 'inventory', type: 'object', value: { slots: 4 }, editable: true },
+    ] }],
+  },
+};
+const allowlistModel2367 = cockpit.entityComponentInspectorModel(allowlistRun2367);
+assert.equal(allowlistModel2367.components[0].fields.find((f) => f.name === 'speed').editable, true);
+assert.equal(allowlistModel2367.components[0].fields.find((f) => f.name === 'script_ref').editable, false);
+assert.match(allowlistModel2367.components[0].fields.find((f) => f.name === 'script_ref').reason, /Signal Gate component edit allowlist/);
+assert.equal(allowlistModel2367.components[0].fields.find((f) => f.name === 'inventory').editable, false);
+const allowlistMarkup2367 = cockpit.renderEntityComponentInspectorSurface(allowlistRun2367);
+assert.match(allowlistMarkup2367, /unsupported by Signal Gate allowlist · read-only/);
+assert.match(allowlistMarkup2367, /script_ref/);
+assert.match(allowlistMarkup2367, /inventory/);
+const blockedField2367 = allowlistModel2367.components[0].fields.find((f) => f.name === 'script_ref');
+const blockedComponentDraft2367 = cockpit.entityComponentDraftEdit({ id: 'player', component: 'SignalGate', path: 'examples/game-runtime/scene.json' }, blockedField2367, 'scripts/other.gd');
+assert.equal(blockedComponentDraft2367.validationStatus, 'blocked');
+assert.match(blockedComponentDraft2367.blockedReasons.join(' '), /allowlist/);
+
 console.log('authoring cockpit smoke test passed');
 
 assert.match(cockpit.renderMutationReviewSurface(run), /Review decisions/);
