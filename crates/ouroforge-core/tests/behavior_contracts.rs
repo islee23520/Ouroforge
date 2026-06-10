@@ -120,7 +120,8 @@ mod behavior_runtime_contract {
 
     #[test]
     fn loads_validated_behavior_artifact_into_runtime_state() {
-        let artifact = BehaviorArtifact::from_json_str(valid_fixture()).expect("valid behavior parses");
+        let artifact =
+            BehaviorArtifact::from_json_str(valid_fixture()).expect("valid behavior parses");
         let state = artifact.runtime_state();
 
         assert_eq!(artifact.artifact_id, "behavior-runtime-demo");
@@ -538,7 +539,9 @@ mod behavior_runtime_contract {
     fn rejects_malformed_or_untrusted_behavior_artifacts_at_loader_boundary() {
         let invalid_cases = [
             (
-                include_str!("../../../examples/behavior-runtime-v1/invalid/missing-validated-by.json"),
+                include_str!(
+                    "../../../examples/behavior-runtime-v1/invalid/missing-validated-by.json"
+                ),
                 "missing field `validatedBy`",
             ),
             (
@@ -548,7 +551,9 @@ mod behavior_runtime_contract {
                 "validatedBy.validationStatus must be passed",
             ),
             (
-                include_str!("../../../examples/behavior-runtime-v1/invalid/bad-state-transition.json"),
+                include_str!(
+                    "../../../examples/behavior-runtime-v1/invalid/bad-state-transition.json"
+                ),
                 "state transition target must reference a declared state",
             ),
         ];
@@ -637,14 +642,17 @@ mod behavior_runtime_contract {
     }
 
     fn behavior_draft_fixture_value() -> serde_json::Value {
-        serde_json::from_str(behavior_draft_fixture_str("valid")).expect("behavior draft fixture json")
+        serde_json::from_str(behavior_draft_fixture_str("valid"))
+            .expect("behavior draft fixture json")
     }
 
     fn parse_behavior_draft_str(input: &str) -> Result<BehaviorDraftArtifact, anyhow::Error> {
         BehaviorDraftArtifact::from_json_str(input)
     }
 
-    fn parse_behavior_draft(value: serde_json::Value) -> Result<BehaviorDraftArtifact, anyhow::Error> {
+    fn parse_behavior_draft(
+        value: serde_json::Value,
+    ) -> Result<BehaviorDraftArtifact, anyhow::Error> {
         BehaviorDraftArtifact::from_json_str(
             &serde_json::to_string_pretty(&value).expect("draft fixture serializes"),
         )
@@ -670,15 +678,17 @@ mod behavior_runtime_contract {
             BehaviorDraftValidationStatus::Stale
         );
 
-        let blocked = parse_behavior_draft_str(behavior_draft_fixture_str("missing-evidence-blocked"))
-            .expect("blocked missing evidence draft validates");
+        let blocked =
+            parse_behavior_draft_str(behavior_draft_fixture_str("missing-evidence-blocked"))
+                .expect("blocked missing evidence draft validates");
         assert_eq!(
             blocked.validation_status,
             BehaviorDraftValidationStatus::Blocked
         );
 
-        let unsupported = parse_behavior_draft_str(behavior_draft_fixture_str("unsupported-blocked"))
-            .expect("blocked unsupported behavior draft validates");
+        let unsupported =
+            parse_behavior_draft_str(behavior_draft_fixture_str("unsupported-blocked"))
+                .expect("blocked unsupported behavior draft validates");
         assert_eq!(
             unsupported.validation_status,
             BehaviorDraftValidationStatus::Blocked
@@ -743,7 +753,8 @@ mod behavior_runtime_contract {
         let mut blocked = behavior_draft_fixture_value();
         blocked["proposedBehavior"] = unsupported_behavior;
         blocked["validationStatus"] = serde_json::json!("blocked");
-        blocked["blockedReasons"] = serde_json::json!(["unsupported behavior action requires review"]);
+        blocked["blockedReasons"] =
+            serde_json::json!(["unsupported behavior action requires review"]);
         parse_behavior_draft(blocked).expect("unsupported behavior can be visible and blocked");
 
         let malformed = serde_json::from_str(behavior_draft_fixture_str("malformed-operation"))
@@ -771,7 +782,8 @@ mod behavior_runtime_contract {
             ),
             ("malformed-operation", "action id must not be empty"),
         ] {
-            let error = parse_behavior_draft_str(behavior_draft_fixture_str(name)).expect_err(expected);
+            let error =
+                parse_behavior_draft_str(behavior_draft_fixture_str(name)).expect_err(expected);
             assert!(format!("{error:?}").contains(expected), "{error:?}");
         }
     }
@@ -804,7 +816,8 @@ mod behavior_runtime_contract {
     }
 
     fn behavior_apply_fixture_value() -> serde_json::Value {
-        serde_json::from_str(behavior_apply_fixture_str("ready")).expect("behavior apply fixture json")
+        serde_json::from_str(behavior_apply_fixture_str("ready"))
+            .expect("behavior apply fixture json")
     }
 
     fn parse_behavior_apply(
@@ -877,7 +890,8 @@ mod behavior_runtime_contract {
                 "unsupported behavior must remain blocked before apply",
             ),
         ] {
-            let error = parse_behavior_apply_str(behavior_apply_fixture_str(name)).expect_err(expected);
+            let error =
+                parse_behavior_apply_str(behavior_apply_fixture_str(name)).expect_err(expected);
             assert!(format!("{error:?}").contains(expected), "{error:?}");
         }
     }
@@ -1261,9 +1275,10 @@ mod behavior_runtime_contract {
 
     #[test]
     fn behavior_apply_transaction_read_model_preserves_rollback_rerun_and_evidence_refs() {
-        let read_model =
-            behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("ready"))
-                .expect("ready transaction read model");
+        let read_model = behavior_apply_transaction_read_model_from_json_str(
+            behavior_apply_fixture_str("ready"),
+        )
+        .expect("ready transaction read model");
 
         assert_eq!(
             read_model.schema_version,
@@ -1306,9 +1321,10 @@ mod behavior_runtime_contract {
 
     #[test]
     fn behavior_apply_transaction_read_model_keeps_blocked_state_visible() {
-        let read_model =
-            behavior_apply_transaction_read_model_from_json_str(behavior_apply_fixture_str("stale"))
-                .expect("stale transaction read model");
+        let read_model = behavior_apply_transaction_read_model_from_json_str(
+            behavior_apply_fixture_str("stale"),
+        )
+        .expect("stale transaction read model");
 
         assert_eq!(read_model.status, "stale");
         assert!(!read_model.trusted_apply_ready);

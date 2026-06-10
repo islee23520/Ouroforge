@@ -120,8 +120,9 @@ fn classifier_fixtures_validate_and_roll_up_status() {
         ("classifier.inconclusive.fixture.json", "blocked"),
         ("classifier.stale.fixture.json", "stale"),
     ] {
-        let artifact = QaErrorClassifierArtifact::from_json_str(&error_classifier_read_fixture(name))
-            .unwrap_or_else(|error| panic!("{name}: {error:#}"));
+        let artifact =
+            QaErrorClassifierArtifact::from_json_str(&error_classifier_read_fixture(name))
+                .unwrap_or_else(|error| panic!("{name}: {error:#}"));
         assert_eq!(artifact.computed_status(), expected_status, "{name} status");
         let read_model = artifact.read_model();
         assert_eq!(read_model.status, expected_status);
@@ -276,9 +277,10 @@ fn bundle_fixtures_validate_and_roll_up_status() {
 
 #[test]
 fn complete_bundle_covers_every_component_type() {
-    let artifact =
-        QaEvidenceBundleArtifact::from_json_str(&evidence_bundle_read_fixture("bundle.complete.fixture.json"))
-            .expect("complete");
+    let artifact = QaEvidenceBundleArtifact::from_json_str(&evidence_bundle_read_fixture(
+        "bundle.complete.fixture.json",
+    ))
+    .expect("complete");
     let read_model = artifact.read_model();
     for component_type in [
         "scenario-candidates",
@@ -499,8 +501,9 @@ fn policy_fixtures_validate_and_classify() {
         ("policy.unsupported.fixture.json", "unsupported"),
         ("policy.stale.fixture.json", "stale"),
     ] {
-        let artifact = FlakeRerunPolicyArtifact::from_json_str(&flake_rerun_policy_read_fixture(name))
-            .unwrap_or_else(|error| panic!("{name}: {error:#}"));
+        let artifact =
+            FlakeRerunPolicyArtifact::from_json_str(&flake_rerun_policy_read_fixture(name))
+                .unwrap_or_else(|error| panic!("{name}: {error:#}"));
         assert_eq!(artifact.computed_classification(), expected, "{name}");
         let read_model = artifact.read_model();
         assert_eq!(read_model.classification, expected);
@@ -605,8 +608,9 @@ fn budget_fixtures_validate_and_classify() {
         ("budget.unsupported.fixture.json", "unsupported"),
         ("budget.baseline-change.fixture.json", "fail"),
     ] {
-        let artifact = PerformanceBudgetArtifact::from_json_str(&performance_budget_read_fixture(name))
-            .unwrap_or_else(|error| panic!("{name}: {error:#}"));
+        let artifact =
+            PerformanceBudgetArtifact::from_json_str(&performance_budget_read_fixture(name))
+                .unwrap_or_else(|error| panic!("{name}: {error:#}"));
         assert_eq!(
             artifact.computed_status().as_str(),
             expected_status,
@@ -684,9 +688,10 @@ fn invalid_budget_fixtures_fail_closed() {
             "boundary must state",
         ),
     ] {
-        let error = PerformanceBudgetArtifact::from_json_str(&performance_budget_read_fixture(name))
-            .expect_err(name)
-            .to_string();
+        let error =
+            PerformanceBudgetArtifact::from_json_str(&performance_budget_read_fixture(name))
+                .expect_err(name)
+                .to_string();
         assert!(error.contains(expected), "{name}: {error}");
     }
 }
@@ -722,8 +727,9 @@ fn budget_docs_keep_governance_and_wording_boundaries() {
 
 #[test]
 fn demo_manifest_validates_and_wires_all_stages() {
-    let manifest = QaPlaytestDemoManifest::from_json_str(&playtest_demo_read_fixture("demo.manifest.json"))
-        .unwrap_or_else(|error| panic!("demo.manifest.json: {error:#}"));
+    let manifest =
+        QaPlaytestDemoManifest::from_json_str(&playtest_demo_read_fixture("demo.manifest.json"))
+            .unwrap_or_else(|error| panic!("demo.manifest.json: {error:#}"));
     let read_model = manifest.read_model();
     assert_eq!(read_model.stage_count, 13);
     assert_eq!(read_model.present_stage_count, 13);
@@ -857,7 +863,8 @@ fn run_matrix_verdicts_cover_full_taxonomy() {
         "matrix.stale.fixture.json",
         "matrix.unsupported.fixture.json",
     ] {
-        let artifact = QaRunMatrixArtifact::from_json_str(&run_matrix_read_fixture(name)).expect(name);
+        let artifact =
+            QaRunMatrixArtifact::from_json_str(&run_matrix_read_fixture(name)).expect(name);
         for row in &artifact.rows {
             seen.insert(row.verdict.clone());
         }

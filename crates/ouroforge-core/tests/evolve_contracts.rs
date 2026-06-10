@@ -256,7 +256,8 @@ mod evolve_campaign_convergence_contract {
     };
 
     fn fixture(name: &str) -> EvolveCampaignArtifact {
-        let path = super::workspace_path(&format!("examples/evolve-campaign-v1/convergence/{name}"));
+        let path =
+            super::workspace_path(&format!("examples/evolve-campaign-v1/convergence/{name}"));
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|err| panic!("fixture {} exists: {err}", path.display()));
         serde_json::from_str(&text).expect("fixture parses")
@@ -264,7 +265,8 @@ mod evolve_campaign_convergence_contract {
 
     #[test]
     fn converged_campaign_reports_passing_iteration_and_no_diagnosis() {
-        let outcome = compute_evolve_campaign_outcome(&fixture("converged.fixture.json")).expect("ok");
+        let outcome =
+            compute_evolve_campaign_outcome(&fixture("converged.fixture.json")).expect("ok");
         assert_eq!(outcome.schema_version, EVOLVE_CAMPAIGN_SCHEMA_VERSION);
         assert_eq!(outcome.state, EvolveCampaignOutcomeState::Converged);
         assert_eq!(
@@ -282,7 +284,8 @@ mod evolve_campaign_convergence_contract {
 
     #[test]
     fn converged_deltas_record_per_iteration_improvement() {
-        let outcome = compute_evolve_campaign_outcome(&fixture("converged.fixture.json")).expect("ok");
+        let outcome =
+            compute_evolve_campaign_outcome(&fixture("converged.fixture.json")).expect("ok");
         // baseline iteration has no improving transition.
         assert_eq!(outcome.iteration_deltas[0].improved_gates, 0);
         // iteration 1 fixes mechanical + runtime versus the baseline.
@@ -295,7 +298,8 @@ mod evolve_campaign_convergence_contract {
     #[test]
     fn not_converged_at_budget_reports_diagnosis_and_last_deltas() {
         let outcome =
-            compute_evolve_campaign_outcome(&fixture("not-converged-budget.fixture.json")).expect("ok");
+            compute_evolve_campaign_outcome(&fixture("not-converged-budget.fixture.json"))
+                .expect("ok");
         assert_eq!(outcome.state, EvolveCampaignOutcomeState::NotConverged);
         assert_eq!(
             outcome.stop_reason,
@@ -456,7 +460,8 @@ mod evolve_campaign_demo_contract {
         let artifact = fixture("non-converging.fixture.json");
 
         // Bounded: the campaign stops at the iteration budget, never unbounded.
-        let read_model = validate_evolve_campaign(&artifact).expect("non-converging demo validates");
+        let read_model =
+            validate_evolve_campaign(&artifact).expect("non-converging demo validates");
         assert_eq!(
             read_model.stop_reason,
             EvolveCampaignStopReason::BudgetExhausted
@@ -472,7 +477,8 @@ mod evolve_campaign_demo_contract {
         );
 
         // Not-converged outcome carries an evidence-linked diagnosis.
-        let outcome = compute_evolve_campaign_outcome(&artifact).expect("non-converging demo outcome");
+        let outcome =
+            compute_evolve_campaign_outcome(&artifact).expect("non-converging demo outcome");
         assert_eq!(outcome.state, EvolveCampaignOutcomeState::NotConverged);
         assert!(outcome.converged_iteration.is_none());
         assert!(
@@ -494,7 +500,8 @@ mod evolve_campaign_demo_contract {
         );
 
         // The journal records the safe non-convergence summary.
-        let journal = build_evolve_campaign_journal(&artifact).expect("non-converging demo journal");
+        let journal =
+            build_evolve_campaign_journal(&artifact).expect("non-converging demo journal");
         assert_eq!(
             journal.summary.state,
             EvolveCampaignOutcomeState::NotConverged
@@ -506,7 +513,8 @@ mod evolve_campaign_demo_contract {
     fn demo_manifest_enumerates_both_cases() {
         let path = super::workspace_path("examples/evolve-campaign-v1/demo/manifest.json");
         let text = std::fs::read_to_string(&path).expect("demo manifest exists");
-        let manifest: serde_json::Value = serde_json::from_str(&text).expect("demo manifest parses");
+        let manifest: serde_json::Value =
+            serde_json::from_str(&text).expect("demo manifest parses");
 
         assert_eq!(manifest["schemaVersion"], "evolve-campaign-demo-v1");
         assert_eq!(manifest["issue"], 1490);
@@ -567,8 +575,8 @@ mod evolve_campaign_journal_contract {
 
     #[test]
     fn multi_iteration_narrative_links_deltas_and_evidence() {
-        let journal =
-            build_evolve_campaign_journal(&fixture("converged-narrative.fixture.json")).expect("ok");
+        let journal = build_evolve_campaign_journal(&fixture("converged-narrative.fixture.json"))
+            .expect("ok");
         assert_eq!(journal.schema_version, EVOLVE_CAMPAIGN_SCHEMA_VERSION);
         assert_eq!(journal.entries.len(), 3);
 
@@ -600,8 +608,9 @@ mod evolve_campaign_journal_contract {
 
     #[test]
     fn not_converged_summary_carries_diagnosis() {
-        let journal = build_evolve_campaign_journal(&fixture("not-converged-narrative.fixture.json"))
-            .expect("ok");
+        let journal =
+            build_evolve_campaign_journal(&fixture("not-converged-narrative.fixture.json"))
+                .expect("ok");
         assert_eq!(
             journal.summary.state,
             EvolveCampaignOutcomeState::NotConverged
@@ -636,9 +645,10 @@ mod evolve_campaign_journal_contract {
 
     #[test]
     fn not_converged_markdown_renders_diagnosis_line() {
-        let markdown =
-            render_evolve_campaign_journal_markdown(&fixture("not-converged-narrative.fixture.json"))
-                .expect("ok");
+        let markdown = render_evolve_campaign_journal_markdown(&fixture(
+            "not-converged-narrative.fixture.json",
+        ))
+        .expect("ok");
         assert!(markdown.contains("Outcome: not-converged"));
         assert!(markdown.contains("Diagnosis:"));
         assert!(markdown.contains("Converged at iteration: none"));
@@ -1032,7 +1042,8 @@ mod evolve_proposal_selection_contract {
     use ouroforge_core::{
         add_evidence_artifact, create_run, evolve_run, list_mutation_proposals,
         write_mutation_backlog_artifact, MutationBacklogArtifact, MutationBacklogItem,
-        MutationBacklogSeverity, MutationClassificationCategory, MutationProposalBoundedMutationType,
+        MutationBacklogSeverity, MutationClassificationCategory,
+        MutationProposalBoundedMutationType,
     };
     use serde_json::{json, Value};
     use std::{
@@ -1399,7 +1410,8 @@ scenarios:
             ],
         );
 
-        let summary = evolve_run(&run_dir).expect("multi-classification backlog selects a proposal");
+        let summary =
+            evolve_run(&run_dir).expect("multi-classification backlog selects a proposal");
         assert_eq!(summary.status, "proposed");
 
         let proposals = list_mutation_proposals(&run_dir).expect("proposal list");
@@ -1725,10 +1737,12 @@ scenarios:
         let (_, after_run) = create_fixture_run_under(&after_root, "evolve-rerun-missing-after");
         write_scenario_result(&before_run, "failed");
         write_failed_verdict(&before_run);
-        fs::remove_file(after_run.join("evidence/index.json")).expect("remove required evidence index");
+        fs::remove_file(after_run.join("evidence/index.json"))
+            .expect("remove required evidence index");
 
-        let error = write_run_comparison_artifact(&before_run, &after_run, before_run.join("mutation"))
-            .expect_err("missing after evidence blocks comparison");
+        let error =
+            write_run_comparison_artifact(&before_run, &after_run, before_run.join("mutation"))
+                .expect_err("missing after evidence blocks comparison");
 
         assert!(error
             .to_string()
@@ -1827,14 +1841,16 @@ scenarios:
     }
 
     fn write_failed_verdict(run_dir: &Path) {
-        let visual = "evidence/scenarios/collect-and-exit/visual/visual-before/visual-comparison.json";
+        let visual =
+            "evidence/scenarios/collect-and-exit/visual/visual-before/visual-comparison.json";
         let semantic =
             "evidence/scenarios/collect-and-exit/semantic/semantic-before/runtime-invariant-model.json";
         write_verdict(run_dir, "failed", "fail", "fail", visual, semantic);
     }
 
     fn write_passed_verdict(run_dir: &Path) {
-        let visual = "evidence/scenarios/collect-and-exit/visual/visual-after/visual-comparison.json";
+        let visual =
+            "evidence/scenarios/collect-and-exit/visual/visual-after/visual-comparison.json";
         let semantic =
             "evidence/scenarios/collect-and-exit/semantic/semantic-after/runtime-invariant-model.json";
         write_verdict(run_dir, "passed", "pass", "pass", visual, semantic);

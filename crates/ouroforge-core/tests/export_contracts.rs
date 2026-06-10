@@ -26,7 +26,7 @@ use ouroforge_core::export_package_metadata::{
     LOCAL_DISTRIBUTION_DESCRIPTOR_SCHEMA_VERSION,
 };
 use ouroforge_core::export_plan::{
-    ExportPlan, PlannedInputKind, PlannedOutputKind, PlannedInput, EXPORT_PLAN_SCHEMA_VERSION,
+    ExportPlan, PlannedInput, PlannedInputKind, PlannedOutputKind, EXPORT_PLAN_SCHEMA_VERSION,
 };
 use ouroforge_core::export_probe_check::{
     check_bundle_probe, check_probe_source, ensure_bundle_probe_compatible, ExportProbeMode,
@@ -353,11 +353,10 @@ fn refuses_blocked_source_path() {
     // A plan whose asset root points at a blocked generated-state prefix can only
     // be built by hand; the bundle must refuse it even if it reaches assembly.
     let mut p = bundle_plan();
-    p.source_inputs
-        .push(PlannedInput {
-            kind: PlannedInputKind::AssetRoot,
-            path: "target/debug/leak".to_string(),
-        });
+    p.source_inputs.push(PlannedInput {
+        kind: PlannedInputKind::AssetRoot,
+        path: "target/debug/leak".to_string(),
+    });
     let staging = unique_staging("blocked");
     let err =
         assemble_web_bundle(&p, &repo_root(), &staging).expect_err("blocked source path refused");
@@ -448,14 +447,8 @@ fn evidence(run_id: &str, bundle_dir: &Path) -> ExportEvidenceBundle {
     let plan = ExportPlan::from_profile(&p).unwrap();
     let manifest = build_asset_manifest(&plan, &repo_root(), &p.project_id).unwrap();
     assemble_web_bundle(&plan, &repo_root(), bundle_dir).unwrap();
-    let fingerprint = build_fingerprint(
-        &p,
-        &plan,
-        &manifest,
-        bundle_dir,
-        "ouroforge-core-0.1.0",
-    )
-    .unwrap();
+    let fingerprint =
+        build_fingerprint(&p, &plan, &manifest, bundle_dir, "ouroforge-core-0.1.0").unwrap();
     let verification = verify_export_bundle(&plan, bundle_dir, ExportProbeMode::DevProbeEnabled);
     build_export_evidence(
         run_id,
@@ -646,8 +639,10 @@ fn package_metadata_fixture(rel: &str) -> String {
 
 #[test]
 fn valid_metadata_generates_local_descriptor() {
-    let metadata = PackageMetadata::from_json_str(&package_metadata_fixture("package-metadata.valid.fixture.json"))
-        .expect("valid metadata parses");
+    let metadata = PackageMetadata::from_json_str(&package_metadata_fixture(
+        "package-metadata.valid.fixture.json",
+    ))
+    .expect("valid metadata parses");
     assert_eq!(
         metadata.schema_version,
         EXPORT_PACKAGE_METADATA_SCHEMA_VERSION
@@ -669,15 +664,17 @@ fn valid_metadata_generates_local_descriptor() {
 
 #[test]
 fn missing_required_metadata_is_rejected() {
-    let err = PackageMetadata::from_json_str(&package_metadata_fixture("invalid/missing-title.json"))
-        .expect_err("missing title rejected");
+    let err =
+        PackageMetadata::from_json_str(&package_metadata_fixture("invalid/missing-title.json"))
+            .expect_err("missing title rejected");
     assert!(err.to_string().contains("title"));
 }
 
 #[test]
 fn store_release_signing_credential_fields_are_blocked() {
-    let err = PackageMetadata::from_json_str(&package_metadata_fixture("invalid/signing-field.json"))
-        .expect_err("signing field rejected");
+    let err =
+        PackageMetadata::from_json_str(&package_metadata_fixture("invalid/signing-field.json"))
+            .expect_err("signing field rejected");
     assert!(err
         .to_string()
         .contains("failed to parse Package Metadata JSON"));
@@ -685,8 +682,10 @@ fn store_release_signing_credential_fields_are_blocked() {
 
 #[test]
 fn forbidden_publish_wording_is_rejected() {
-    let mut value: serde_json::Value =
-        serde_json::from_str(&package_metadata_fixture("package-metadata.valid.fixture.json")).unwrap();
+    let mut value: serde_json::Value = serde_json::from_str(&package_metadata_fixture(
+        "package-metadata.valid.fixture.json",
+    ))
+    .unwrap();
     value["description"] = serde_json::json!("Production-ready app store release.");
     let err =
         PackageMetadata::from_json_str(&value.to_string()).expect_err("publish wording rejected");
@@ -695,8 +694,10 @@ fn forbidden_publish_wording_is_rejected() {
 
 #[test]
 fn metadata_round_trips() {
-    let metadata =
-        PackageMetadata::from_json_str(&package_metadata_fixture("package-metadata.valid.fixture.json")).unwrap();
+    let metadata = PackageMetadata::from_json_str(&package_metadata_fixture(
+        "package-metadata.valid.fixture.json",
+    ))
+    .unwrap();
     let json = metadata.to_json().unwrap();
     assert_eq!(PackageMetadata::from_json_str(&json).unwrap(), metadata);
 }
@@ -1091,14 +1092,17 @@ fn valid_export_profile_has_no_publish_fields() {
 
 #[test]
 fn publish_config_fails_closed() {
-    let cfg = release_blocker_read("examples/export-release-blocker-v1/invalid/publish-config.json");
+    let cfg =
+        release_blocker_read("examples/export-release-blocker-v1/invalid/publish-config.json");
     let err = ensure_no_publish_config(&cfg).expect_err("publish config blocked");
     assert!(err.to_string().contains("publish"));
 }
 
 #[test]
 fn signing_deploy_upload_credentials_fail_closed() {
-    let cfg = release_blocker_read("examples/export-release-blocker-v1/invalid/signing-deploy-config.json");
+    let cfg = release_blocker_read(
+        "examples/export-release-blocker-v1/invalid/signing-deploy-config.json",
+    );
     let value: serde_json::Value = serde_json::from_str(&cfg).unwrap();
     let hits = scan_for_publish_fields(&value);
     for expected in [
@@ -1340,7 +1344,8 @@ fn assembled_bundle_passes_verification() {
             "missing check {id}"
         );
     }
-    ensure_export_verified(&verify_plan(), &bundle, ExportProbeMode::DevProbeEnabled).expect("verified");
+    ensure_export_verified(&verify_plan(), &bundle, ExportProbeMode::DevProbeEnabled)
+        .expect("verified");
     std::fs::remove_dir_all(&bundle).ok();
 }
 
@@ -1438,7 +1443,11 @@ fn command_allowlist_is_inert_policy() {
 #[test]
 fn verification_report_serializes_as_evidence() {
     let bundle = assembled("evidence");
-    let report = verify_export_bundle(&verify_plan(), &bundle, ExportProbeMode::PackagedProbeLimited);
+    let report = verify_export_bundle(
+        &verify_plan(),
+        &bundle,
+        ExportProbeMode::PackagedProbeLimited,
+    );
     let json = report.to_json().unwrap();
     assert!(json.contains("\"verdict\": \"pass\""));
     assert!(json.contains("runtime-probe-compatibility"));

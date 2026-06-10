@@ -132,7 +132,8 @@ mod design_brief {
     }
     #[test]
     fn gdd_design_brief_accepts_valid_partial_and_blocked_fixtures() {
-        let ready = GddDesignBriefArtifact::from_json_str(valid_fixture()).expect("ready brief parses");
+        let ready =
+            GddDesignBriefArtifact::from_json_str(valid_fixture()).expect("ready brief parses");
         assert_eq!(ready.schema_version, GDD_DESIGN_BRIEF_SCHEMA_VERSION);
         assert_eq!(ready.status, GddDesignBriefStatus::Ready);
         assert_eq!(
@@ -166,7 +167,8 @@ mod design_brief {
                     .to_string()
                     .contains("local fixture/reference roots")
         );
-        let mut value: serde_json::Value = serde_json::from_str(valid_fixture()).expect("fixture json");
+        let mut value: serde_json::Value =
+            serde_json::from_str(valid_fixture()).expect("fixture json");
         value["generationPrompt"] = serde_json::json!("make a full game");
         let unknown = GddDesignBriefArtifact::from_json_str(&value.to_string())
             .expect_err("generation authority fields are rejected");
@@ -246,14 +248,16 @@ mod design_brief {
         ];
 
         for (value, expected) in cases {
-            let error = GddDesignBriefArtifact::from_json_str(&value.to_string()).expect_err(expected);
+            let error =
+                GddDesignBriefArtifact::from_json_str(&value.to_string()).expect_err(expected);
             assert!(error.to_string().contains(expected), "{error:?}");
         }
     }
 
     #[test]
     fn gdd_design_brief_read_model_preserves_display_compatibility() {
-        let ready = GddDesignBriefArtifact::from_json_str(valid_fixture()).expect("ready brief parses");
+        let ready =
+            GddDesignBriefArtifact::from_json_str(valid_fixture()).expect("ready brief parses");
         let read_model = ready.read_model();
         assert_eq!(read_model.schema_version, GDD_DESIGN_BRIEF_SCHEMA_VERSION);
         assert_eq!(read_model.brief_id, "collect-and-exit-brief");
@@ -324,7 +328,8 @@ mod design_brief {
         // The published gdd-design-brief-v1 contract lists blockedReasons as a required
         // top-level field, so a brief that omits it must fail closed rather than silently
         // defaulting to an empty list.
-        let mut value: serde_json::Value = serde_json::from_str(valid_fixture()).expect("fixture json");
+        let mut value: serde_json::Value =
+            serde_json::from_str(valid_fixture()).expect("fixture json");
         value
             .as_object_mut()
             .expect("brief object")
@@ -1798,30 +1803,53 @@ mod to_prototype_demo {
         assert_eq!(manifest["status"], "evidence-gated-pass");
         assert!(repo_path(manifest["gddRef"].as_str().unwrap()).exists());
 
-        GddDesignBriefArtifact::from_json_str(&read_repo(ref_at(&manifest, "designBrief"))).unwrap();
-        GddRequirementExtractionArtifact::from_json_str(&read_repo(ref_at(&manifest, "requirements")))
+        GddDesignBriefArtifact::from_json_str(&read_repo(ref_at(&manifest, "designBrief")))
             .unwrap();
-        GddMechanicsMappingArtifact::from_json_str(&read_repo(ref_at(&manifest, "mechanicsMapping")))
-            .unwrap();
+        GddRequirementExtractionArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "requirements",
+        )))
+        .unwrap();
+        GddMechanicsMappingArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "mechanicsMapping",
+        )))
+        .unwrap();
         GddFeasibilityGateArtifact::from_json_str(&read_repo(ref_at(&manifest, "feasibilityGate")))
             .unwrap();
-        GddProjectScaffoldPlanArtifact::from_json_str(&read_repo(ref_at(&manifest, "scaffoldPlan")))
-            .unwrap();
+        GddProjectScaffoldPlanArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "scaffoldPlan",
+        )))
+        .unwrap();
         GddSceneLevelPlanArtifact::from_json_str(&read_repo(ref_at(&manifest, "sceneLevelPlan")))
             .unwrap();
-        GddGameplayBehaviorPlanArtifact::from_json_str(&read_repo(ref_at(&manifest, "behaviorPlan")))
-            .unwrap();
+        GddGameplayBehaviorPlanArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "behaviorPlan",
+        )))
+        .unwrap();
         GddAssetPlaceholderPlanArtifact::from_json_str(&read_repo(ref_at(&manifest, "assetPlan")))
             .unwrap();
-        GddScenarioAcceptancePlanArtifact::from_json_str(&read_repo(ref_at(&manifest, "scenarioPlan")))
-            .unwrap();
+        GddScenarioAcceptancePlanArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "scenarioPlan",
+        )))
+        .unwrap();
         GddPrototypeTaskGraphArtifact::from_json_str(&read_repo(ref_at(&manifest, "taskGraph")))
             .unwrap();
-        GddPrototypeDraftBundleArtifact::from_json_str(&read_repo(ref_at(&manifest, "draftBundle")))
+        GddPrototypeDraftBundleArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "draftBundle",
+        )))
+        .unwrap();
+        GddPrototypeApplyArtifact::from_json_str(&read_repo(ref_at(&manifest, "reviewApply")))
             .unwrap();
-        GddPrototypeApplyArtifact::from_json_str(&read_repo(ref_at(&manifest, "reviewApply"))).unwrap();
-        GddPrototypeRunEvidenceArtifact::from_json_str(&read_repo(ref_at(&manifest, "runEvidence")))
-            .unwrap();
+        GddPrototypeRunEvidenceArtifact::from_json_str(&read_repo(ref_at(
+            &manifest,
+            "runEvidence",
+        )))
+        .unwrap();
         GddPrototypeEvidenceJournalBundleArtifact::from_json_str(&read_repo(ref_at(
             &manifest,
             "evidenceJournalBundle",

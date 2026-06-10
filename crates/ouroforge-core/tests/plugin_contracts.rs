@@ -18,18 +18,17 @@
 use ouroforge_core::plugin_asset_metadata::{
     validate_descriptors, PluginAssetMetadataDescriptor, ALLOWED_ASSET_TYPES, ALLOWED_FIELD_TYPES,
 };
+use ouroforge_core::plugin_compatibility::PluginCompatibilityStatus;
 use ouroforge_core::plugin_compatibility::{
     evaluate, CURRENT_OUROFORGE_VERSION, SUPPORTED_PLUGIN_SCHEMA_VERSIONS,
 };
-use ouroforge_core::plugin_compatibility::PluginCompatibilityStatus;
 use ouroforge_core::plugin_conflicts::{
     detect_conflicts, PluginConflictKind, PluginConflictSeverity,
 };
-use ouroforge_core::plugin_evidence::{
-    write_plugin_registry_evidence, PluginRegistryEvidenceArtifact,
-    PluginValidationStatus,
-};
 use ouroforge_core::plugin_evidence::PluginCompatibilityStatus as EvidenceCompatibilityStatus;
+use ouroforge_core::plugin_evidence::{
+    write_plugin_registry_evidence, PluginRegistryEvidenceArtifact, PluginValidationStatus,
+};
 use ouroforge_core::plugin_extension_catalog::{
     is_allowed, validate_extension_point, ALLOWED_EXTENSION_POINT_IDS, CATALOG,
 };
