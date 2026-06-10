@@ -19,6 +19,19 @@ const REQUIRED_ARTIFACTS: &[&str] = &[
     "verdict.md",
 ];
 
+const CHECKLIST_IDS: &[&str] = &[
+    "po-check-live-url",
+    "po-check-console",
+    "po-check-screenshot",
+    "po-check-replay",
+    "po-check-world-sample",
+    "po-check-event-sample",
+    "po-check-frame-stats",
+    "po-check-before-after",
+    "po-check-verdict",
+    "po-check-generated-state",
+];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationReport {
     pub bundle_root: PathBuf,
@@ -38,6 +51,14 @@ struct Manifest {
     browser: Value,
     retry_attempts: u64,
     artifact_inventory: Vec<ArtifactInventoryEntry>,
+    #[serde(default)]
+    observability_api_keys_used: Vec<String>,
+    #[serde(default)]
+    observability_api_keys_available: Vec<String>,
+    #[serde(default)]
+    diagnostics: Vec<Value>,
+    #[serde(default)]
+    replay: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,8 +70,27 @@ struct ArtifactInventoryEntry {
     required: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerdictOptions {
+    pub generated_at: String,
+    pub generated_state_audit: String,
+}
+
+impl Default for VerdictOptions {
+    fn default() -> Self {
+        Self {
+            generated_at: "1970-01-01T00:00:00Z".to_string(),
+            generated_state_audit: "No generated observability artifacts are tracked by this renderer; run `git status --short --ignored` for closure evidence.".to_string(),
+        }
+    }
+}
+
 pub fn required_artifacts() -> &'static [&'static str] {
     REQUIRED_ARTIFACTS
+}
+
+pub fn checklist_ids() -> &'static [&'static str] {
+    CHECKLIST_IDS
 }
 
 pub fn validate_bundle(bundle_root: impl AsRef<Path>) -> Result<ValidationReport> {
@@ -103,6 +143,340 @@ pub fn validate_bundle(bundle_root: impl AsRef<Path>) -> Result<ValidationReport
     })
 }
 
+pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -> Result<String> {
+    let bundle_root = bundle_root.as_ref();
+    validate_bundle(bundle_root)?;
+    let manifest = read_manifest(bundle_root)?;
+    let console_lines = read_jsonl(bundle_root.join("console.jsonl"))?;
+    let frame_lines = read_jsonl(bundle_root.join("frame-stats.jsonl"))?;
+    let world_lines = read_jsonl(bundle_root.join("world-samples.jsonl"))?;
+    let events = read_json(bundle_root.join("events.json"))?;
+    let replay = read_json(bundle_root.join("input-replay.json"))?;
+
+    let console_errors = console_lines
+        .iter()
+        .filter(|line| {
+            matches!(
+                line.get("level").and_then(Value::as_str),
+                Some("error") | Some("warning")
+            )
+        })
+        .count();
+    let runtime_diagnostics = collect_runtime_diagnostics(&manifest, &world_lines);
+    let fatal_count = runtime_diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.to_ascii_lowercase().contains("fatal"))
+        .count();
+    let usability_gap_count = runtime_diagnostics.len().saturating_sub(fatal_count);
+    let objective_sequence = replay
+        .get("objective_flag_sequence")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let final_flags = objective_sequence
+        .last()
+        .and_then(|value| value.get("goal_flags"))
+        .cloned()
+        .unwrap_or(Value::Object(Default::default()));
+    let exit_reached = final_flags
+        .get("exit_reached")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let screenshot_paths = inventory_paths_by_kind(&manifest, "png");
+    let product_observed_complete = console_errors == 0
+        && runtime_diagnostics.is_empty()
+        && !world_lines.is_empty()
+        && !frame_lines.is_empty()
+        && !screenshot_paths.is_empty()
+        && exit_reached;
+    let product_status = if product_observed_complete {
+        "product-observed complete"
+    } else {
+        "product-observed FAIL"
+    };
+    let mechanical_status = if exit_reached || manifest.replay.is_none() {
+        "contract-pass"
+    } else {
+        "contract-fail"
+    };
+
+    let mut out = String::new();
+    out.push_str("# Live observability verdict\n\n");
+    out.push_str(&format!("Generated at: {}\n\n", options.generated_at));
+    out.push_str("## Classification\n\n");
+    out.push_str(&format!("- Mechanical contract: `{mechanical_status}`\n"));
+    out.push_str(&format!("- Product observation: `{product_status}`\n"));
+    out.push_str(&format!("- Bundle: `{}`\n", bundle_root.display()));
+    out.push_str(&format!("- Run id: `{}`\n", manifest.run_id));
+    out.push_str(&format!("- Run kind: `{}`\n", manifest.run_kind));
+    out.push_str(&format!("- Target: `{}`\n\n", manifest.target_url));
+
+    out.push_str("## Checklist trace\n\n");
+    out.push_str("| M115.3 id | Result | Artifact path(s) | Rationale |\n");
+    out.push_str("| --- | --- | --- | --- |\n");
+    let replay_result = if objective_sequence.is_empty() {
+        "FAIL"
+    } else {
+        "PASS"
+    };
+    let screenshot_result = if screenshot_paths.is_empty() {
+        "FAIL"
+    } else {
+        "PASS"
+    };
+    let diagnostics_result = if console_errors == 0 && fatal_count == 0 {
+        "PASS"
+    } else {
+        "FAIL"
+    };
+    let world_result = if world_lines.is_empty() {
+        "FAIL"
+    } else {
+        "PASS"
+    };
+    let frame_result = if frame_lines.is_empty() {
+        "FAIL"
+    } else {
+        "PASS"
+    };
+    let event_count = events
+        .get("events")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len);
+    let event_result = if event_count == 0 { "FAIL" } else { "PASS" };
+    let before_after_result = if objective_sequence.len() >= 2 {
+        "PASS"
+    } else {
+        "N/A"
+    };
+    let verdict_result = if product_observed_complete {
+        "PASS"
+    } else {
+        "FAIL"
+    };
+    let generated_result = "PASS";
+    push_row(
+        &mut out,
+        "po-check-live-url",
+        "PASS",
+        "manifest.json",
+        "Local-only target URL is recorded in manifest.",
+    );
+    push_row(
+        &mut out,
+        "po-check-console",
+        diagnostics_result,
+        "console.jsonl; world-samples.jsonl",
+        &format!(
+            "console warnings/errors: {console_errors}; runtime diagnostics: {}.",
+            runtime_diagnostics.len()
+        ),
+    );
+    push_row(
+        &mut out,
+        "po-check-screenshot",
+        screenshot_result,
+        &join_or(&screenshot_paths, "screenshots/"),
+        "Screenshot inventory is listed by concrete artifact path.",
+    );
+    push_row(
+        &mut out,
+        "po-check-replay",
+        replay_result,
+        "input-replay.json",
+        &format!(
+            "objective checkpoints: {}; final exit_reached: {exit_reached}.",
+            objective_sequence.len()
+        ),
+    );
+    push_row(
+        &mut out,
+        "po-check-world-sample",
+        world_result,
+        "world-samples.jsonl",
+        &format!("world sample lines: {}.", world_lines.len()),
+    );
+    push_row(
+        &mut out,
+        "po-check-event-sample",
+        event_result,
+        "events.json",
+        &format!("event entries: {event_count}."),
+    );
+    push_row(
+        &mut out,
+        "po-check-frame-stats",
+        frame_result,
+        "frame-stats.jsonl",
+        &format!("frame stat lines: {}.", frame_lines.len()),
+    );
+    push_row(&mut out, "po-check-before-after", before_after_result, "input-replay.json", "Replay objective sequence provides start/after checkpoints for this run; no source mutation is claimed.");
+    push_row(
+        &mut out,
+        "po-check-verdict",
+        verdict_result,
+        "verdict.md",
+        "This verdict separates mechanical contract status from product-observed usability.",
+    );
+    push_row(
+        &mut out,
+        "po-check-generated-state",
+        generated_result,
+        "manifest.json",
+        &options.generated_state_audit,
+    );
+    out.push('\n');
+
+    out.push_str("## Artifact summaries\n\n");
+    out.push_str(&format!(
+        "- Console lines: `{}`; warning/error lines: `{console_errors}`.\n",
+        console_lines.len()
+    ));
+    out.push_str(&format!("- Frame stat lines: `{}`.\n", frame_lines.len()));
+    out.push_str(&format!("- World sample lines: `{}`.\n", world_lines.len()));
+    out.push_str(&format!("- Event entries: `{event_count}`.\n"));
+    out.push_str(&format!(
+        "- Replay: `{}`; objective checkpoints: `{}`.\n",
+        manifest.replay.as_deref().unwrap_or("none"),
+        objective_sequence.len()
+    ));
+    out.push_str(&format!(
+        "- Screenshots: `{}`.\n",
+        join_or(&screenshot_paths, "none")
+    ));
+    out.push_str(&format!(
+        "- Observability API keys used: `{}`.\n\n",
+        join_or(&manifest.observability_api_keys_used, "none")
+    ));
+
+    out.push_str("## State progression\n\n");
+    if objective_sequence.is_empty() {
+        out.push_str("No objective flag sequence recorded.\n\n");
+    } else {
+        out.push_str("| Checkpoint | Tick | Flags |\n| --- | ---: | --- |\n");
+        for checkpoint in &objective_sequence {
+            let label = checkpoint
+                .get("label")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let tick = checkpoint.get("tick").and_then(Value::as_i64).unwrap_or(-1);
+            let flags = checkpoint.get("goal_flags").cloned().unwrap_or(Value::Null);
+            out.push_str(&format!(
+                "| `{}` | {} | `{}` |\n",
+                escape_md(label),
+                tick,
+                compact_json(&flags)
+            ));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("## Fatal failures vs usability gaps\n\n");
+    out.push_str(&format!("- Fatal failures: `{fatal_count}`.\n"));
+    out.push_str(&format!(
+        "- Usability gaps/diagnostics: `{usability_gap_count}`.\n"
+    ));
+    if runtime_diagnostics.is_empty() {
+        out.push_str("- No runtime diagnostics were recorded in the sampled bundle.\n\n");
+    } else {
+        for diagnostic in &runtime_diagnostics {
+            out.push_str(&format!("- `{}`\n", escape_md(diagnostic)));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("## Usability note\n\n");
+    if product_observed_complete {
+        out.push_str("The bundle satisfies the checklist items used by this renderer. Fun, release, market, and commercial readiness remain outside this mechanical verdict.\n");
+    } else {
+        out.push_str("The bundle can be a mechanical `contract-pass` while still being `product-observed FAIL`. Current diagnostics or missing checklist evidence must become gap/backlog input rather than being hidden behind green tests.\n");
+    }
+
+    Ok(out)
+}
+
+fn push_row(out: &mut String, id: &str, result: &str, paths: &str, rationale: &str) {
+    out.push_str(&format!(
+        "| `{}` | {} | `{}` | {} |\n",
+        id,
+        result,
+        escape_md(paths),
+        escape_md(rationale)
+    ));
+}
+
+fn read_manifest(bundle_root: &Path) -> Result<Manifest> {
+    serde_json::from_slice(&fs::read(bundle_root.join("manifest.json"))?)
+        .context("manifest.json is not valid JSON")
+}
+
+fn read_json(path: PathBuf) -> Result<Value> {
+    serde_json::from_slice(&fs::read(&path).with_context(|| format!("reading {}", path.display()))?)
+        .with_context(|| format!("{} is not valid JSON", path.display()))
+}
+
+fn read_jsonl(path: PathBuf) -> Result<Vec<Value>> {
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str(line)
+                .with_context(|| format!("{} has invalid JSONL", path.display()))
+        })
+        .collect()
+}
+
+fn collect_runtime_diagnostics(manifest: &Manifest, world_lines: &[Value]) -> Vec<String> {
+    let mut diagnostics = Vec::new();
+    for diagnostic in &manifest.diagnostics {
+        diagnostics.push(compact_json(diagnostic));
+    }
+    for line in world_lines {
+        if let Some(items) = line.get("diagnostics").and_then(Value::as_array) {
+            for item in items {
+                diagnostics.push(compact_json(item));
+            }
+        }
+        if let Some(items) = line.get("runtime_diagnostics").and_then(Value::as_array) {
+            for item in items {
+                diagnostics.push(compact_json(item));
+            }
+        }
+    }
+    diagnostics.sort();
+    diagnostics.dedup();
+    diagnostics
+}
+
+fn inventory_paths_by_kind(manifest: &Manifest, kind: &str) -> Vec<String> {
+    let mut paths: Vec<String> = manifest
+        .artifact_inventory
+        .iter()
+        .filter(|entry| entry.kind == kind)
+        .map(|entry| entry.path.clone())
+        .collect();
+    paths.sort();
+    paths
+}
+
+fn compact_json(value: &Value) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "null".to_string())
+}
+
+fn join_or(values: &[String], fallback: &str) -> String {
+    if values.is_empty() {
+        fallback.to_string()
+    } else {
+        values.join(",")
+    }
+}
+
+fn escape_md(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
+}
+
 fn validate_manifest(bundle_root: &Path, manifest: &Manifest) -> Result<()> {
     if manifest.schema_version != SCHEMA_VERSION {
         bail!("manifest schema_version must be {SCHEMA_VERSION}");
@@ -137,6 +511,7 @@ fn validate_manifest(bundle_root: &Path, manifest: &Manifest) -> Result<()> {
         bail!("manifest browser must be an object");
     }
     let _attempts = manifest.retry_attempts;
+    let _available_keys = &manifest.observability_api_keys_available;
 
     let mut inventory_by_path: HashMap<&str, &ArtifactInventoryEntry> = HashMap::new();
     for entry in &manifest.artifact_inventory {

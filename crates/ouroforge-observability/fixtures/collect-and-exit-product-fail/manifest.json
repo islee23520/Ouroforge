@@ -1,0 +1,95 @@
+{
+  "schema_version": "live-observability-v1",
+  "run_id": "collect-and-exit-product-fail",
+  "created_at": "2026-06-10T00:00:00Z",
+  "target_url": "http://127.0.0.1:8871/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json",
+  "run_kind": "runtime",
+  "tool_versions": {
+    "runner": "live-observability-runner-v1",
+    "node": "fixture",
+    "schema": "live-observability-v1"
+  },
+  "browser": {
+    "browser": "fixture-chrome",
+    "protocol_version": "fixture"
+  },
+  "retry_attempts": 1,
+  "replay": "collect-and-exit",
+  "observability_api_keys_used": [
+    "whenReady",
+    "getWorldState",
+    "getFrameStats",
+    "getEvents",
+    "setInput",
+    "step"
+  ],
+  "observability_api_keys_available": [
+    "getWorldState",
+    "getFrameStats",
+    "getEvents",
+    "setInput",
+    "step",
+    "whenReady"
+  ],
+  "diagnostics": [],
+  "artifact_inventory": [
+    {
+      "path": "manifest.json",
+      "kind": "json",
+      "required": true
+    },
+    {
+      "path": "console.jsonl",
+      "kind": "jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "required": true
+    },
+    {
+      "path": "frame-stats.jsonl",
+      "kind": "jsonl",
+      "sha256": "144a08a28c5429dcec4ff3252c6bbbf32d2d973859cde72dec67d7c2fc5c189a",
+      "required": true
+    },
+    {
+      "path": "world-samples.jsonl",
+      "kind": "jsonl",
+      "sha256": "5a17a8e1d31be072eca7f6d28381ccbb8b563967c63fc1128f80ea81dba48dac",
+      "required": true
+    },
+    {
+      "path": "events.json",
+      "kind": "json",
+      "sha256": "f8f76e6b6fbb2caad5478da8a309e8db6b03a43a8afb45f98ecc589f1a9e2187",
+      "required": true
+    },
+    {
+      "path": "input-replay.json",
+      "kind": "json",
+      "sha256": "f63cd4c089118d5d626b8639ba436810acacbe6ae15e71aded13d5fb346f51ad",
+      "required": true
+    },
+    {
+      "path": "screenshots/",
+      "kind": "directory",
+      "required": true
+    },
+    {
+      "path": "verdict.md",
+      "kind": "markdown",
+      "sha256": "a5b11f0687bec86e35a6a998e4cfbced64f9911872d4aee82074ad5b7bbca80a",
+      "required": true
+    },
+    {
+      "path": "screenshots/final.png",
+      "kind": "png",
+      "sha256": "31679c5bf4b86a92d8f9480e823c3f4f434066abe77f1c35efd9c042378662ff",
+      "required": false
+    },
+    {
+      "path": "screenshots/start.png",
+      "kind": "png",
+      "sha256": "6186778a847223fae078e7f49f761da1d267d7d6fe285d5f91ecec5e3e77360e",
+      "required": false
+    }
+  ]
+}
