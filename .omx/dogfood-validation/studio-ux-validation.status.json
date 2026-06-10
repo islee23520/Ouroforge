@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "dogfood-studio-ux-validation-status-v1",
+  "blocker": "B6",
+  "status": "ready_for_verifier",
+  "evidenceClassification": "local-read-only-and-review-gated-studio-ux-evidence",
+  "demoIdentity": "collect-and-exit-local-rc-candidate",
+  "protectedIssues": {
+    "1": "OPEN",
+    "23": "OPEN"
+  },
+  "mergedPrerequisites": [
+    {
+      "blocker": "B1",
+      "pr": 2334,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/claim-coverage-matrix.md"
+    },
+    {
+      "blocker": "B2",
+      "pr": 2335,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/demo-game-spec.md"
+    },
+    {
+      "blocker": "B3",
+      "pr": 2336,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/pipeline-dry-run.md"
+    },
+    {
+      "blocker": "B4",
+      "pr": 2337,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/export-release-readiness.md"
+    },
+    {
+      "blocker": "B5",
+      "pr": 2339,
+      "state": "MERGED",
+      "artifact": ".omx/dogfood-validation/gameplay-runtime-stress.md"
+    }
+  ],
+  "trackedArtifacts": [
+    ".omx/dogfood-validation/studio-ux-validation.md",
+    ".omx/dogfood-validation/studio-ux-validation.status.json",
+    "examples/dogfood-studio-ux-validation-v1/studio-ux-validation-smoke.test.cjs"
+  ],
+  "studioEvidence": {
+    "cockpitSource": "examples/authoring-cockpit/cockpit.js",
+    "cockpitRegressionTest": "examples/authoring-cockpit/cockpit.test.cjs",
+    "integratedDemoSmoke": "examples/authoring-cockpit/integrated-demo-smoke.test.cjs",
+    "studioWalkthroughDoc": "docs/godot-plus-demo-studio-walkthrough-v1.md",
+    "studioWalkthroughSmoke": "examples/godot-plus-demo-studio-walkthrough-v790/godot-plus-studio-walkthrough-smoke.test.cjs",
+    "reviewCockpitDoc": "docs/studio-review-cockpit-v1.md",
+    "workspaceCockpitDoc": "docs/studio-v3-project-workspace-cockpit.md",
+    "exportInspectionDoc": "docs/studio-export-package-inspection-panel-v1.md",
+    "panelChecks": 11,
+    "integratedPanelCount": 13,
+    "browserTrustedWrites": false,
+    "commandBridge": false,
+    "reviewGatedHandoffOnly": true
+  },
+  "forbiddenScopeIntroduced": false,
+  "forbiddenScope": [
+    "product Studio feature implementation",
+    "trusted browser/source writes",
+    "command bridge",
+    "hosted/cloud/multi-user behavior",
+    "auto-port",
+    "live bridge",
+    "foreign-runtime embedding",
+    "release automation",
+    "signing",
+    "upload",
+    "publishing",
+    "credential flow",
+    "Steam depot flow",
+    "Era Q M102-M106 implementation"
+  ],
+  "verification": [
+    "node --test examples/dogfood-studio-ux-validation-v1/studio-ux-validation-smoke.test.cjs",
+    "node --check examples/authoring-cockpit/cockpit.js",
+    "node examples/authoring-cockpit/cockpit.test.cjs",
+    "node examples/authoring-cockpit/integrated-demo-smoke.test.cjs",
+    "node examples/godot-plus-demo-studio-walkthrough-v790/godot-plus-studio-walkthrough-smoke.test.cjs",
+    "git diff --check origin/main...HEAD"
+  ]
+}
