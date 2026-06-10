@@ -206,7 +206,7 @@ pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -
     out.push_str("## Classification\n\n");
     out.push_str(&format!("- Mechanical contract: `{mechanical_status}`\n"));
     out.push_str(&format!("- Product observation: `{product_status}`\n"));
-    out.push_str(&format!("- Bundle: `{}`\n", bundle_root.display()));
+    out.push_str(&format!("- Bundle: `{}`\n", manifest.run_id));
     out.push_str(&format!("- Run id: `{}`\n", manifest.run_id));
     out.push_str(&format!("- Run kind: `{}`\n", manifest.run_kind));
     out.push_str(&format!("- Target: `{}`\n\n", manifest.target_url));

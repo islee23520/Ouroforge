@@ -46,3 +46,16 @@ fn rendered_verdict_is_byte_identical_except_timestamp_line() {
     assert_ne!(a, b);
     assert_eq!(strip_generated_at(&a), strip_generated_at(&b));
 }
+
+#[test]
+fn rendered_verdict_is_stable_across_equivalent_bundle_paths() {
+    let options = VerdictOptions {
+        generated_at: "2026-06-10T00:00:00Z".to_string(),
+        ..Default::default()
+    };
+    let relative = render_verdict("fixtures/collect-and-exit-product-fail", &options).unwrap();
+    let absolute = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures/collect-and-exit-product-fail");
+    let absolute_render = render_verdict(&absolute, &options).unwrap();
+    assert_eq!(relative, absolute_render);
+}

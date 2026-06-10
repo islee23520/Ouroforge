@@ -6,7 +6,7 @@ Generated at: 2026-06-10T00:00:00Z
 
 - Mechanical contract: `contract-pass`
 - Product observation: `product-observed FAIL`
-- Bundle: `fixtures/collect-and-exit-product-fail`
+- Bundle: `collect-and-exit-product-fail`
 - Run id: `collect-and-exit-product-fail`
 - Run kind: `runtime`
 - Target: `http://127.0.0.1:8871/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/collect-and-exit.scene.json`
