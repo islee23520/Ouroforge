@@ -924,6 +924,28 @@ behavior, create support/security SLAs, implement source apply, or replace the
 
 ## Near-term governance and public-readiness work
 
+### Live Preview Loop v1 governance wording (Era X Milestone 131)
+
+Era X M131 (#2518-#2522, parent SSOT #2517) is recorded as complete but
+bounded. #2518/#2519/#2520 closed contract-complete (preview session
+intent validation sharing apply-preflight code paths with a permanent parity
+golden gate; the receive-only runtime preview channel with WebSocket push and
+channel-idle determinism; transcript capture with fidelity replay and draft
+export into the existing visual-edit-draft artifact). #2521 closed
+product-observed complete for exactly the live preview latency loop and the
+transcript-to-draft export handoff: 12/12 validated tweaks at CDP-primary
+p50 2.5 ms / p95 8.7 ms against the record-only 1000 ms budget, 3/3 scene
+reloads at p50 2.0 ms / p95 15.6 ms against 5000 ms, zero runtime
+diagnostics, with the review-to-apply rerun leg recorded as an explicit gap
+owned by M132.2/M132.3. Coverage is locked by
+[`docs/scenario-coverage-v112-live-preview-loop.md`](scenario-coverage-v112-live-preview-loop.md).
+These artifacts do not authorize trusted browser writes, command bridges,
+auto-apply, editor-maturity claims, production readiness, or Godot
+parity/replacement positioning. Latency budgets become hard gates from the
+next cycle per the #2517 Q2 resolution. #1 and #23 remain open governance
+anchors.
+
+
 ### Evaluator Depth v1 governance refresh
 
 Evaluator Depth v1 is recorded as **complete for Milestone 4.1**, closing the
