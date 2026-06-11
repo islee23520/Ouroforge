@@ -1,0 +1,236 @@
+{
+  "schemaVersion": "ouroforge.preview-delta-fixtures.v1",
+  "issue": 2519,
+  "boundary": "Deterministic fixtures for mechanical preview-delta application; deltas mirror ouroforge.preview-delta.v1 produced by ouroforge preview serve.",
+  "cases": [
+    {
+      "name": "applies entity transform x and y atomically",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-001",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-001",
+        "sequence": 1,
+        "kind": "entityTransform",
+        "status": "applied",
+        "edits": [
+          { "entityId": "player", "path": "components.transform.x", "value": 48 },
+          { "entityId": "player", "path": "components.transform.y", "value": 96 }
+        ],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": true,
+        "appliedEdits": 2,
+        "worldChecks": [
+          { "entityId": "player", "path": "components.transform.x", "value": 48 },
+          { "entityId": "player", "path": "components.transform.y", "value": 96 }
+        ]
+      }
+    },
+    {
+      "name": "applies sprite color string",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-002",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-002",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [{ "entityId": "player", "path": "sprite.color", "value": "#3366ff" }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": true,
+        "appliedEdits": 1,
+        "worldChecks": [{ "entityId": "player", "path": "sprite.color", "value": "#3366ff" }]
+      }
+    },
+    {
+      "name": "applies velocity, size, and controllable",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-003",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-003",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [
+          { "entityId": "player", "path": "components.velocity.x", "value": 4 },
+          { "entityId": "player", "path": "components.velocity.y", "value": -2 },
+          { "entityId": "player", "path": "components.size.width", "value": 16 },
+          { "entityId": "player", "path": "components.size.height", "value": 18 },
+          { "entityId": "wall", "path": "components.controllable", "value": true }
+        ],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": true,
+        "appliedEdits": 5,
+        "worldChecks": [
+          { "entityId": "player", "path": "components.velocity.x", "value": 4 },
+          { "entityId": "player", "path": "components.velocity.y", "value": -2 },
+          { "entityId": "player", "path": "components.size.width", "value": 16 },
+          { "entityId": "player", "path": "components.size.height", "value": 18 },
+          { "entityId": "wall", "path": "components.controllable", "value": true }
+        ]
+      }
+    },
+    {
+      "name": "applies optional status, input, and cameraTarget integers",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-004",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-004",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [
+          { "entityId": "player", "path": "components.status.hitPoints", "value": 2 },
+          { "entityId": "player", "path": "components.status.maxHitPoints", "value": 5 },
+          { "entityId": "player", "path": "components.input.moveSpeed", "value": 75 },
+          { "entityId": "player", "path": "components.input.jumpImpulse", "value": 150 },
+          { "entityId": "player", "path": "components.cameraTarget.weight", "value": 80 }
+        ],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": true,
+        "appliedEdits": 5,
+        "worldChecks": [
+          { "entityId": "player", "path": "components.status.hitPoints", "value": 2 },
+          { "entityId": "player", "path": "components.input.moveSpeed", "value": 75 },
+          { "entityId": "player", "path": "components.cameraTarget.weight", "value": 80 }
+        ]
+      }
+    },
+    {
+      "name": "uiText edit on entity without uiText component fails closed",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-005",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-005",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [{ "entityId": "player", "path": "components.uiText.text", "value": "HUD" }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": false,
+        "diagnostic": "preview_delta_apply_failed",
+        "errorIncludes": "requires uiText component"
+      }
+    },
+    {
+      "name": "sceneReload delta requests reload without touching entities",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-006",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-006",
+        "sequence": 2,
+        "kind": "sceneReload",
+        "status": "applied",
+        "edits": [],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "1" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "0" }
+      },
+      "expect": {
+        "ok": true,
+        "requiresSceneReload": true,
+        "worldChecks": [{ "entityId": "player", "path": "components.transform.x", "value": 32 }]
+      }
+    },
+    {
+      "name": "rejected deltas are skipped, never applied",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-007",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-007",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "rejected",
+        "edits": [{ "entityId": "player", "path": "components.transform.x", "value": 999 }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "errors": ["preview candidate scene validation failed"]
+      },
+      "expect": {
+        "ok": true,
+        "skipped": "rejected",
+        "worldChecks": [{ "entityId": "player", "path": "components.transform.x", "value": 32 }]
+      }
+    },
+    {
+      "name": "unknown entity fails closed and leaves world untouched",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-008",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-008",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [{ "entityId": "ghost", "path": "components.transform.x", "value": 1 }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": false,
+        "diagnostic": "preview_delta_apply_failed",
+        "errorIncludes": "entity not found: ghost",
+        "worldChecks": [{ "entityId": "player", "path": "components.transform.x", "value": 32 }]
+      }
+    },
+    {
+      "name": "non-allowlisted path fails closed",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v1",
+        "deltaId": "preview-delta-fixture-009",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-009",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [{ "entityId": "player", "path": "components.transform.rotation", "value": 90 }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": false,
+        "diagnostic": "preview_delta_apply_failed",
+        "errorIncludes": "path is not allowed"
+      }
+    },
+    {
+      "name": "wrong schema version fails closed with schema diagnostic",
+      "delta": {
+        "schemaVersion": "ouroforge.preview-delta.v0",
+        "deltaId": "preview-delta-fixture-010",
+        "sessionId": "fixture-session",
+        "intentId": "fixture-intent-010",
+        "sequence": 1,
+        "kind": "parameterSet",
+        "status": "applied",
+        "edits": [{ "entityId": "player", "path": "components.transform.x", "value": 1 }],
+        "beforeSceneHash": { "algorithm": "fnv1a64", "value": "0" },
+        "afterSceneHash": { "algorithm": "fnv1a64", "value": "1" }
+      },
+      "expect": {
+        "ok": false,
+        "diagnostic": "preview_delta_schema_unsupported",
+        "errorIncludes": "schemaVersion"
+      }
+    }
+  ]
+}
