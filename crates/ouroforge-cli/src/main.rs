@@ -139,6 +139,10 @@ enum Commands {
         #[command(subcommand)]
         command: PatchPreviewCommand,
     },
+    Preview {
+        #[command(subcommand)]
+        command: PreviewCommand,
+    },
     ProposalAmendment {
         #[command(subcommand)]
         command: ProposalAmendmentCommand,
@@ -634,6 +638,28 @@ enum EvidenceCommand {
     },
     List {
         run_dir: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum PreviewCommand {
+    /// Start the loopback preview validation server for one scene.
+    Serve {
+        scene_path: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+        #[arg(long, value_name = "ID")]
+        session_id: Option<String>,
+    },
+    /// Show status of a running preview server.
+    Status {
+        #[arg(long)]
+        url: String,
+    },
+    /// Request shutdown of a running preview server.
+    Stop {
+        #[arg(long)]
+        url: String,
     },
 }
 
@@ -1689,6 +1715,54 @@ fn main() -> Result<()> {
                 report.claimed_ported_units.len()
             );
             println!("{}", report.fidelity_report.oracle_rule);
+        }
+        Commands::Preview {
+            command:
+                PreviewCommand::Serve {
+                    scene_path,
+                    port,
+                    session_id,
+                },
+        } => {
+            let session_id =
+                session_id.unwrap_or_else(|| format!("preview-{}", std::process::id()));
+            let mut config = ouroforge_core::preview_session_server::PreviewServerConfig::new(
+                scene_path,
+                &session_id,
+            );
+            config.port = port;
+            let server = ouroforge_core::preview_session_server::PreviewServer::bind(&config)?;
+            let addr = server.local_addr()?;
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::json!({
+                    "status": "serving",
+                    "url": format!("http://{addr}"),
+                    "sessionId": session_id,
+                    "scenePath": config.scene_path.to_string_lossy(),
+                    "pid": std::process::id(),
+                }))?
+            );
+            let report = server.serve_until_shutdown()?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Commands::Preview {
+            command: PreviewCommand::Status { url },
+        } => {
+            let value = ouroforge_core::preview_session_server::preview_http_request(
+                &url, "GET", "/session",
+            )?;
+            println!("{}", serde_json::to_string_pretty(&value)?);
+        }
+        Commands::Preview {
+            command: PreviewCommand::Stop { url },
+        } => {
+            let value = ouroforge_core::preview_session_server::preview_http_request(
+                &url,
+                "POST",
+                "/shutdown",
+            )?;
+            println!("{}", serde_json::to_string_pretty(&value)?);
         }
         Commands::Plugin { command } => {
             handle_plugin_command(command)?;

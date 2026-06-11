@@ -198,6 +198,7 @@ pub use seeded_rng::SEEDED_RNG_ALGORITHM;
 pub mod trust_gradient_audit;
 pub use source_apply_audit_ledger::*;
 pub mod preview_session;
+pub mod preview_session_server;
 pub mod qa_error_classifier;
 pub mod qa_evidence_bundle;
 pub mod qa_failure_backlog;
