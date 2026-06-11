@@ -2751,9 +2751,13 @@
   function assetBaseForSceneSource(sceneSource) {
     if (typeof sceneSource !== 'string' || !sceneSource) return '';
     const withoutQuery = sceneSource.split('?')[0].split('#')[0];
-    const sceneDir = withoutQuery.includes('/') ? withoutQuery.slice(0, withoutQuery.lastIndexOf('/') + 1) : '';
-    if (sceneDir.endsWith('/scenes/')) return sceneDir.slice(0, -'scenes/'.length);
-    return sceneDir;
+    const scenesMarker = '/scenes/';
+    const markerIndex = withoutQuery.indexOf(scenesMarker);
+    if (markerIndex !== -1) {
+      return `${withoutQuery.slice(0, markerIndex)}/`;
+    }
+    if (!withoutQuery.includes('/')) return '';
+    return `${withoutQuery.slice(0, withoutQuery.lastIndexOf('/') + 1)}`;
   }
 
   function sceneRelativeAssetPath(assetPath) {

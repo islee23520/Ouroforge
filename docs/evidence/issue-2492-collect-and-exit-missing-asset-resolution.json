@@ -1,0 +1,110 @@
+{
+  "issue": 2492,
+  "classification": "product-observed complete",
+  "generated_at": "2026-06-11T03:25:00Z",
+  "worktree": "/private/tmp/ouroforge-2492-pr2504",
+  "server": "python3 -m http.server 8873 --bind 127.0.0.1",
+  "target_dir": "/private/tmp/ouroforge-target-2492",
+  "runs": [
+    {
+      "run_id": "issue-2492-before-controlled-failure",
+      "bundle_path": "runs/issue-2492/live-observability/issue-2492-before-controlled-failure",
+      "target_url": "http://127.0.0.1:8873/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/before-controlled-failure.scene.json",
+      "validation": "valid observability bundle; artifacts=10",
+      "objective_flag_sequence": [
+        {
+          "label": "start",
+          "tick": 0,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": false,
+            "exit_reached": false
+          }
+        },
+        {
+          "label": "after-key",
+          "tick": 40,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": true,
+            "exit_reached": false,
+            "door_open": true
+          }
+        },
+        {
+          "label": "after-exit",
+          "tick": 85,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": true,
+            "exit_reached": false,
+            "door_open": true
+          }
+        }
+      ],
+      "final_goal_flags": {
+        "player_alive": true,
+        "key_collected": true,
+        "exit_reached": false,
+        "door_open": true
+      },
+      "runtime_diagnostics": [],
+      "console_jsonl_empty": true,
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/final.png"
+      ],
+      "verdict": "product-observed FAIL"
+    },
+    {
+      "run_id": "issue-2492-after-reviewed-fix",
+      "bundle_path": "runs/issue-2492/live-observability/issue-2492-after-reviewed-fix",
+      "target_url": "http://127.0.0.1:8873/examples/game-runtime/?scene=/examples/playable-demo-v2/collect-and-exit/scenes/session-k-product-observed/after-reviewed-fix.scene.json",
+      "validation": "valid observability bundle; artifacts=10",
+      "objective_flag_sequence": [
+        {
+          "label": "start",
+          "tick": 0,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": false,
+            "exit_reached": false
+          }
+        },
+        {
+          "label": "after-key",
+          "tick": 40,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": true,
+            "exit_reached": false,
+            "door_open": true
+          }
+        },
+        {
+          "label": "after-exit",
+          "tick": 85,
+          "goal_flags": {
+            "player_alive": true,
+            "key_collected": true,
+            "exit_reached": true,
+            "door_open": true
+          }
+        }
+      ],
+      "final_goal_flags": {
+        "player_alive": true,
+        "key_collected": true,
+        "exit_reached": true,
+        "door_open": true
+      },
+      "runtime_diagnostics": [],
+      "console_jsonl_empty": true,
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/final.png"
+      ],
+      "verdict": "product-observed complete"
+    }
+  ]
+}
