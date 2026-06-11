@@ -9,6 +9,7 @@ members = [
   "crates/ouroforge-protocols",
   "crates/ouroforge-core",
   "crates/ouroforge-cli",
+  "crates/ouroforge-observability",
 ]
 resolver = "2"
 

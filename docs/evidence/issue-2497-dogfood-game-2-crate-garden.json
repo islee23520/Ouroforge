@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "ouroforge.dogfoodGame2Evidence.v1",
+  "issue": 2497,
+  "classification": "product-observed complete",
+  "game": "Crate Garden Puzzle",
+  "genre": "turn-based grid logic puzzle",
+  "genreSelectionRationale": "Signal Gate Relay is a real-time platform/relay action slice; Crate Garden is a discrete Sokoban-style grid logic puzzle with pushable crates and target coverage.",
+  "seed": "examples/playable-demo-v2/crate-garden-puzzle/seeds/crate-garden-puzzle.yaml",
+  "manifest": "examples/playable-demo-v2/crate-garden-puzzle/ouroforge.project.json",
+  "beforeAfterRuns": [
+    {
+      "runId": "issue-2497-crate-garden-before",
+      "bundle": "runs/issue-2497/live-observability/issue-2497-crate-garden-before",
+      "targetUrl": "http://127.0.0.1:8897/examples/game-runtime/?scene=/examples/playable-demo-v2/crate-garden-puzzle/scenes/before-review.scene.json",
+      "finalFlags": {
+        "grid_status": "playing",
+        "grid_won": false,
+        "move_count": 1
+      },
+      "runtimeDiagnostics": [],
+      "consoleBytes": 0,
+      "verdict": "product-observed FAIL",
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/progress-first-move.png",
+        "screenshots/final.png"
+      ]
+    },
+    {
+      "runId": "issue-2497-crate-garden-after",
+      "bundle": "runs/issue-2497/live-observability/issue-2497-crate-garden-after",
+      "targetUrl": "http://127.0.0.1:8897/examples/game-runtime/?scene=/examples/playable-demo-v2/crate-garden-puzzle/scenes/crate-garden-puzzle.scene.json",
+      "finalFlags": {
+        "grid_status": "won",
+        "grid_won": true,
+        "move_count": 4
+      },
+      "runtimeDiagnostics": [],
+      "consoleBytes": 0,
+      "verdict": "product-observed complete",
+      "screenshots": [
+        "screenshots/start.png",
+        "screenshots/progress-first-move.png",
+        "screenshots/final.png"
+      ]
+    }
+  ],
+  "reviewApply": "examples/playable-demo-v2/crate-garden-puzzle/review/review-apply-decision.json",
+  "playtestBacklog": "examples/playable-demo-v2/crate-garden-puzzle/playtest/playtest-backlog.json",
+  "usabilityGaps": [
+    {
+      "id": "raw-json-primary-workflow",
+      "backlogIssue": "#2512",
+      "owner": "future Studio/CLI authoring workflow",
+      "manualSteps": [
+        "seed YAML",
+        "project manifest JSON",
+        "grid puzzle scene JSON",
+        "review/apply decision JSON",
+        "playtest backlog JSON"
+      ]
+    }
+  ],
+  "guardrails": [
+    "#1 remains open and body not edited",
+    "#23 remains open",
+    "no hosted collaboration",
+    "no secure sandbox claim",
+    "no Godot parity/replacement claim",
+    "no native/store/signing/upload",
+    "no command bridge",
+    "no browser trusted writes",
+    "no self-approval",
+    "no auto-apply",
+    "no auto-merge",
+    "no Era Q full 3D/M102-M106"
+  ]
+}

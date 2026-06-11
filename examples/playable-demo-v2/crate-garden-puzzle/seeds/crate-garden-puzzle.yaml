@@ -1,0 +1,21 @@
+schemaVersion: ouroforge.seed.v1
+id: crate-garden-puzzle
+issue: 2497
+title: Crate Garden Puzzle
+genre: turn-based grid logic puzzle
+selectedBecause: >-
+  Signal Gate Relay is a real-time platform/relay action slice. Crate Garden is
+  a deterministic Sokoban-style grid puzzle with discrete moves, pushable crates,
+  target coverage, and no timing/platform traversal requirement, exercising a
+  materially different game loop.
+intent:
+  playerGoal: Push the seed crate onto the garden bed target.
+  coreLoop: inspect grid, choose a direction, move/push once, observe board state.
+  failState: blocked pushes do not mutate the puzzle into a false win.
+  winState: all targets covered by crates.
+guardrails:
+  - local browser/runtime only
+  - no hosted collaboration
+  - no command bridge
+  - no self-approval
+  - generated evidence under ignored runs/

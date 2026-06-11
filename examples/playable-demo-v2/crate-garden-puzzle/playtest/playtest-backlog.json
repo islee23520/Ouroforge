@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "playtest-gap-backlog-v1",
+  "issue": 2497,
+  "backlogId": "crate-garden-puzzle-playtest-2497",
+  "findings": [
+    {
+      "findingId": "raw-json-primary-workflow",
+      "category": "authoring_usability",
+      "severity": "blocking",
+      "status": "open-backlog-needed",
+      "observation": "Seed/scaffold/playable/review artifacts for Game 2 required direct raw JSON/YAML authoring rather than a complete Studio/CLI happy path.",
+      "ownerIssue": "#2512",
+      "nextAction": "Use #2512 to replace the raw JSON/YAML primary authoring path with a guided local Studio/CLI workflow.",
+      "blocksProductObserved": false
+    }
+  ],
+  "readModel": {
+    "findingCount": 1,
+    "blockingDeferredCount": 0,
+    "openNonBlockingCount": 1,
+    "futureProposalCandidateCount": 1,
+    "closureAllowed": true
+  }
+}

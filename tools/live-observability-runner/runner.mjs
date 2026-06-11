@@ -353,6 +353,78 @@ async function runInputReplay(cdp, replayName, { screenshotDir } = {}) {
     await evaluateJson(cdp, `window.__OUROFORGE__.setInput({ right: false, keys: { right: false } })`);
     return { name: 'signal-gate-relay', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics, checkpoint_screenshots: checkpointScreenshots };
   }
+  if (replayName === 'grid-puzzle') {
+    const support = await evaluateJson(cdp, `
+      (async () => {
+        const api = window.__OUROFORGE__;
+        const diagnostics = [];
+        const required = ['getWorldState', 'setInput', 'step'];
+        for (const key of required) {
+          if (!api || typeof api[key] !== 'function') {
+            diagnostics.push({ code: 'unsupported-target', message: 'window.__OUROFORGE__.' + key + ' is missing' });
+          }
+        }
+        return { hasWhenReady: typeof api?.whenReady === 'function', diagnostics };
+      })()
+    `);
+    const used = [];
+    const diagnostics = support?.diagnostics ?? [];
+    const sequence = [];
+    if (support?.hasWhenReady) {
+      used.push('whenReady');
+      await evaluateJson(cdp, `window.__OUROFORGE__.whenReady()`);
+    }
+    if (diagnostics.length > 0) {
+      return { name: 'grid-puzzle', used_keys: used, steps: [], objective_flag_sequence: sequence, diagnostics, checkpoint_screenshots: [] };
+    }
+    used.push('getWorldState', 'setInput', 'step');
+    const moves = await evaluateJson(cdp, `
+      (() => {
+        const world = window.__OUROFORGE__.getWorldState();
+        return world?.gridPuzzle?.intendedSolution ?? [];
+      })()
+    `);
+    const flags = async (label, screenshotName = null) => {
+      const snapshot = await evaluateJson(cdp, `
+        (() => {
+          const world = window.__OUROFORGE__.getWorldState();
+          const grid = world?.gridPuzzle ?? null;
+          return {
+            label: ${JSON.stringify(label)},
+            tick: world?.tick ?? null,
+            goal_flags: {
+              grid_status: grid?.status ?? null,
+              grid_won: grid?.status === 'won',
+              move_count: grid?.moveCount ?? null
+            },
+            gridPuzzle: grid
+          };
+        })()
+      `);
+      sequence.push(snapshot);
+      if (screenshotName && screenshotDir) {
+        await capturePng(cdp, path.join(screenshotDir, screenshotName));
+      }
+      return snapshot;
+    };
+    const steps = [{ index: 0, action: 'sample', label: 'start' }];
+    const checkpointScreenshots = [];
+    await flags('start');
+    for (let index = 0; index < moves.length; index += 1) {
+      const move = moves[index];
+      const input = { [move]: true, keys: { [move]: true } };
+      steps.push({ index: steps.length, action: 'setInput', input });
+      await evaluateJson(cdp, `window.__OUROFORGE__.setInput(${JSON.stringify(input)})`);
+      steps.push({ index: steps.length, action: 'step', count: 1, label: `move-${index + 1}-${move}` });
+      await evaluateJson(cdp, `window.__OUROFORGE__.step(1)`);
+      await evaluateJson(cdp, `window.__OUROFORGE__.setInput({ ${JSON.stringify(move)}: false, keys: { ${JSON.stringify(move)}: false } })`);
+      const screenshotName = index === 0 ? 'progress-first-move.png' : null;
+      await flags(`move-${index + 1}-${move}`, screenshotName);
+      if (screenshotName) checkpointScreenshots.push({ label: `move-${index + 1}-${move}`, path: `screenshots/${screenshotName}` });
+    }
+    steps.push({ index: steps.length, action: 'setInput', input: {} });
+    return { name: 'grid-puzzle', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics, checkpoint_screenshots: checkpointScreenshots };
+  }
   if (replayName !== 'collect-and-exit') {
     return { name: replayName, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [{ code: 'unsupported-target', message: `unknown replay: ${replayName}` }] };
   }

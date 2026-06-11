@@ -18,7 +18,7 @@ Generated at: 2026-06-10T00:00:00Z
 | `po-check-live-url` | PASS | `manifest.json` | Local-only target URL is recorded in manifest. |
 | `po-check-console` | PASS | `console.jsonl; world-samples.jsonl` | console warnings/errors: 0; runtime diagnostics: 1. |
 | `po-check-screenshot` | PASS | `screenshots/final.png,screenshots/start.png` | Screenshot inventory is listed by concrete artifact path. |
-| `po-check-replay` | PASS | `input-replay.json` | objective checkpoints: 3; final exit_reached: true. |
+| `po-check-replay` | PASS | `input-replay.json` | objective checkpoints: 3; final exit_reached: true; final grid_won: false. |
 | `po-check-world-sample` | PASS | `world-samples.jsonl` | world sample lines: 1. |
 | `po-check-event-sample` | PASS | `events.json` | event entries: 2. |
 | `po-check-frame-stats` | PASS | `frame-stats.jsonl` | frame stat lines: 1. |

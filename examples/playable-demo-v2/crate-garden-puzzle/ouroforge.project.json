@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "ouroforge.project.v1",
+  "projectId": "crate_garden_puzzle_dogfood_2",
+  "issue": 2497,
+  "title": "Crate Garden Puzzle",
+  "genre": "turn-based grid logic puzzle",
+  "genreSelectionRationale": "Different from Signal Gate Relay's real-time platform/relay loop: this game uses discrete Sokoban-style grid pushes, target coverage, and deterministic puzzle-state reasoning.",
+  "seedRef": "seeds/crate-garden-puzzle.yaml",
+  "mainScene": "scenes/crate-garden-puzzle.scene.json",
+  "scenarioRef": "scenarios/crate-garden-puzzle-core.json",
+  "reviewApplyRef": "review/review-apply-decision.json",
+  "playtestRef": "playtest/playtest-backlog.json",
+  "generatedStatePolicy": "runs/issue-2497/** for browser profiles, screenshots, live observability bundles, and generated playtest transcripts",
+  "nonClaims": [
+    "no broad genre support claim",
+    "no full game production claim",
+    "no Godot parity or replacement claim",
+    "no hosted/cloud/store/signing/upload claim"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1",
+  "id": "crate-garden-puzzle",
+  "bounds": {
+    "width": 192,
+    "height": 160
+  },
+  "renderer": {
+    "background": "#18212f",
+    "viewport": {
+      "width": 192,
+      "height": 160
+    }
+  },
+  "entities": [],
+  "metadata": {
+    "dogfoodGame": 2,
+    "issue": 2497,
+    "state": "after-review-apply",
+    "knownGap": "none for scoped mechanical puzzle loop"
+  },
+  "gridPuzzle": {
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "id": "crate-garden-puzzle-v1",
+    "width": 6,
+    "height": 5,
+    "objects": {
+      "floor": {
+        "role": "background"
+      },
+      "wall": {
+        "role": "solid"
+      },
+      "player": {
+        "role": "player"
+      },
+      "crate": {
+        "role": "pushable"
+      },
+      "target": {
+        "role": "target"
+      }
+    },
+    "legend": {
+      "#": [
+        "floor",
+        "wall"
+      ],
+      ".": [
+        "floor"
+      ],
+      "@": [
+        "floor",
+        "target"
+      ],
+      "*": [
+        "floor",
+        "crate"
+      ],
+      "P": [
+        "floor",
+        "player"
+      ]
+    },
+    "rows": [
+      "######",
+      "#@...#",
+      "#.*P.#",
+      "#....#",
+      "######"
+    ],
+    "win": {
+      "type": "all-targets-covered"
+    },
+    "lose": {
+      "type": "none"
+    },
+    "intendedSolution": [
+      "left",
+      "down",
+      "left",
+      "up"
+    ]
+  }
+}

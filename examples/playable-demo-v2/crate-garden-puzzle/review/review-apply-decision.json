@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "ouroforge.review-apply-decision.v1",
+  "issue": 2497,
+  "decisionId": "crate-garden-review-apply-2497",
+  "proposal": "Replace incomplete before-review intendedSolution with the reviewed four-move solution and keep the level layout unchanged.",
+  "beforeScene": "scenes/before-review.scene.json",
+  "afterScene": "scenes/crate-garden-puzzle.scene.json",
+  "reviewer": { "type": "human-required-template", "selfApproval": false },
+  "trustedWriteBoundary": {
+    "browserTrustedWrite": false,
+    "commandBridge": false,
+    "autoApply": false,
+    "autoMerge": false
+  },
+  "rawJsonManualSteps": [
+    {
+      "path": "examples/playable-demo-v2/crate-garden-puzzle/scenes/crate-garden-puzzle.scene.json",
+      "reason": "No Studio happy-path scaffold/apply UI produced the second-game grid puzzle scene; agent edited fixture JSON directly.",
+      "owner": "backlog issue required after #2497 evidence",
+      "classification": "usability-gap"
+    }
+  ]
+}

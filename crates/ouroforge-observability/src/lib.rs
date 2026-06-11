@@ -182,19 +182,24 @@ pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -
         .get("exit_reached")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let grid_won = final_flags
+        .get("grid_won")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let objective_satisfied = exit_reached || grid_won;
     let screenshot_paths = inventory_paths_by_kind(&manifest, "png");
     let product_observed_complete = console_errors == 0
         && runtime_diagnostics.is_empty()
         && !world_lines.is_empty()
         && !frame_lines.is_empty()
         && !screenshot_paths.is_empty()
-        && exit_reached;
+        && objective_satisfied;
     let product_status = if product_observed_complete {
         "product-observed complete"
     } else {
         "product-observed FAIL"
     };
-    let mechanical_status = if exit_reached || manifest.replay.is_none() {
+    let mechanical_status = if objective_satisfied || manifest.replay.is_none() {
         "contract-pass"
     } else {
         "contract-fail"
@@ -285,7 +290,7 @@ pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -
         replay_result,
         "input-replay.json",
         &format!(
-            "objective checkpoints: {}; final exit_reached: {exit_reached}.",
+            "objective checkpoints: {}; final exit_reached: {exit_reached}; final grid_won: {grid_won}.",
             objective_sequence.len()
         ),
     );

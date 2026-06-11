@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ouroforge.scenario.v1",
+  "scenarioId": "crate-garden-puzzle-core",
+  "sceneRef": "../scenes/crate-garden-puzzle.scene.json",
+  "replay": "grid-puzzle",
+  "expectedCheckpoints": [
+    { "label": "start", "grid_status": "playing", "grid_won": false },
+    { "label": "move-4-up", "grid_status": "won", "grid_won": true }
+  ]
+}

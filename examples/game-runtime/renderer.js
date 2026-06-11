@@ -633,6 +633,56 @@
     }
   }
 
+  function gridPuzzleRoleForCell(world, layerName) {
+    const objects = world && world.gridPuzzle && world.gridPuzzle.objects ? world.gridPuzzle.objects : {};
+    return objects[layerName] && objects[layerName].role ? objects[layerName].role : 'background';
+  }
+
+  function drawGridPuzzle({ context, world }) {
+    const grid = world && world.gridPuzzle;
+    if (!context || !grid || !Array.isArray(grid.cells)) return [];
+    const cellSize = 24;
+    const origin = { x: 24, y: 36 };
+    const drawn = [];
+    const roleStyle = {
+      background: '#1f2937',
+      solid: '#475569',
+      target: '#f59e0b',
+      pushable: '#22c55e',
+      player: '#38bdf8',
+      hazard: '#ef4444',
+    };
+    context.save();
+    context.font = '10px ui-monospace, monospace';
+    for (let y = 0; y < grid.height; y += 1) {
+      const row = grid.cells[y] || [];
+      for (let x = 0; x < grid.width; x += 1) {
+        const layers = Array.isArray(row[x]) ? row[x] : [];
+        const screenX = origin.x + (x * cellSize);
+        const screenY = origin.y + (y * cellSize);
+        context.fillStyle = '#111827';
+        context.fillRect(screenX, screenY, cellSize - 1, cellSize - 1);
+        for (const layer of layers) {
+          const role = gridPuzzleRoleForCell(world, layer);
+          if (role === 'background') continue;
+          context.fillStyle = roleStyle[role] || '#e5e7eb';
+          const inset = role === 'target' ? 7 : (role === 'player' ? 5 : 3);
+          context.fillRect(screenX + inset, screenY + inset, cellSize - (inset * 2) - 1, cellSize - (inset * 2) - 1);
+        }
+        context.strokeStyle = '#334155';
+        context.strokeRect(screenX, screenY, cellSize - 1, cellSize - 1);
+        drawn.push({ x, y, layers: layers.slice(), screenX, screenY });
+      }
+    }
+    context.fillStyle = '#e5e7eb';
+    context.fillText(`grid=${grid.id || 'grid-puzzle'} status=${grid.status} moves=${grid.moveCount}`, origin.x, origin.y + (grid.height * cellSize) + 16);
+    if (grid.lastMove && grid.lastMove.direction) {
+      context.fillText(`last=${grid.lastMove.direction}:${grid.lastMove.result}`, origin.x, origin.y + (grid.height * cellSize) + 30);
+    }
+    context.restore();
+    return drawn;
+  }
+
   function drawRuntime({ canvas, context, world, renderer, assets, animation, tilemap }) {
     if (!canvas || !context || !world) return [];
     const activeRenderer = normalizeRenderer(renderer, world.bounds || { width: canvas.width, height: canvas.height });
@@ -662,6 +712,7 @@
       context,
       summary: scene3dRenderSummary({ world, frameId: `tick-${world.tick ?? 0}` }),
     });
+    drawGridPuzzle({ context, world });
     context.fillStyle = '#f2f6f8';
     context.font = '10px ui-monospace, monospace';
     context.fillText(`scene=${world.sceneId} tick=${world.tick}`, 8, 14);
