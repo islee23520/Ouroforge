@@ -186,7 +186,9 @@ pub fn render_verdict(bundle_root: impl AsRef<Path>, options: &VerdictOptions) -
         .get("grid_won")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    let objective_satisfied = exit_reached || grid_won;
+    let grid_won_satisfies_objective =
+        manifest.replay.as_deref() == Some("grid-puzzle") && grid_won;
+    let objective_satisfied = exit_reached || grid_won_satisfies_objective;
     let screenshot_paths = inventory_paths_by_kind(&manifest, "png");
     let product_observed_complete = console_errors == 0
         && runtime_diagnostics.is_empty()

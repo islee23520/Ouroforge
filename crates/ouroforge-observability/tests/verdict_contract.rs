@@ -1,8 +1,13 @@
 use ouroforge_observability::{
     checklist_ids, render_verdict, validate_bundle, write_rendered_verdict, VerdictOptions,
 };
+use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static TEMP_COPY_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn strip_generated_at(markdown: &str) -> String {
     markdown
@@ -27,6 +32,41 @@ fn renders_collect_and_exit_contract_pass_product_fail_golden() {
     for id in checklist_ids() {
         assert!(actual.contains(id), "missing checklist id {id}");
     }
+}
+
+#[test]
+fn stale_grid_won_does_not_satisfy_non_grid_replay_objective() {
+    let temp = copy_fixture_to_temp("collect-and-exit-product-fail");
+    let replay_path = temp.join("input-replay.json");
+    let mut replay: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&replay_path).unwrap()).unwrap();
+    let sequence = replay["objective_flag_sequence"].as_array_mut().unwrap();
+    let final_flags = sequence
+        .last_mut()
+        .unwrap()
+        .get_mut("goal_flags")
+        .unwrap()
+        .as_object_mut()
+        .unwrap();
+    final_flags.insert("exit_reached".to_string(), serde_json::json!(false));
+    final_flags.insert("grid_won".to_string(), serde_json::json!(true));
+    fs::write(&replay_path, serde_json::to_string(&replay).unwrap()).unwrap();
+    refresh_manifest_digest(&temp, "input-replay.json");
+
+    let verdict = render_verdict(
+        &temp,
+        &VerdictOptions {
+            generated_at: "2026-06-10T00:00:03Z".to_string(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert!(verdict.contains("Replay: `collect-and-exit`"));
+    assert!(verdict.contains("final exit_reached: false; final grid_won: true"));
+    assert!(verdict.contains("Mechanical contract: `contract-fail`"));
+    assert!(verdict.contains("Product observation: `product-observed FAIL`"));
+    let _ = fs::remove_dir_all(temp);
 }
 
 #[test]
@@ -82,14 +122,38 @@ fn copy_fixture_to_temp(name: &str) -> PathBuf {
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures")
         .join(name);
+    let unique = TEMP_COPY_COUNTER.fetch_add(1, Ordering::SeqCst);
     let parent = std::env::temp_dir().join(format!(
-        "ouroforge-observability-test-{}",
+        "ouroforge-observability-test-{}-{unique}",
         std::process::id()
     ));
     let dest = parent.join(name);
     let _ = fs::remove_dir_all(&parent);
     copy_dir_all(&source, &dest);
     dest
+}
+
+fn refresh_manifest_digest(bundle_root: &Path, artifact_path: &str) {
+    let manifest_path = bundle_root.join("manifest.json");
+    let mut manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    let digest = hex_sha256(&fs::read(bundle_root.join(artifact_path)).unwrap());
+    let inventory = manifest["artifact_inventory"].as_array_mut().unwrap();
+    let entry = inventory
+        .iter_mut()
+        .find(|entry| entry["path"].as_str() == Some(artifact_path))
+        .unwrap();
+    entry["sha256"] = Value::String(digest);
+    fs::write(
+        manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap() + "\n",
+    )
+    .unwrap();
+}
+
+fn hex_sha256(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn copy_dir_all(source: &Path, dest: &Path) {
