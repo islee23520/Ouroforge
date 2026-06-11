@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "m130-cockpit-copyable-command-v1",
+  "commandId": "signal-gate-dogfood-seed-validate",
+  "label": "Validate Signal Gate Relay seed",
+  "command": "cargo run -p ouroforge-cli -- seed validate examples/playable-demo-v2/signal-gate-dogfood/seeds/signal-gate-relay.yaml",
+  "boundary": "Display-only copyable text; Studio does not execute commands or perform trusted writes."
+}

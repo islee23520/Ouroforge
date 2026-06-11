@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "m130-studio-reviewer-observation-v1",
+  "observationId": "signal-gate-relay-studio-reviewer-2494",
+  "ownerIssue": 2494,
+  "m130PhaseIssue": 2391,
+  "manualGapId": "m130-2391-manual-studio-launch",
+  "projectRef": "signal-gate-dogfood",
+  "projectManifestPath": "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
+  "readOnlySurfaces": [
+    "examples/authoring-cockpit/index.html",
+    "examples/authoring-cockpit/cockpit.js"
+  ],
+  "cockpitRenderFunctionsReferenced": [
+    "renderProjectOverviewSurface",
+    "renderStudioNavigation",
+    "renderProjectRunSurface",
+    "renderIntegration"
+  ],
+  "copyableCommands": [
+    "examples/authoring-cockpit/commands/signal-gate-dogfood-project-validate.json",
+    "examples/authoring-cockpit/commands/signal-gate-dogfood-seed-validate.json",
+    "examples/authoring-cockpit/commands/signal-gate-dogfood-project-run.json",
+    "examples/authoring-cockpit/commands/signal-gate-dogfood-dashboard-export.json"
+  ],
+  "manualSteps": {
+    "transcriptTemplateVersion": "m130-studio-reviewer-transcript-v1",
+    "studioLaunchUrl": "http://127.0.0.1:8000/examples/authoring-cockpit/",
+    "runtimePreviewUrl": "http://127.0.0.1:8000/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+    "localServerCommand": "python3 -m http.server 8000 --bind 127.0.0.1 --directory .",
+    "fields": [
+      "observedAtUtc",
+      "reviewer",
+      "studioPanelsVisible",
+      "projectContextVisible",
+      "copyableCommandsReviewed",
+      "runtimePreviewOpened",
+      "browserTrustedWriteAttempted",
+      "notes"
+    ],
+    "browserTrustedWriteAttemptedExpected": false
+  },
+  "trustedWritePolicy": "rust-cli-only",
+  "evidenceDocRef": "docs/evidence/studio-reviewer-observation-signal-gate-2494.md",
+  "boundary": "Read-only Studio reviewer observation handoff for Signal Gate Relay; browser surfaces display escaped evidence and copyable Rust CLI command text only."
+}
