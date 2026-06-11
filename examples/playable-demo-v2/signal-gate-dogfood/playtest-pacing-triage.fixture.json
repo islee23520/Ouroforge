@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "signal-gate-playtest-pacing-template-v1",
+  "issue": 2496,
+  "classification": "contract-complete",
+  "status": "template-prepared-awaiting-human-playtest",
+  "scope": "Environment and observation template only; no human fun/feel verdict recorded by this fixture.",
+  "scenarioRef": "scenarios/signal-gate-relay-core.json",
+  "scenarioPackId": "signal-gate-relay-core",
+  "seedRef": "seeds/signal-gate-relay.yaml",
+  "liveEntryPointUrl": "http://127.0.0.1:8896/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+  "localServerCommand": "python3 -m http.server 8896 --bind 127.0.0.1",
+  "optionalContextReplayCommand": "node tools/live-observability-runner/runner.mjs --url http://127.0.0.1:8896/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json --run-id issue-2496-signal-gate-playtest-context --out-root runs/issue-2496/live-observability --replay signal-gate-relay --wait-ms 3000",
+  "observationTemplate": {
+    "schemaVersion": "ouroforge.playtest-capture-template.v1",
+    "captureId": "TODO-human-playtest-capture-id",
+    "projectId": "signal_gate_relay_dogfood",
+    "playtester": {
+      "actorId": "TODO-human-playtester-id",
+      "role": "human-playtester",
+      "humanConfirmed": false
+    },
+    "scenarioContext": {
+      "sceneRef": "examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+      "replay": "signal-gate-relay",
+      "mechanicalEvidenceRefs": []
+    },
+    "requiredFieldsBeforeClosure": {
+      "observedBehavior": "TODO",
+      "expectedBehavior": "TODO",
+      "productImpact": "TODO",
+      "humanFunFeelNotes": "TODO-human-owned-evidence-not-automated-score",
+      "mechanicalVerdict": "TODO-separate-from-fun-feel",
+      "releaseGoNoGo": "TODO-human-owned-or-not-recorded",
+      "recommendedBacklogAction": "TODO",
+      "evidenceRefs": []
+    },
+    "trustedWriteRequested": false,
+    "releaseAuthority": false,
+    "generatedStatePolicy": "generated playtest runs/logs/screenshots remain under ignored runs/ unless explicitly fixture-scoped"
+  },
+  "playtestGapBacklog": {
+    "schemaVersion": "playtest-gap-backlog-v1",
+    "backlogId": "signal-gate-playtest-backlog-2496-template",
+    "findings": [
+      {
+        "findingId": "pacing-blocker",
+        "category": "dogfood_game_quality",
+        "severity": "blocking",
+        "status": "awaiting-human-playtest",
+        "observation": "Deferred M129/M130 pacing concern requires a bounded human playtest before resolution or split.",
+        "humanFunFeelNote": "not-recorded",
+        "evidenceRefs": [],
+        "ownerIssue": "#2496",
+        "nextAction": "User/human playtester completes observationTemplate; then resolve with evidence or split into owner-assigned follow-up issue.",
+        "blocksProductObserved": true
+      }
+    ],
+    "readModel": {
+      "findingCount": 1,
+      "blockingDeferredCount": 1,
+      "openNonBlockingCount": 0,
+      "futureProposalCandidateCount": 1,
+      "closureAllowed": false
+    }
+  },
+  "verdictSeparation": {
+    "mechanical": {
+      "status": "not-evaluated-in-this-template",
+      "summary": "Mechanical replay context may be captured, but this fixture does not close the playtest issue."
+    },
+    "funFeel": {
+      "status": "awaiting-human-evidence",
+      "summary": "Human fun/feel notes are required and must not become an automated pass/fail or release approval.",
+      "releaseGoNoGo": "not-recorded"
+    }
+  },
+  "guardrails": [
+    "#1 remains open",
+    "#23 remains open",
+    "no browser trusted writes",
+    "no command bridge",
+    "no self-approval",
+    "no auto-apply",
+    "no auto-merge",
+    "no release or market readiness claim",
+    "do not close #2496 until human playtest evidence exists"
+  ]
+}
