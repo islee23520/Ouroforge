@@ -68,10 +68,43 @@ Validation rejections (allowlist miss, unknown entity, type mismatch, invalid
 candidate scene) are `rejected` deltas with diagnostics. Envelope errors
 (wrong schema version, session mismatch) are hard errors, not deltas.
 
+## Transcript and draft export (M131.3, #2520)
+
+### `ouroforge.preview-transcript.v1`
+
+The serve process records every intent with its normalized delta in memory
+(`PreviewTranscriptRecorder`). `GET /transcript` returns the transcript;
+persistence is the local CLI client's job (`ouroforge preview transcript
+--url ... --output runs/...`), so the serve path stays write-free.
+
+- Entries carry `index`, integer `relativeMs` instrumentation timing, the
+  `intent`, and the `delta`.
+- `semanticDigest` is computed over the timing-stripped canonical form:
+  identical interaction histories digest identically regardless of pacing.
+- **Fidelity guarantee:** `replay_preview_transcript` re-runs every intent
+  through the same validation code paths and fails closed on stale base
+  scenes, any delta that does not reproduce byte-identically, final-state
+  divergence, or digest mismatch.
+
+### `ouroforge preview export-proposal`
+
+Converts a fidelity-verified transcript into the EXISTING
+`visual-edit-draft-v1` artifact (no new proposal type):
+
+- Net effect = the last applied value per `(entityId, sceneEditPath)`. Every
+  allowlisted path is a leaf scalar, so base-relative application of the net
+  values reproduces the final session state — the same base-relative
+  convention the existing draft preflight validates.
+- Rejected interactions contribute no net edits; empty transcripts fail
+  closed.
+- The exported draft passes `validate_scene_preflight` against the base scene
+  before it is written, links the transcript semantic digest as evidence, and
+  ships with no pre-filled review gate. Export produces a draft only; review
+  and apply authority stay with the existing gated CLI flow.
+
 ## Boundaries
 
 This contract does not authorize browser trusted writes, command bridges,
-auto-apply to the trusted worktree, remote/non-loopback binding, multi-client
-sessions, transcript capture (M131.3), or any runtime client behavior
-(M131.2). Scene mutation authority remains exclusively with the existing
-review-gated apply flow.
+auto-apply to the trusted worktree, remote/non-loopback binding, or
+multi-client sessions. Scene mutation authority remains exclusively with the
+existing review-gated apply flow.
