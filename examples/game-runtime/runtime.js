@@ -20,6 +20,9 @@
     { code: 'sampler_failed', severity: 'error', class: 'sampler', description: 'Runtime state sampler could not produce bounded evidence.' },
     { code: 'render_failed', severity: 'error', class: 'render', description: 'Runtime render evidence generation failed.' },
     { code: 'collision_trigger_anomaly', severity: 'warning', class: 'collision-trigger', description: 'Collision or trigger evidence was anomalous.' },
+    { code: 'preview_delta_apply_failed', severity: 'error', class: 'preview-channel', description: 'A validated preview delta could not be applied to the live world.' },
+    { code: 'preview_delta_schema_unsupported', severity: 'warning', class: 'preview-channel', description: 'A preview channel payload had an unsupported schema or status.' },
+    { code: 'preview_channel_failed', severity: 'warning', class: 'preview-channel', description: 'The preview channel socket failed to connect, parse, or reload.' },
   ]);
   const runtimeDiagnosticTypeByCode = new Map(runtimeDiagnosticTypes.map((diagnostic) => [diagnostic.code, diagnostic]));
 
@@ -33,6 +36,8 @@
     ['sampleRuntimeState', 'stable', 'Run a bounded runtime-state sampler and emit typed sampler diagnostics on failure.'],
     ['scenarioCoverageV100', 'test-only', 'Runs the M119 Scenario Coverage v100 planted diagnostic suite in bounded runtime scope.'],
     ['queryEntity', 'stable', 'Query an entity by id and emit typed invalid-query diagnostics.'],
+    ['connectPreviewChannel', 'experimental', 'Connect a receive-only loopback preview channel that applies Rust-validated deltas to the live world.'],
+    ['previewChannelState', 'stable', 'Read receive-only preview channel status, counters, and latency instrumentation timestamps.'],
     ['getDiagnostics', 'stable', 'Read structured runtime diagnostics emitted by the browser runtime.'],
     ['diagnosticTypes', 'stable', 'Machine-readable single-source runtime diagnostic enum consumed by classifiers.'],
     ['getFrameStats', 'stable', 'Read frame/render/collision counters for runtime shell diagnostics.'],
@@ -2765,11 +2770,176 @@
     const base = assetBaseForSceneSource(activeSceneSource);
     return base ? `${base}${assetPath}` : assetPath;
   }
+  // --- Preview channel client (M131.2, Era X #2519) -----------------------
+  // Receive-only consumer of Rust-validated ouroforge.preview-delta.v1
+  // frames pushed by `ouroforge preview serve` over a loopback WebSocket.
+  // The runtime never originates intents or writes on this channel; acks are
+  // best-effort instrumentation. With no connection the runtime behavior is
+  // bit-identical to a build without this block (channel-idle determinism).
+  const previewChannelModule =
+    (typeof window !== 'undefined' && window.OuroforgePreviewChannel) ||
+    (typeof globalThis !== 'undefined' && globalThis.OuroforgePreviewChannel) ||
+    null;
+  const previewChannelState = {
+    schemaVersion: 'ouroforge.preview-channel-state.v1',
+    mode: 'idle',
+    url: null,
+    connected: false,
+    deltasApplied: 0,
+    deltasSkipped: 0,
+    deltasFailed: 0,
+    sceneReloads: 0,
+    timestamps: [],
+  };
+
+  function previewNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : null;
+  }
+
+  function handlePreviewDeltaMessage(rawText, socket) {
+    const receivedAt = previewNow();
+    let delta;
+    try {
+      delta = JSON.parse(String(rawText));
+    } catch (error) {
+      previewChannelState.deltasFailed += 1;
+      recordRuntimeDiagnostic('preview_channel_failed', 'Preview channel payload was not JSON.', {
+        error: String(error),
+      });
+      return { ok: false, error: 'preview channel payload was not JSON' };
+    }
+    const result = previewChannelModule.applyPreviewDelta(world, delta);
+    const appliedAt = previewNow();
+    const deltaId = delta && typeof delta.deltaId === 'string' ? delta.deltaId : null;
+    if (!result.ok) {
+      previewChannelState.deltasFailed += 1;
+      recordRuntimeDiagnostic(
+        result.diagnostic || 'preview_delta_apply_failed',
+        result.error || 'Preview delta application failed.',
+        { deltaId }
+      );
+    } else if (result.requiresSceneReload) {
+      previewChannelState.sceneReloads += 1;
+      record('runtime.preview.scene_reload_requested', { deltaId, sceneSource: activeSceneSource });
+      fetch(activeSceneSource)
+        .then((response) => response.json())
+        .then((scene) => {
+          loadScene(scene, { sceneSource: activeSceneSource });
+          record('runtime.preview.scene_reloaded', { sceneSource: activeSceneSource });
+        })
+        .catch((error) => {
+          recordRuntimeDiagnostic('preview_channel_failed', 'Preview scene reload failed.', {
+            error: String(error),
+            sceneSource: activeSceneSource,
+          });
+        });
+    } else if (result.skipped) {
+      previewChannelState.deltasSkipped += 1;
+    } else {
+      previewChannelState.deltasApplied += 1;
+      record('runtime.preview.delta_applied', {
+        deltaId,
+        sequence: delta.sequence,
+        appliedEdits: result.appliedEdits,
+        entityIds: result.entityIds,
+      });
+    }
+    previewChannelState.timestamps.push({ deltaId, receivedAt, appliedAt, tick: world.tick });
+    if (previewChannelState.timestamps.length > 64) previewChannelState.timestamps.shift();
+    if (socket && typeof socket.send === 'function') {
+      try {
+        socket.send(
+          JSON.stringify({
+            type: 'ack',
+            schemaVersion: 'ouroforge.preview-ack.v1',
+            deltaId,
+            receivedAt,
+            appliedAt,
+          })
+        );
+      } catch (_error) {
+        // Acks are best-effort instrumentation only.
+      }
+    }
+    return result;
+  }
+
+  function previewLoopbackUrl(url) {
+    return (
+      typeof url === 'string' &&
+      (url.startsWith('ws://127.0.0.1:') ||
+        url.startsWith('ws://localhost:') ||
+        url.startsWith('ws://[::1]:'))
+    );
+  }
+
+  function connectPreviewChannel(url) {
+    if (!previewChannelModule) {
+      recordRuntimeDiagnostic('preview_channel_failed', 'Preview channel module is not loaded.', {
+        url: String(url),
+      });
+      return { ok: false, error: 'preview channel module missing' };
+    }
+    if (!previewLoopbackUrl(url)) {
+      recordRuntimeDiagnostic(
+        'preview_channel_failed',
+        'Preview channel URL must be a loopback ws:// address.',
+        { url: String(url) }
+      );
+      return { ok: false, error: 'preview channel url must be loopback ws://' };
+    }
+    const WebSocketCtor =
+      (typeof WebSocket !== 'undefined' && WebSocket) ||
+      (typeof globalThis !== 'undefined' && globalThis.WebSocket) ||
+      null;
+    if (typeof WebSocketCtor !== 'function') {
+      recordRuntimeDiagnostic('preview_channel_failed', 'WebSocket is unavailable in this host.', {
+        url,
+      });
+      return { ok: false, error: 'WebSocket unavailable' };
+    }
+    let socket;
+    try {
+      socket = new WebSocketCtor(url);
+    } catch (error) {
+      recordRuntimeDiagnostic('preview_channel_failed', 'Preview channel socket failed to open.', {
+        url,
+        error: String(error),
+      });
+      return { ok: false, error: 'preview channel socket failed to open' };
+    }
+    previewChannelState.mode = 'connecting';
+    previewChannelState.url = url;
+    socket.onopen = () => {
+      previewChannelState.connected = true;
+      previewChannelState.mode = 'connected';
+      record('runtime.preview.channel_connected', { url });
+    };
+    socket.onclose = () => {
+      previewChannelState.connected = false;
+      previewChannelState.mode = 'closed';
+    };
+    socket.onerror = () => {
+      recordRuntimeDiagnostic('preview_channel_failed', 'Preview channel socket error.', { url });
+    };
+    socket.onmessage = (event) => handlePreviewDeltaMessage(event && event.data, socket);
+    return { ok: true, url };
+  }
+  // -------------------------------------------------------------------------
+
   const api = Object.freeze({
     apiVersion: runtimeApiVersion,
     apiCompatibility: runtimeApiCompatibility,
     apiInventory() {
       return runtimeApiInventory(api);
+    },
+    connectPreviewChannel(url) {
+      return connectPreviewChannel(url);
+    },
+    previewChannelState() {
+      return clone(previewChannelState);
     },
     getWorldState() {
       const state = clone(world);
@@ -3089,5 +3259,19 @@
   // Expose a readiness accessor so harnesses can await the fetched scene before
   // reading world state (otherwise they observe the synchronous fallback scene
   // and a late loadScene would reset the steps they executed in the interim).
+  function previewUrlFromLocation(locationValue = globalThis.location) {
+    try {
+      if (!locationValue || typeof locationValue.search !== 'string') return null;
+      const requested = new URLSearchParams(locationValue.search).get('preview');
+      if (!requested) return null;
+      return previewLoopbackUrl(requested) ? requested : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+  const previewUrl = previewUrlFromLocation();
+  if (previewUrl) {
+    sceneReady.then(() => connectPreviewChannel(previewUrl)).catch(() => {});
+  }
   window.__OUROFORGE__ = api;
 })();

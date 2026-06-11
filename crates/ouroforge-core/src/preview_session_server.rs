@@ -17,7 +17,10 @@ use serde_json::json;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tungstenite::handshake::derive_accept_key;
+use tungstenite::protocol::Role;
+use tungstenite::{Message, WebSocket};
 
 pub const PREVIEW_SERVER_STATUS_SCHEMA_VERSION: &str = "ouroforge.preview-server-status.v1";
 
@@ -72,16 +75,30 @@ pub struct PreviewServerReport {
     pub intents_rejected: u64,
     #[serde(rename = "envelopeErrors")]
     pub envelope_errors: u64,
+    #[serde(rename = "deltasBroadcast")]
+    pub deltas_broadcast: u64,
+    #[serde(rename = "acksReceived")]
+    pub acks_received: u64,
     #[serde(rename = "shutdownReason")]
     pub shutdown_reason: String,
+}
+
+enum ConnectionOutcome {
+    Continue,
+    Shutdown,
+    Subscribe(Box<WebSocket<TcpStream>>),
+    Broadcast(String),
 }
 
 pub struct PreviewServer {
     listener: TcpListener,
     session: PreviewSession,
+    subscribers: Vec<WebSocket<TcpStream>>,
     applied: u64,
     rejected: u64,
     envelope_errors: u64,
+    deltas_broadcast: u64,
+    acks_received: u64,
 }
 
 impl PreviewServer {
@@ -97,9 +114,12 @@ impl PreviewServer {
         Ok(Self {
             listener,
             session,
+            subscribers: Vec::new(),
             applied: 0,
             rejected: 0,
             envelope_errors: 0,
+            deltas_broadcast: 0,
+            acks_received: 0,
         })
     }
 
@@ -121,8 +141,10 @@ impl PreviewServer {
         }
     }
 
-    /// Serve requests until `POST /shutdown`. Connections are handled one at
-    /// a time; each request gets a `Connection: close` JSON response.
+    /// Serve requests until `POST /shutdown`. HTTP connections are handled
+    /// one at a time with `Connection: close` JSON responses; `GET /channel`
+    /// upgrades to a receive-only WebSocket subscription that gets every
+    /// subsequent delta pushed as a JSON text frame.
     pub fn serve_until_shutdown(mut self) -> Result<PreviewServerReport> {
         loop {
             let (stream, _peer) = self
@@ -130,16 +152,29 @@ impl PreviewServer {
                 .accept()
                 .context("preview server accept failed")?;
             match self.handle_connection(stream) {
-                Ok(true) => {
+                Ok(ConnectionOutcome::Shutdown) => {
+                    self.drain_acks(Duration::from_millis(500));
+                    for subscriber in &mut self.subscribers {
+                        let _ = subscriber.close(None);
+                    }
                     return Ok(PreviewServerReport {
                         session_id: self.session.session_id.clone(),
                         intents_applied: self.applied,
                         intents_rejected: self.rejected,
                         envelope_errors: self.envelope_errors,
+                        deltas_broadcast: self.deltas_broadcast,
+                        acks_received: self.acks_received,
                         shutdown_reason: "shutdown-requested".to_string(),
                     });
                 }
-                Ok(false) => {}
+                Ok(ConnectionOutcome::Subscribe(subscriber)) => {
+                    self.subscribers.push(*subscriber);
+                }
+                Ok(ConnectionOutcome::Broadcast(delta_json)) => {
+                    self.drain_acks(Duration::ZERO);
+                    self.broadcast(&delta_json);
+                }
+                Ok(ConnectionOutcome::Continue) => {}
                 // Per-connection IO errors (client vanished mid-request) must
                 // not kill the long-lived session.
                 Err(_) => {}
@@ -147,7 +182,58 @@ impl PreviewServer {
         }
     }
 
-    fn handle_connection(&mut self, stream: TcpStream) -> Result<bool> {
+    /// Push one delta JSON frame to every subscriber, pruning dead sockets.
+    fn broadcast(&mut self, delta_json: &str) {
+        if self.subscribers.is_empty() {
+            return;
+        }
+        let mut alive = Vec::with_capacity(self.subscribers.len());
+        for mut subscriber in self.subscribers.drain(..) {
+            if subscriber
+                .send(Message::Text(delta_json.to_string()))
+                .is_ok()
+            {
+                alive.push(subscriber);
+            }
+        }
+        if !alive.is_empty() {
+            self.deltas_broadcast += 1;
+        }
+        self.subscribers = alive;
+    }
+
+    /// Best-effort, non-blocking drain of client acknowledgement frames.
+    /// Acks are instrumentation evidence, not a delivery protocol: losing one
+    /// never affects session state.
+    fn drain_acks(&mut self, patience: Duration) {
+        if self.subscribers.is_empty() {
+            return;
+        }
+        let deadline = Instant::now() + patience;
+        loop {
+            let mut drained_any = false;
+            for subscriber in &mut self.subscribers {
+                if subscriber.get_ref().set_nonblocking(true).is_err() {
+                    continue;
+                }
+                while let Ok(message) = subscriber.read() {
+                    if let Message::Text(text) = message {
+                        if text.contains("\"type\":\"ack\"") || text.contains("\"type\": \"ack\"") {
+                            self.acks_received += 1;
+                            drained_any = true;
+                        }
+                    }
+                }
+                let _ = subscriber.get_ref().set_nonblocking(false);
+            }
+            if drained_any || Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn handle_connection(&mut self, stream: TcpStream) -> Result<ConnectionOutcome> {
         stream.set_read_timeout(Some(STREAM_TIMEOUT)).ok();
         stream.set_write_timeout(Some(STREAM_TIMEOUT)).ok();
         let mut reader = BufReader::new(stream);
@@ -160,6 +246,7 @@ impl PreviewServer {
         let path = parts.next().unwrap_or_default().to_string();
 
         let mut content_length = 0usize;
+        let mut websocket_key: Option<String> = None;
         loop {
             let mut header = String::new();
             reader
@@ -169,8 +256,8 @@ impl PreviewServer {
             if header.is_empty() {
                 break;
             }
-            if let Some(value) = header
-                .to_ascii_lowercase()
+            let lowered = header.to_ascii_lowercase();
+            if let Some(value) = lowered
                 .strip_prefix("content-length:")
                 .map(str::trim)
                 .map(str::to_string)
@@ -178,6 +265,13 @@ impl PreviewServer {
                 content_length = value
                     .parse::<usize>()
                     .context("invalid content-length header")?;
+            }
+            if lowered.starts_with("sec-websocket-key:") {
+                websocket_key = header
+                    .splitn(2, ':')
+                    .nth(1)
+                    .map(str::trim)
+                    .map(str::to_string);
             }
         }
         if content_length > MAX_REQUEST_BODY_BYTES {
@@ -187,7 +281,7 @@ impl PreviewServer {
                 413,
                 &json!({"error": "request body exceeds preview server limit"}),
             )?;
-            return Ok(false);
+            return Ok(ConnectionOutcome::Continue);
         }
         let mut body = vec![0u8; content_length];
         if content_length > 0 {
@@ -200,7 +294,29 @@ impl PreviewServer {
         match (method.as_str(), path.as_str()) {
             ("GET", "/healthz") | ("GET", "/session") => {
                 respond_json(stream, 200, &json!(self.status()))?;
-                Ok(false)
+                Ok(ConnectionOutcome::Continue)
+            }
+            ("GET", "/channel") => {
+                let Some(key) = websocket_key else {
+                    respond_json(
+                        stream,
+                        400,
+                        &json!({"error": "GET /channel requires a WebSocket upgrade request"}),
+                    )?;
+                    return Ok(ConnectionOutcome::Continue);
+                };
+                let accept = derive_accept_key(key.as_bytes());
+                let mut stream = stream;
+                stream
+                    .write_all(
+                        format!(
+                            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
+                        )
+                        .as_bytes(),
+                    )
+                    .context("failed to write WebSocket upgrade response")?;
+                let websocket = WebSocket::from_raw_socket(stream, Role::Server, None);
+                Ok(ConnectionOutcome::Subscribe(Box::new(websocket)))
             }
             ("POST", "/intent") => {
                 let intent: PreviewIntent = match serde_json::from_slice(&body) {
@@ -212,7 +328,7 @@ impl PreviewServer {
                             400,
                             &json!({"error": format!("invalid preview intent: {error}")}),
                         )?;
-                        return Ok(false);
+                        return Ok(ConnectionOutcome::Continue);
                     }
                 };
                 match apply_preview_intent(&mut self.session, &intent) {
@@ -225,18 +341,21 @@ impl PreviewServer {
                                 self.rejected += 1
                             }
                         }
+                        let delta_json = serde_json::to_string(&delta)
+                            .context("failed to encode preview delta")?;
                         respond_json(stream, 200, &json!(delta))?;
+                        Ok(ConnectionOutcome::Broadcast(delta_json))
                     }
                     Err(error) => {
                         self.envelope_errors += 1;
                         respond_json(stream, 400, &json!({"error": error.to_string()}))?;
+                        Ok(ConnectionOutcome::Continue)
                     }
                 }
-                Ok(false)
             }
             ("POST", "/shutdown") => {
                 respond_json(stream, 200, &json!({"status": "shutting-down"}))?;
-                Ok(true)
+                Ok(ConnectionOutcome::Shutdown)
             }
             _ => {
                 respond_json(
@@ -244,7 +363,7 @@ impl PreviewServer {
                     404,
                     &json!({"error": format!("unknown preview endpoint {method} {path}")}),
                 )?;
-                Ok(false)
+                Ok(ConnectionOutcome::Continue)
             }
         }
     }
