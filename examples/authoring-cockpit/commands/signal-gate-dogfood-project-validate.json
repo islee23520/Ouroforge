@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "m130-cockpit-copyable-command-v1",
+  "commandId": "signal-gate-dogfood-project-validate",
+  "label": "Validate Signal Gate Relay dogfood project manifest",
+  "command": "cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
+  "boundary": "Display-only copyable text; Studio does not execute commands or perform trusted writes."
+}

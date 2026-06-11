@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "m130-cockpit-copyable-command-v1",
+  "commandId": "signal-gate-dogfood-dashboard-export",
+  "label": "Export dashboard evidence for Studio read-only inspection",
+  "command": "cargo run -p ouroforge-cli -- dashboard export --runs-root runs --output examples/evidence-dashboard/dashboard-data.json",
+  "boundary": "Display-only copyable text; Studio does not execute commands or perform trusted writes."
+}

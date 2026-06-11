@@ -14,7 +14,9 @@
         "runs/m130/2391-first-playable/bundle.json",
         "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/manifest.json",
         "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/verdict.md",
-        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md"
+        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md",
+        "examples/production-usability-gate-v111/studio-reviewer-observation.fixture.json",
+        "docs/evidence/studio-reviewer-observation-signal-gate-2494.md"
       ],
       "screenshotRefs": [
         "runs/m130/2391-first-playable/screenshots/state-start.png",
@@ -26,9 +28,9 @@
       "manualGaps": [
         {
           "gapId": "m130-2391-manual-studio-launch",
-          "ownerIssue": "#2394",
+          "ownerIssue": "#2494",
           "summary": "Studio launch and reviewer observation remain manual local steps; the gate records the transcript rather than claiming hidden automation.",
-          "followUp": "Keep the step in the final postmortem backlog unless a later explicit issue automates product-surface capture."
+          "followUp": "Issue #2494 artifact: examples/production-usability-gate-v111/studio-reviewer-observation.fixture.json and docs/evidence/studio-reviewer-observation-signal-gate-2494.md record the manual Studio reviewer observation handoff."
         }
       ]
     },
