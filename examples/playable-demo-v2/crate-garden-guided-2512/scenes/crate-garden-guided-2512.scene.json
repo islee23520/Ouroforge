@@ -1,0 +1,87 @@
+{
+  "bounds": {
+    "height": 160,
+    "width": 192
+  },
+  "entities": [],
+  "gridPuzzle": {
+    "height": 5,
+    "id": "crate-garden-guided-2512-grid",
+    "intendedSolution": [
+      "left",
+      "down",
+      "left",
+      "up"
+    ],
+    "legend": {
+      "#": [
+        "floor",
+        "wall"
+      ],
+      "*": [
+        "floor",
+        "crate"
+      ],
+      ".": [
+        "floor"
+      ],
+      "@": [
+        "floor",
+        "target"
+      ],
+      "P": [
+        "floor",
+        "player"
+      ]
+    },
+    "lose": {
+      "type": "none"
+    },
+    "objects": {
+      "crate": {
+        "role": "pushable"
+      },
+      "floor": {
+        "role": "background"
+      },
+      "player": {
+        "role": "player"
+      },
+      "target": {
+        "role": "target"
+      },
+      "wall": {
+        "role": "solid"
+      }
+    },
+    "rows": [
+      "######",
+      "#@...#",
+      "#.*P.#",
+      "#....#",
+      "######"
+    ],
+    "schemaVersion": "ouroforge.grid-puzzle.v1",
+    "width": 6,
+    "win": {
+      "type": "all-targets-covered"
+    }
+  },
+  "id": "crate-garden-guided-2512",
+  "metadata": {
+    "guidedAuthoringCommand": "ouroforge dogfood guided-grid-puzzle",
+    "issue": 2512,
+    "knownGap": "none for scoped mechanical puzzle loop",
+    "rawFileEditingRequired": false,
+    "state": "after-review-apply",
+    "title": "Crate Garden Guided 2512"
+  },
+  "renderer": {
+    "background": "#18212f",
+    "viewport": {
+      "height": 160,
+      "width": 192
+    }
+  },
+  "schemaVersion": "1"
+}

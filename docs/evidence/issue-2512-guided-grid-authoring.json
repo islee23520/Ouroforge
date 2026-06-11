@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "ouroforge.productObservedEvidenceSummary.v1",
+  "issue": 2512,
+  "scope": "Dogfood Game 2 guided grid-puzzle CLI authoring path",
+  "classification": "product-observed complete",
+  "guidedCommand": "cargo run -p ouroforge-cli -- dogfood guided-grid-puzzle examples/playable-demo-v2/crate-garden-guided-2512 --project-id crate-garden-guided-2512 --title 'Crate Garden Guided 2512' --issue 2512",
+  "generatedProjectRoot": "examples/playable-demo-v2/crate-garden-guided-2512",
+  "artifacts": {
+    "seed": "examples/playable-demo-v2/crate-garden-guided-2512/seeds/crate-garden-guided-2512.yaml",
+    "projectManifest": "examples/playable-demo-v2/crate-garden-guided-2512/ouroforge.project.json",
+    "beforeScene": "examples/playable-demo-v2/crate-garden-guided-2512/scenes/before-review.scene.json",
+    "afterScene": "examples/playable-demo-v2/crate-garden-guided-2512/scenes/crate-garden-guided-2512.scene.json",
+    "scenarioPack": "examples/playable-demo-v2/crate-garden-guided-2512/scenarios/crate-garden-guided-2512-core.json",
+    "reviewApplyDecision": "examples/playable-demo-v2/crate-garden-guided-2512/review/review-apply-decision.json",
+    "playtestBacklog": "examples/playable-demo-v2/crate-garden-guided-2512/playtest/playtest-backlog.json"
+  },
+  "rawFileEditingRequired": false,
+  "rawJsonManualSteps": [],
+  "validatorEvidence": [
+    "cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/crate-garden-guided-2512/ouroforge.project.json",
+    "cargo run -p ouroforge-cli -- seed validate examples/playable-demo-v2/crate-garden-guided-2512/seeds/crate-garden-guided-2512.yaml",
+    "cargo test -p ouroforge-cli --test artifact_commands dogfood_guided_grid_puzzle_generates_authoring_artifacts_without_raw_editing"
+  ],
+  "liveBrowserEvidence": {
+    "before": {
+      "bundle": "runs/issue-2512/guided-authoring/issue-2512-guided-before",
+      "finalFlags": { "grid_status": "playing", "grid_won": false, "move_count": 1 },
+      "mechanicalContract": "contract-fail",
+      "productObservation": "product-observed FAIL"
+    },
+    "after": {
+      "bundle": "runs/issue-2512/guided-authoring/issue-2512-guided-after",
+      "finalFlags": { "grid_status": "won", "grid_won": true, "move_count": 4 },
+      "mechanicalContract": "contract-pass",
+      "productObservation": "product-observed complete"
+    }
+  },
+  "guardrails": {
+    "browserTrustedWrite": false,
+    "commandBridge": false,
+    "selfApproval": false,
+    "autoApply": false,
+    "autoMerge": false,
+    "hostedCollaboration": false,
+    "signingUploadStoreExportExpansion": false,
+    "godotParityClaim": false,
+    "anchorsRemainOpen": [1, 23],
+    "issue2496Untouched": true
+  }
+}

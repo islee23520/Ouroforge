@@ -1,0 +1,40 @@
+{
+  "assetRoots": [
+    "assets"
+  ],
+  "generated": {
+    "roots": [
+      "runs",
+      "target",
+      "dashboard-data"
+    ]
+  },
+  "project": {
+    "id": "crate-garden-guided-2512",
+    "name": "Crate Garden Guided 2512"
+  },
+  "runsRoot": "runs",
+  "scenarioPacks": [
+    {
+      "id": "crate-garden-guided-2512-core",
+      "path": "scenarios/crate-garden-guided-2512-core.json"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "before-review",
+      "path": "scenes/before-review.scene.json"
+    },
+    {
+      "id": "main",
+      "path": "scenes/crate-garden-guided-2512.scene.json"
+    }
+  ],
+  "schemaVersion": "project-manifest-v1",
+  "seeds": [
+    {
+      "id": "crate-garden-guided-2512",
+      "path": "seeds/crate-garden-guided-2512.yaml"
+    }
+  ]
+}

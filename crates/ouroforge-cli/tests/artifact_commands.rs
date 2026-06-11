@@ -3530,6 +3530,101 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
     format!("{hash:016x}")
 }
 
+#[test]
+fn dogfood_guided_grid_puzzle_generates_authoring_artifacts_without_raw_editing() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temp = unique_temp_dir("ouroforge-guided-grid-puzzle-cli-test");
+    let project_dir = temp.join("guided-grid");
+    fs::create_dir_all(&temp).expect("temp exists");
+
+    let output = run_cli(
+        &repo_root,
+        &[
+            "dogfood",
+            "guided-grid-puzzle",
+            project_dir.to_str().unwrap(),
+            "--project-id",
+            "guided-grid-test",
+            "--title",
+            "Guided Grid Test",
+            "--issue",
+            "2512",
+        ],
+    );
+    let summary: serde_json::Value = serde_json::from_str(&output).expect("summary json");
+    assert_eq!(summary["schemaVersion"], "guided-grid-puzzle-authoring-v1");
+    assert_eq!(summary["rawFileEditingRequired"], false);
+    assert_eq!(summary["guardrails"]["browserTrustedWrite"], false);
+    assert_eq!(summary["guardrails"]["commandBridge"], false);
+    assert_eq!(summary["guardrails"]["selfApproval"], false);
+    assert_eq!(summary["guardrails"]["autoApply"], false);
+
+    let project_validate = run_cli(
+        &repo_root,
+        &[
+            "project",
+            "validate",
+            project_dir.join("ouroforge.project.json").to_str().unwrap(),
+        ],
+    );
+    assert!(project_validate.contains("Project manifest valid: guided-grid-test"));
+
+    let seed_validate = run_cli(
+        &repo_root,
+        &[
+            "seed",
+            "validate",
+            project_dir
+                .join("seeds/guided-grid-test.yaml")
+                .to_str()
+                .unwrap(),
+        ],
+    );
+    assert!(seed_validate.contains("Seed valid: guided-grid-test"));
+
+    for rel in [
+        "ouroforge.project.json",
+        "seeds/guided-grid-test.yaml",
+        "scenes/before-review.scene.json",
+        "scenes/guided-grid-test.scene.json",
+        "scenarios/guided-grid-test-core.json",
+        "review/review-apply-decision.json",
+        "playtest/playtest-backlog.json",
+        "assets/README.md",
+    ] {
+        assert!(project_dir.join(rel).is_file(), "generated {rel}");
+    }
+
+    let review: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(project_dir.join("review/review-apply-decision.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(review["rawJsonManualSteps"].as_array().unwrap().len(), 0);
+    assert_eq!(review["rawFileEditingRequired"], false);
+    assert_eq!(review["guidedCliGenerated"], true);
+    assert_eq!(review["trustedWriteBoundary"]["browserTrustedWrite"], false);
+    assert_eq!(review["trustedWriteBoundary"]["commandBridge"], false);
+    assert_eq!(review["trustedWriteBoundary"]["autoApply"], false);
+    assert_eq!(review["trustedWriteBoundary"]["autoMerge"], false);
+
+    let playtest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(project_dir.join("playtest/playtest-backlog.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(playtest["findings"].as_array().unwrap().len(), 0);
+    assert_eq!(playtest["rawFileEditingRequired"], false);
+    assert_eq!(playtest["humanFunFeelJudgment"], "not claimed");
+
+    let after_scene: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(project_dir.join("scenes/guided-grid-test.scene.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(after_scene["gridPuzzle"]["intendedSolution"][0], "left");
+    assert_eq!(after_scene["metadata"]["rawFileEditingRequired"], false);
+
+    fs::remove_dir_all(temp).ok();
+}
+
 fn run_cli(current_dir: &Path, args: &[&str]) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_ouroforge"))
         .current_dir(current_dir)

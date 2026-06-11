@@ -1,0 +1,22 @@
+{
+  "afterScene": "scenes/crate-garden-guided-2512.scene.json",
+  "beforeScene": "scenes/before-review.scene.json",
+  "decisionId": "crate-garden-guided-2512-guided-review-apply",
+  "guidedAuthoringCommand": "ouroforge dogfood guided-grid-puzzle",
+  "guidedCliGenerated": true,
+  "issue": 2512,
+  "proposal": "Replace incomplete before-review intendedSolution with the reviewed four-move solution while keeping the guided level layout unchanged.",
+  "rawFileEditingRequired": false,
+  "rawJsonManualSteps": [],
+  "reviewer": {
+    "selfApproval": false,
+    "type": "human-required-template"
+  },
+  "schemaVersion": "ouroforge.review-apply-decision.v1",
+  "trustedWriteBoundary": {
+    "autoApply": false,
+    "autoMerge": false,
+    "browserTrustedWrite": false,
+    "commandBridge": false
+  }
+}

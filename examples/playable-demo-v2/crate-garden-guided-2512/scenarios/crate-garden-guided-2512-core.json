@@ -1,0 +1,35 @@
+{
+  "description": "Guided CLI generated grid-puzzle scenario pack for #2512.",
+  "id": "crate-garden-guided-2512-core",
+  "scenarioGroups": [
+    {
+      "description": "Mechanical grid-puzzle objective from guided authoring artifacts.",
+      "id": "guided-grid-puzzle-core",
+      "scenarios": [
+        {
+          "assertions": [
+            {
+              "world_state": {
+                "equals": "won",
+                "path": "gridPuzzle.status"
+              }
+            },
+            {
+              "world_state": {
+                "equals": true,
+                "path": "gridPuzzle.win.satisfied"
+              }
+            }
+          ],
+          "description": "Replay the guided intended solution and verify grid_won=true.",
+          "id": "guided-grid-puzzle-win-path"
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    "scenes/crate-garden-guided-2512.scene.json"
+  ],
+  "schemaVersion": "scenario-pack-v1",
+  "seed": "seeds/crate-garden-guided-2512.yaml"
+}

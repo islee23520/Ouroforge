@@ -1,0 +1,16 @@
+{
+  "backlogId": "crate-garden-guided-2512-playtest-guided",
+  "findings": [],
+  "guidedAuthoringCommand": "ouroforge dogfood guided-grid-puzzle",
+  "humanFunFeelJudgment": "not claimed",
+  "issue": 2512,
+  "rawFileEditingRequired": false,
+  "readModel": {
+    "blockingDeferredCount": 0,
+    "closureAllowed": true,
+    "findingCount": 0,
+    "futureProposalCandidateCount": 0,
+    "openNonBlockingCount": 0
+  },
+  "schemaVersion": "playtest-gap-backlog-v1"
+}
