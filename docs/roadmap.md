@@ -3171,6 +3171,7 @@ approval, and evidence that the change belongs in the current roadmap.
 - Full Studio Editor integrated demo: [`docs/full-studio-editor-integrated-demo-v1.md`](full-studio-editor-integrated-demo-v1.md).
 - Full Studio Editor Scenario Coverage v17: [`docs/scenario-coverage-v17-full-studio-editor.md`](scenario-coverage-v17-full-studio-editor.md).
 - Godot-Plus Demo Game v1 scope contract: [`docs/godot-plus-demo-game-v1.md`](godot-plus-demo-game-v1.md).
+- Distribution Delegation Decision Gate v1 (Era X M136, design-only ADR): [`docs/distribution-delegation-adr-v1.md`](distribution-delegation-adr-v1.md).
 
 ## Product-Observed Rebaseline (M115, 2026-06-10 corrective)
 
