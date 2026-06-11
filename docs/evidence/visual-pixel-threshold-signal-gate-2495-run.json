@@ -1,0 +1,110 @@
+{
+  "schemaVersion": "ouroforge.visualPixelThresholdRunSummary.v1",
+  "issue": 2495,
+  "classification": "product-observed complete",
+  "liveUrl": "http://127.0.0.1:8895/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+  "liveBundle": "runs/issue-2495/live-observability/issue-2495-signal-gate-visual",
+  "comparisonRoot": "runs/issue-2495/visual-comparison",
+  "viewport": {
+    "width": 756,
+    "height": 469
+  },
+  "deviceScaleFactor": 1,
+  "colorScheme": "light",
+  "fontPolicy": "browser-default sans-serif; no webfont injection; Chrome headless default rasterization recorded by fixture",
+  "threshold": {
+    "thresholdId": "pixel-threshold",
+    "maxChangedPixels": 256,
+    "maxChangedPercentX1000": 1,
+    "rationale": "At 756x469 (354,564 px), 256 changed pixels (~0.07%) tolerates minor anti-aliasing, HUD text rasterization, and single-frame timing drift while still failing visible layout, sprite, or objective-state regressions across the bounded Signal Gate Relay replay checkpoints."
+  },
+  "comparisons": [
+    {
+      "state": "start",
+      "baseline": "runs/issue-2495/visual-comparison/screenshots/state-start-baseline.png",
+      "actual": "runs/issue-2495/visual-comparison/screenshots/state-start.png",
+      "totalPixels": 354564,
+      "changedPixels": 0,
+      "threshold": 256,
+      "result": "pass",
+      "baselineSha256": "d4842eda113adcaf79423c2b429c792e200485aaae46e858c99baec9db2863cd",
+      "actualSha256": "d4842eda113adcaf79423c2b429c792e200485aaae46e858c99baec9db2863cd"
+    },
+    {
+      "state": "key-gate",
+      "baseline": "runs/issue-2495/visual-comparison/screenshots/state-key-gate-baseline.png",
+      "actual": "runs/issue-2495/visual-comparison/screenshots/state-key-gate.png",
+      "totalPixels": 354564,
+      "changedPixels": 0,
+      "threshold": 256,
+      "result": "pass",
+      "baselineSha256": "3ec02585b20be3f3bf70a4618554bda0a1cf49e2d6eef3e976fb9a1a603901d2",
+      "actualSha256": "3ec02585b20be3f3bf70a4618554bda0a1cf49e2d6eef3e976fb9a1a603901d2"
+    },
+    {
+      "state": "win-exit",
+      "baseline": "runs/issue-2495/visual-comparison/screenshots/state-win-exit-baseline.png",
+      "actual": "runs/issue-2495/visual-comparison/screenshots/state-win-exit.png",
+      "totalPixels": 354564,
+      "changedPixels": 0,
+      "threshold": 256,
+      "result": "pass",
+      "baselineSha256": "e097561ff6b61c590e4af19ddae5ace6080a020d32a882ac9ed09709bcec0f9d",
+      "actualSha256": "e097561ff6b61c590e4af19ddae5ace6080a020d32a882ac9ed09709bcec0f9d"
+    }
+  ],
+  "consoleDiagnostics": "console.jsonl empty",
+  "runtimeDiagnostics": [],
+  "finalGoalFlags": {
+    "player_alive": true,
+    "relay_1_active": true,
+    "key_collected": true,
+    "exit_reached": true,
+    "gate_open": true
+  },
+  "replayCheckpoints": [
+    {
+      "label": "start",
+      "tick": 0,
+      "goal_flags": {
+        "player_alive": true,
+        "relay_1_active": false,
+        "key_collected": false,
+        "exit_reached": false
+      }
+    },
+    {
+      "label": "relay-1",
+      "tick": 28,
+      "goal_flags": {
+        "player_alive": true,
+        "relay_1_active": true,
+        "key_collected": false,
+        "exit_reached": false
+      }
+    },
+    {
+      "label": "key-gate",
+      "tick": 58,
+      "goal_flags": {
+        "player_alive": true,
+        "relay_1_active": true,
+        "key_collected": true,
+        "exit_reached": false,
+        "gate_open": true
+      }
+    },
+    {
+      "label": "win-exit",
+      "tick": 123,
+      "goal_flags": {
+        "player_alive": true,
+        "relay_1_active": true,
+        "key_collected": true,
+        "exit_reached": true,
+        "gate_open": true
+      }
+    }
+  ],
+  "verdict": "product-observed complete"
+}

@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "signal-gate-visual-comparison-fixture-v1",
+  "issue": 2495,
+  "fixtureScoped": true,
+  "scenarioId": "signal-gate-relay",
+  "replay": "signal-gate-relay",
+  "viewport": {
+    "width": 756,
+    "height": 469
+  },
+  "deviceScaleFactor": 1,
+  "colorScheme": "light",
+  "sourceUrl": "http://127.0.0.1:8895/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+  "liveEntryPointUrl": "http://127.0.0.1:8895/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+  "generatedRunRoot": "runs/issue-2495/visual-comparison/",
+  "screenshotStates": [
+    {
+      "state": "start",
+      "checkpointId": "start",
+      "baselineScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-start-baseline.png",
+      "actualScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-start.png"
+    },
+    {
+      "state": "key-gate",
+      "checkpointId": "key-gate",
+      "baselineScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-key-gate-baseline.png",
+      "actualScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-key-gate.png"
+    },
+    {
+      "state": "win-exit",
+      "checkpointId": "win-exit",
+      "baselineScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-win-exit-baseline.png",
+      "actualScreenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-win-exit.png"
+    }
+  ],
+  "thresholds": [
+    {
+      "thresholdId": "pixel-threshold",
+      "maxChangedPixels": 256,
+      "maxChangedPercentX1000": 1,
+      "rationale": "At 756x469 (354,564 px), 256 changed pixels (~0.07%) tolerates minor anti-aliasing, HUD text rasterization, and single-frame timing drift while still failing visible layout, sprite, or objective-state regressions across the bounded Signal Gate Relay replay checkpoints."
+    }
+  ],
+  "comparisons": [
+    {
+      "schemaVersion": "visual-comparison-evidence-v1",
+      "comparisonId": "signal_gate_relay_start_visual_2495",
+      "runId": "issue-2495-signal-gate-visual",
+      "scenarioId": "signal-gate-relay",
+      "checkpointId": "start",
+      "before": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-start-baseline.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "after": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-start.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "outcome": "unchanged",
+      "pixelDiffSummary": {
+        "totalPixels": 354564,
+        "changedPixels": 0,
+        "changedPercentX1000": 0
+      },
+      "thresholds": [
+        {
+          "thresholdId": "pixel-threshold",
+          "maxChangedPixels": 256,
+          "maxChangedPercentX1000": 1
+        }
+      ],
+      "evidenceRefs": [
+        "runs/issue-2495/visual-comparison/screenshots/state-start-baseline.png",
+        "runs/issue-2495/visual-comparison/screenshots/state-start.png",
+        "runs/issue-2495/live-observability/issue-2495-signal-gate-visual/input-replay.json"
+      ],
+      "guardrails": [
+        "Scoped pixel-threshold comparison for Signal Gate Relay checkpoints only.",
+        "No pixel-perfect engine or shipped-game claim is implied."
+      ]
+    },
+    {
+      "schemaVersion": "visual-comparison-evidence-v1",
+      "comparisonId": "signal_gate_relay_key_gate_visual_2495",
+      "runId": "issue-2495-signal-gate-visual",
+      "scenarioId": "signal-gate-relay",
+      "checkpointId": "key-gate",
+      "before": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-key-gate-baseline.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "after": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-key-gate.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "outcome": "unchanged",
+      "pixelDiffSummary": {
+        "totalPixels": 354564,
+        "changedPixels": 0,
+        "changedPercentX1000": 0
+      },
+      "thresholds": [
+        {
+          "thresholdId": "pixel-threshold",
+          "maxChangedPixels": 256,
+          "maxChangedPercentX1000": 1
+        }
+      ],
+      "evidenceRefs": [
+        "runs/issue-2495/visual-comparison/screenshots/state-key-gate-baseline.png",
+        "runs/issue-2495/visual-comparison/screenshots/state-key-gate.png",
+        "runs/issue-2495/live-observability/issue-2495-signal-gate-visual/input-replay.json"
+      ],
+      "guardrails": [
+        "Scoped pixel-threshold comparison for Signal Gate Relay checkpoints only.",
+        "No pixel-perfect engine or shipped-game claim is implied."
+      ]
+    },
+    {
+      "schemaVersion": "visual-comparison-evidence-v1",
+      "comparisonId": "signal_gate_relay_win_exit_visual_2495",
+      "runId": "issue-2495-signal-gate-visual",
+      "scenarioId": "signal-gate-relay",
+      "checkpointId": "win-exit",
+      "before": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-win-exit-baseline.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "after": {
+        "screenshotRef": "runs/issue-2495/visual-comparison/screenshots/state-win-exit.png",
+        "format": "png",
+        "width": 756,
+        "height": 469
+      },
+      "outcome": "unchanged",
+      "pixelDiffSummary": {
+        "totalPixels": 354564,
+        "changedPixels": 0,
+        "changedPercentX1000": 0
+      },
+      "thresholds": [
+        {
+          "thresholdId": "pixel-threshold",
+          "maxChangedPixels": 256,
+          "maxChangedPercentX1000": 1
+        }
+      ],
+      "evidenceRefs": [
+        "runs/issue-2495/visual-comparison/screenshots/state-win-exit-baseline.png",
+        "runs/issue-2495/visual-comparison/screenshots/state-win-exit.png",
+        "runs/issue-2495/live-observability/issue-2495-signal-gate-visual/input-replay.json"
+      ],
+      "guardrails": [
+        "Scoped pixel-threshold comparison for Signal Gate Relay checkpoints only.",
+        "No pixel-perfect engine or shipped-game claim is implied."
+      ]
+    }
+  ],
+  "requiredTrackedArtifacts": [
+    "examples/playable-demo-v2/signal-gate-dogfood/visual-comparison-signal-gate-relay.fixture.json",
+    "examples/playable-demo-v2/signal-gate-dogfood/visual-comparison-smoke.test.cjs",
+    "docs/evidence/visual-pixel-threshold-signal-gate-2495.md"
+  ],
+  "boundary": "Fixture declares capture settings, font policy, pixel-threshold policy, and visual-comparison-evidence-v1 comparison shapes. PNG baselines and live captures remain under ignored runs/ trees only.",
+  "guardrails": [
+    "#1 remains open",
+    "#23 remains open",
+    "no browser trusted writes",
+    "no command bridge",
+    "no auto-apply",
+    "no auto-merge",
+    "no release claim"
+  ],
+  "fontPolicy": "browser-default sans-serif; no webfont injection; Chrome headless default rasterization recorded by fixture"
+}
