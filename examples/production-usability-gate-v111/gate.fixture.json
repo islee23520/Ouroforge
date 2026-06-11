@@ -57,6 +57,8 @@
       "evidenceRefs": [
         "examples/playable-demo-v2/collect-and-exit/export/export-profile.json",
         "examples/production-usability-gate-v111/local-package-provenance.fixture.json",
+        "examples/production-usability-gate-v111/local-package-inspection-handoff.fixture.json",
+        "docs/evidence/local-package-inspection-handoff-2498.md",
         "runs/studio-local-package-smoke-v1/smoke.json",
         "runs/m130/2393-local-package/smoke.json"
       ],

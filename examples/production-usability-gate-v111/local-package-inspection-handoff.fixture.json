@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "local-package-inspection-handoff-v1",
+  "issue": 2498,
+  "m130Phase": 2393,
+  "handoffId": "signal-gate-relay-local-package-inspection",
+  "provenanceRef": "examples/production-usability-gate-v111/local-package-provenance.fixture.json",
+  "exportProfileRef": "examples/playable-demo-v2/collect-and-exit/export/export-profile.json",
+  "packageMetadataRef": "examples/playable-demo-v2/collect-and-exit/export/package-metadata.json",
+  "checksumsRef": "dist/local-web/signal-gate-relay/checksums.sha256",
+  "packageRoot": "dist/local-web/signal-gate-relay/",
+  "runtimeProbePreserved": true,
+  "localSmokeSteps": [
+    "cargo test -p ouroforge-core --test local_package_inspection_handoff -- --exact local_package_handoff_generates_and_smokes_packaged_artifact",
+    "cargo run -p ouroforge-cli -- project validate examples/playable-demo-v2/collect-and-exit/ouroforge.project.json",
+    "cargo test -p ouroforge-core --test godot_plus_demo_export_package_contract",
+    "node examples/playable-demo-v2/collect-and-exit/scaffold-audit.test.cjs",
+    "node examples/playable-demo-v2/collect-and-exit/scenario-matrix-smoke.test.cjs",
+    "python3 -m http.server 8000 --bind 127.0.0.1 --directory dist/local-web/signal-gate-relay"
+  ],
+  "inspectionNotes": "Copy commands only; reviewer runs them locally. Generated package bytes and smoke JSON remain under ignored dist/ and runs/ roots.",
+  "nonGoals": [
+    "native export",
+    "store upload",
+    "signing",
+    "public release automation",
+    "new export engine"
+  ],
+  "sourceProjectRef": "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
+  "packageManifestRef": "dist/local-web/signal-gate-relay/manifest.json",
+  "localSmokeEvidenceRef": "runs/issue-2498/local-package-handoff-smoke.json"
+}
