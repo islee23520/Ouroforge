@@ -3,7 +3,7 @@
   "issue": 2494,
   "scope": "Signal Gate Relay local Studio reviewer observation evidence",
   "classification": "product-observed complete",
-  "localStudioEntryPoint": "elixir runs/issue-2494/studio-observation/render_studio_observation.exs",
+  "localStudioEntryPoint": "elixir scripts/render_studio_observation.exs",
   "browserUrl": "http://127.0.0.1:8884/runs/issue-2494/studio-observation/studio-observation.html",
   "project": "examples/playable-demo-v2/signal-gate-dogfood/ouroforge.project.json",
   "scene": "examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
@@ -30,9 +30,9 @@
     }
   ],
   "sha256": {
-    "studio-transcript.txt": "092124a6649f751c80023106bf2a234c24145698ec46c308c5246ae6c14b0c57",
+    "studio-transcript.txt": "6f8ecbc96309cfb2efbed236bdcb0397c0cfc974c4fe43aec493883efff498bf",
     "studio-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "studio-observation.html": "a0d62417e8ae93fa485802cd2d219c8865d46be131aa1f84a5c079283000ed1a",
+    "studio-observation.html": "fd18528072a3548c01c406c80a75a096a946460d1dda7b790ec2210b4285aa7b",
     "studio-reviewer-observation.png": "ae6d760486d8c486d05ba98ae8602b26bbc6c0c36b9bc462432ce4f5b5d11efe"
   },
   "guardrails": [
@@ -53,5 +53,6 @@
     "no secure sandbox claim",
     "no Godot parity/replacement claim",
     "no Era Q full 3D/M102-M106 work"
-  ]
+  ],
+  "trackedEntryPoint": "scripts/render_studio_observation.exs"
 }

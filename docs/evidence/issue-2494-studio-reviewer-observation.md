@@ -9,14 +9,14 @@ remain outside Studio and must route through existing Rust/local gates.
 
 ## Local Studio entry point
 
-The Studio shell was exercised without dependency installation by loading the
+The Studio shell is reproducible from a tracked script without dependency installation by loading the
 existing local Studio modules directly:
 
 ```bash
-elixir runs/issue-2494/studio-observation/render_studio_observation.exs
+elixir scripts/render_studio_observation.exs
 ```
 
-Generated transcript:
+The tracked script regenerates the ignored transcript:
 
 ```text
 runs/issue-2494/studio-observation/studio-transcript.txt
@@ -82,7 +82,7 @@ live-observability manifest path.
 
 ## Manual steps and follow-up visibility
 
-The local reviewer observation itself is now captured as reproducible evidence.
+The local reviewer observation entry point is tracked and reproducible; generated transcript/page/screenshot outputs remain ignored local evidence.
 The remaining human-owned manual judgment is intentionally not hidden:
 
 | Manual item | Owner | Follow-up |
@@ -92,7 +92,7 @@ The remaining human-owned manual judgment is intentionally not hidden:
 ## Generated-state audit
 
 Generated Studio transcript, browser page, screenshot, and summary stayed under
-ignored `runs/issue-2494/studio-observation/`. Tracked source contains only this
-stable summary and the JSON summary beside it.
+ignored `runs/issue-2494/studio-observation/`. Tracked source contains this
+stable summary, the JSON summary beside it, and `scripts/render_studio_observation.exs`.
 
 #1 and #23 remain open governance anchors; #1 body was not edited.
