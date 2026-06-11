@@ -14,7 +14,10 @@
         "runs/m130/2391-first-playable/bundle.json",
         "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/manifest.json",
         "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/verdict.md",
-        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md"
+        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md",
+        "docs/evidence/signal-gate-win-state-browser-screenshot-2499.json",
+        "docs/evidence/backlog-issue-2493-signal-gate-win-evidence.md",
+        "docs/evidence/backlog-issue-2493-signal-gate-win-evidence.json"
       ],
       "screenshotRefs": [
         "runs/m130/2391-first-playable/screenshots/state-start.png",

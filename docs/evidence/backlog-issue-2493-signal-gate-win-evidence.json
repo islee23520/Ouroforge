@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "ouroforge.backlogIssueEvidenceSummary.v1",
+  "issue": 2493,
+  "resolvesVia": 2499,
+  "scope": "Signal Gate Relay win-state browser evidence backlog linkage for M130 #2391",
+  "classification": "backlog-resolved-by-citation",
+  "closureClassification": "backlog resolved by citation to #2499 product-observed evidence for the bounded Signal Gate Relay start → progress → win browser gap only",
+  "evidenceRefs": [
+    "docs/evidence/signal-gate-win-state-browser-screenshot-2499.md",
+    "docs/evidence/signal-gate-win-state-browser-screenshot-2499.json",
+    "docs/evidence/backlog-issue-2493-signal-gate-win-evidence.md",
+    "examples/production-usability-gate-v111/gate.fixture.json"
+  ],
+  "runRoots": [
+    "runs/m130/2391-first-playable/m130-2391-signal-gate-win-2499/"
+  ],
+  "replayLabels": ["start", "relay-1", "key-gate", "win-exit"],
+  "checklist": [
+    {
+      "id": "start-browser-evidence",
+      "satisfiedBy": "#2499 screenshots/start.png and objective_flag_sequence label start",
+      "status": "cited"
+    },
+    {
+      "id": "progress-browser-evidence",
+      "satisfiedBy": "#2499 objective_flag_sequence labels relay-1 and key-gate",
+      "status": "cited"
+    },
+    {
+      "id": "win-browser-evidence",
+      "satisfiedBy": "#2499 win-exit label and screenshots/final.png",
+      "status": "cited"
+    },
+    {
+      "id": "gate-phase-2391-index",
+      "satisfiedBy": "gate.fixture.json phase 2391 evidenceRefs and screenshotRefs",
+      "status": "indexed"
+    },
+    {
+      "id": "no-overclaim",
+      "satisfiedBy": "anchors #1 and #23 remain open; no release or browser-write authority",
+      "status": "verified"
+    }
+  ],
+  "anchorsRemainOpen": [1, 23],
+  "guardrails": [
+    "no browser trusted writes",
+    "no command bridge",
+    "no self-approval",
+    "no auto-apply",
+    "no auto-merge",
+    "no release claim",
+    "generated runs/ and screenshots stay ignored"
+  ]
+}
