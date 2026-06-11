@@ -661,6 +661,29 @@ enum PreviewCommand {
         #[arg(long)]
         url: String,
     },
+    /// Fetch the deterministic transcript from a running preview server and
+    /// write it under a local generated root.
+    Transcript {
+        #[arg(long)]
+        url: String,
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
+    /// Replay a transcript for fidelity and convert its net edits into an
+    /// existing visual-edit-draft artifact (draft only; review-gated apply
+    /// authority is unchanged).
+    ExportProposal {
+        #[arg(long, value_name = "PATH")]
+        transcript: PathBuf,
+        #[arg(long, value_name = "ID")]
+        draft_id: String,
+        #[arg(long, value_name = "ID", default_value = "preview-export")]
+        author: String,
+        #[arg(long, value_name = "PATH")]
+        target_path: Option<String>,
+        #[arg(long, value_name = "PATH")]
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -1763,6 +1786,65 @@ fn main() -> Result<()> {
                 "/shutdown",
             )?;
             println!("{}", serde_json::to_string_pretty(&value)?);
+        }
+        Commands::Preview {
+            command: PreviewCommand::Transcript { url, output },
+        } => {
+            let value = ouroforge_core::preview_session_server::preview_http_request(
+                &url,
+                "GET",
+                "/transcript",
+            )?;
+            let transcript: ouroforge_core::preview_transcript::PreviewTranscript =
+                serde_json::from_value(value)?;
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&output, serde_json::to_vec_pretty(&transcript)?)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "status": "written",
+                    "output": output.to_string_lossy(),
+                    "sessionId": transcript.session_id,
+                    "entries": transcript.entries.len(),
+                    "semanticDigest": transcript.semantic_digest,
+                }))?
+            );
+        }
+        Commands::Preview {
+            command:
+                PreviewCommand::ExportProposal {
+                    transcript,
+                    draft_id,
+                    author,
+                    target_path,
+                    output,
+                },
+        } => {
+            let raw = std::fs::read(&transcript)?;
+            let transcript: ouroforge_core::preview_transcript::PreviewTranscript =
+                serde_json::from_slice(&raw)?;
+            let draft = ouroforge_core::preview_transcript::export_preview_draft(
+                &transcript,
+                &draft_id,
+                &author,
+                target_path.as_deref(),
+            )?;
+            if let Some(parent) = output.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&output, serde_json::to_vec_pretty(&draft)?)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "status": "written",
+                    "output": output.to_string_lossy(),
+                    "draftId": draft.draft_id,
+                    "operations": draft.proposed_operations.len(),
+                    "boundary": "draft only; review-gated apply authority unchanged",
+                }))?
+            );
         }
         Commands::Plugin { command } => {
             handle_plugin_command(command)?;

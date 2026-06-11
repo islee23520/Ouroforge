@@ -11,6 +11,7 @@
 use crate::preview_session::{
     apply_preview_intent, start_preview_session, PreviewIntent, PreviewSession,
 };
+use crate::preview_transcript::PreviewTranscriptRecorder;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -94,6 +95,8 @@ pub struct PreviewServer {
     listener: TcpListener,
     session: PreviewSession,
     subscribers: Vec<WebSocket<TcpStream>>,
+    recorder: PreviewTranscriptRecorder,
+    started: Instant,
     applied: u64,
     rejected: u64,
     envelope_errors: u64,
@@ -115,6 +118,8 @@ impl PreviewServer {
             listener,
             session,
             subscribers: Vec::new(),
+            recorder: PreviewTranscriptRecorder::new(),
+            started: Instant::now(),
             applied: 0,
             rejected: 0,
             envelope_errors: 0,
@@ -296,6 +301,11 @@ impl PreviewServer {
                 respond_json(stream, 200, &json!(self.status()))?;
                 Ok(ConnectionOutcome::Continue)
             }
+            ("GET", "/transcript") => {
+                let transcript = self.recorder.finish(&self.session)?;
+                respond_json(stream, 200, &json!(transcript))?;
+                Ok(ConnectionOutcome::Continue)
+            }
             ("GET", "/channel") => {
                 let Some(key) = websocket_key else {
                     respond_json(
@@ -341,6 +351,11 @@ impl PreviewServer {
                                 self.rejected += 1
                             }
                         }
+                        self.recorder.record(
+                            &intent,
+                            &delta,
+                            self.started.elapsed().as_millis() as u64,
+                        );
                         let delta_json = serde_json::to_string(&delta)
                             .context("failed to encode preview delta")?;
                         respond_json(stream, 200, &json!(delta))?;
