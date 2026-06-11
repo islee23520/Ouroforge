@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "ouroforge.productObservedEvidenceSummary.v1",
+  "issue": 2493,
+  "scope": "Signal Gate Relay start/progress/win browser evidence",
+  "classification": "product-observed complete",
+  "runRoot": "runs/issue-2493/live-observability/issue-2493-signal-gate-win-evidence/",
+  "liveUrl": "http://127.0.0.1:8879/examples/game-runtime/?scene=/examples/playable-demo-v2/signal-gate-dogfood/scenes/signal-gate-relay.scene.json",
+  "localCommand": "python3 -m http.server 8879 --bind 127.0.0.1",
+  "screenshotRefs": [
+    "runs/issue-2493/live-observability/issue-2493-signal-gate-win-evidence/screenshots/start.png",
+    "runs/issue-2493/live-observability/issue-2493-signal-gate-win-evidence/screenshots/progress-relay-1.png",
+    "runs/issue-2493/live-observability/issue-2493-signal-gate-win-evidence/screenshots/progress-key-gate.png",
+    "runs/issue-2493/live-observability/issue-2493-signal-gate-win-evidence/screenshots/final.png"
+  ],
+  "validation": "valid observability bundle: run_id=issue-2493-signal-gate-win-evidence run_kind=runtime artifacts=12",
+  "replay": {
+    "schema_version": "live-observability-v1",
+    "replay": "signal-gate-relay",
+    "steps": [
+      {
+        "index": 0,
+        "action": "sample",
+        "label": "start"
+      },
+      {
+        "index": 1,
+        "action": "setInput",
+        "input": {
+          "right": true,
+          "keys": {
+            "right": true
+          }
+        }
+      },
+      {
+        "index": 2,
+        "action": "step",
+        "count": 28,
+        "label": "relay-1",
+        "screenshot": "progress-relay-1.png"
+      },
+      {
+        "index": 3,
+        "action": "step",
+        "count": 30,
+        "label": "key-gate",
+        "screenshot": "progress-key-gate.png"
+      },
+      {
+        "index": 4,
+        "action": "step",
+        "count": 65,
+        "label": "win-exit"
+      },
+      {
+        "index": 5,
+        "action": "setInput",
+        "input": {
+          "right": false,
+          "keys": {
+            "right": false
+          }
+        }
+      }
+    ],
+    "objective_flag_sequence": [
+      {
+        "label": "start",
+        "tick": 0,
+        "goal_flags": {
+          "player_alive": true,
+          "relay_1_active": false,
+          "key_collected": false,
+          "exit_reached": false
+        }
+      },
+      {
+        "label": "relay-1",
+        "tick": 28,
+        "goal_flags": {
+          "player_alive": true,
+          "relay_1_active": true,
+          "key_collected": false,
+          "exit_reached": false
+        }
+      },
+      {
+        "label": "key-gate",
+        "tick": 58,
+        "goal_flags": {
+          "player_alive": true,
+          "relay_1_active": true,
+          "key_collected": true,
+          "exit_reached": false,
+          "gate_open": true
+        }
+      },
+      {
+        "label": "win-exit",
+        "tick": 123,
+        "goal_flags": {
+          "player_alive": true,
+          "relay_1_active": true,
+          "key_collected": true,
+          "exit_reached": true,
+          "gate_open": true
+        }
+      }
+    ],
+    "checkpoint_screenshots": [
+      {
+        "label": "relay-1",
+        "path": "screenshots/progress-relay-1.png"
+      },
+      {
+        "label": "key-gate",
+        "path": "screenshots/progress-key-gate.png"
+      }
+    ],
+    "diagnostics": []
+  },
+  "finalWorldState": {
+    "tick": 123,
+    "sceneId": "signal-gate-relay-core-scene",
+    "goalFlags": {
+      "player_alive": true,
+      "relay_1_active": true,
+      "key_collected": true,
+      "exit_reached": true,
+      "gate_open": true
+    }
+  },
+  "runtimeDiagnostics": [],
+  "consoleDiagnostics": "console.jsonl empty",
+  "frameStats": {
+    "tick": 123,
+    "fixedDeltaMs": 16,
+    "entityCount": 8,
+    "eventCount": 64,
+    "renderBreakdownFrameId": "tick-123",
+    "renderQueueFrameId": "tick-123",
+    "renderQueueLayerCount": 3,
+    "renderQueueRenderableCount": 8,
+    "renderQueueDrawCallCount": 5,
+    "renderQueueSkippedCount": 3,
+    "renderQueueBlockedReasonCount": 0,
+    "renderQueueWarningCount": 0,
+    "scene3dRenderFrameId": "tick-123",
+    "scene3dRenderAttemptedObjectCount": 0,
+    "scene3dRenderVisibleObjectCount": 0,
+    "scene3dRenderSkippedObjectCount": 0,
+    "scene3dRenderFailedObjectCount": 0,
+    "scene3dCameraCount": 0,
+    "scene3dTransformNodeCount": 0,
+    "scene3dTransformCount": 0,
+    "scene3dCollisionEventCount": 0,
+    "scene3dCollisionTriggerCount": 0,
+    "scene3dAnimationFrameId": "tick-123",
+    "scene3dAnimationStateCount": 0,
+    "scene3dAnimationActiveStateCount": 0,
+    "scene3dAnimationWarningCount": 0,
+    "tilemapRenderLayerCount": 0,
+    "tilemapRenderCellCount": 0,
+    "tilemapRenderDrawnTileCount": 0,
+    "tilemapRenderMissingTileRefCount": 0,
+    "runtimeFrameBudgetStatus": "within-budget",
+    "runtimeFrameBudgetViolationCount": 0,
+    "runtimeFrameBudgetFrameId": "tick-123",
+    "runtimeFrameBudgetCounts": {
+      "entityCount": 8,
+      "drawCallCount": 5,
+      "layerCount": 3,
+      "collisionPairCount": 1,
+      "activeAnimationCount": 0,
+      "activeVfxCount": 0,
+      "activeJuiceCount": 0,
+      "juiceEventCount": 0,
+      "audioEventCount": 1
+    },
+    "juiceEventCount": 0,
+    "activeJuiceCount": 0
+  },
+  "guardrails": [
+    "#1 remains open",
+    "#23 remains open",
+    "no browser trusted writes",
+    "no command bridge",
+    "no hidden command execution",
+    "no self-approval",
+    "no auto-apply",
+    "no auto-merge",
+    "no dependency install",
+    "no deploy/release/signing/upload",
+    "no pixel-perfect or commercial readiness claim",
+    "no Era Q full 3D/M102-M106 work"
+  ]
+}

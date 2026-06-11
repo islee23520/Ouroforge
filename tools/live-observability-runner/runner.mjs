@@ -286,56 +286,72 @@ async function evaluateJson(cdp, expression) {
 }
 
 
-async function runInputReplay(cdp, replayName) {
+async function capturePng(cdp, file) {
+  const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await writeFile(file, Buffer.from(screenshot.data, 'base64'));
+}
+
+async function runInputReplay(cdp, replayName, { screenshotDir } = {}) {
   if (!replayName) return { name: null, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [] };
   if (replayName === 'signal-gate-relay') {
-    return await evaluateJson(cdp, `
+    const support = await evaluateJson(cdp, `
       (async () => {
         const api = window.__OUROFORGE__;
-        const used = [];
         const diagnostics = [];
-        const sequence = [];
-        function need(key) {
+        const required = ['getWorldState', 'setInput', 'step'];
+        for (const key of required) {
           if (!api || typeof api[key] !== 'function') {
             diagnostics.push({ code: 'unsupported-target', message: 'window.__OUROFORGE__.' + key + ' is missing' });
-            return false;
           }
-          used.push(key);
-          return true;
         }
-        if (typeof api?.whenReady === 'function') {
-          used.push('whenReady');
-          await api.whenReady();
-        }
-        if (!need('getWorldState') || !need('setInput') || !need('step')) {
-          return { name: 'signal-gate-relay', used_keys: used, steps: [], objective_flag_sequence: sequence, diagnostics };
-        }
-        function flags(label) {
-          const world = api.getWorldState();
-          const goalFlags = world?.componentModel?.goalFlags ?? {};
-          sequence.push({ label, tick: world?.tick ?? null, goal_flags: goalFlags });
-          return goalFlags;
-        }
-        const steps = [
-          { index: 0, action: 'sample', label: 'start' },
-          { index: 1, action: 'setInput', input: { right: true, keys: { right: true } } },
-          { index: 2, action: 'step', count: 28, label: 'relay-1' },
-          { index: 3, action: 'step', count: 30, label: 'key-gate' },
-          { index: 4, action: 'step', count: 65, label: 'win-exit' },
-          { index: 5, action: 'setInput', input: { right: false, keys: { right: false } } }
-        ];
-        flags('start');
-        api.setInput({ right: true, keys: { right: true } });
-        api.step(28);
-        flags('relay-1');
-        api.step(30);
-        flags('key-gate');
-        api.step(65);
-        flags('win-exit');
-        api.setInput({ right: false, keys: { right: false } });
-        return { name: 'signal-gate-relay', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics };
+        return { hasWhenReady: typeof api?.whenReady === 'function', diagnostics };
       })()
     `);
+    const used = [];
+    const diagnostics = support?.diagnostics ?? [];
+    const sequence = [];
+    if (support?.hasWhenReady) {
+      used.push('whenReady');
+      await evaluateJson(cdp, `window.__OUROFORGE__.whenReady()`);
+    }
+    if (diagnostics.length > 0) {
+      return { name: 'signal-gate-relay', used_keys: used, steps: [], objective_flag_sequence: sequence, diagnostics, checkpoint_screenshots: [] };
+    }
+    used.push('getWorldState', 'setInput', 'step');
+    const flags = async (label, screenshotName = null) => {
+      const snapshot = await evaluateJson(cdp, `
+        (() => {
+          const world = window.__OUROFORGE__.getWorldState();
+          return { label: ${JSON.stringify(label)}, tick: world?.tick ?? null, goal_flags: world?.componentModel?.goalFlags ?? {} };
+        })()
+      `);
+      sequence.push(snapshot);
+      if (screenshotName && screenshotDir) {
+        await capturePng(cdp, path.join(screenshotDir, screenshotName));
+      }
+      return snapshot;
+    };
+    const checkpointScreenshots = [];
+    const steps = [
+      { index: 0, action: 'sample', label: 'start' },
+      { index: 1, action: 'setInput', input: { right: true, keys: { right: true } } },
+      { index: 2, action: 'step', count: 28, label: 'relay-1', screenshot: 'progress-relay-1.png' },
+      { index: 3, action: 'step', count: 30, label: 'key-gate', screenshot: 'progress-key-gate.png' },
+      { index: 4, action: 'step', count: 65, label: 'win-exit' },
+      { index: 5, action: 'setInput', input: { right: false, keys: { right: false } } }
+    ];
+    await flags('start');
+    await evaluateJson(cdp, `window.__OUROFORGE__.setInput({ right: true, keys: { right: true } })`);
+    await evaluateJson(cdp, `window.__OUROFORGE__.step(28)`);
+    await flags('relay-1', 'progress-relay-1.png');
+    checkpointScreenshots.push({ label: 'relay-1', path: 'screenshots/progress-relay-1.png' });
+    await evaluateJson(cdp, `window.__OUROFORGE__.step(30)`);
+    await flags('key-gate', 'progress-key-gate.png');
+    checkpointScreenshots.push({ label: 'key-gate', path: 'screenshots/progress-key-gate.png' });
+    await evaluateJson(cdp, `window.__OUROFORGE__.step(65)`);
+    await flags('win-exit');
+    await evaluateJson(cdp, `window.__OUROFORGE__.setInput({ right: false, keys: { right: false } })`);
+    return { name: 'signal-gate-relay', used_keys: used, steps, objective_flag_sequence: sequence, diagnostics, checkpoint_screenshots: checkpointScreenshots };
   }
   if (replayName !== 'collect-and-exit') {
     return { name: replayName, used_keys: [], steps: [], objective_flag_sequence: [], diagnostics: [{ code: 'unsupported-target', message: `unknown replay: ${replayName}` }] };
@@ -528,7 +544,7 @@ async function run() {
     await new Promise(resolve => setTimeout(resolve, args.waitMs));
     const startScreenshot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     await writeFile(path.join(screenshotDir, 'start.png'), Buffer.from(startScreenshot.data, 'base64'));
-    const replayResult = await runInputReplay(cdp, args.replay);
+    const replayResult = await runInputReplay(cdp, args.replay, { screenshotDir });
     const runtimeSample = await sampleOuroforgeRuntime(cdp);
     const checkpointScreenshot = args.replay ? 'final.png' : 'start.png';
     if (args.replay) {
@@ -541,7 +557,7 @@ async function run() {
     await writeFile(path.join(bundleDir, 'frame-stats.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), frame: sampledFrameStats.tick ?? 0, fps: null, delta_ms: sampledFrameStats.fixedDeltaMs ?? null, metrics: { Frames: metricMap.Frames ?? null, Timestamp: metricMap.Timestamp ?? null }, runtime_frame_stats: sampledFrameStats }));
     await writeFile(path.join(bundleDir, 'world-samples.jsonl'), jsonLine({ schema_version: SCHEMA_VERSION, timestamp: nowIso(), ...(runtimeSample?.sample ?? { tick: null, scene_id: null, goal_flags: {}, recent_events: [] }), supported: Boolean(runtimeSample?.supported), diagnostics: runtimeSample?.diagnostics ?? [], screenshot: `screenshots/${checkpointScreenshot}` }));
     await writeFile(path.join(bundleDir, 'events.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, events: [{ timestamp: nowIso(), type: 'page-load', target_url: targetUrl }, ...((runtimeSample?.sample?.recent_events ?? []).map(event => ({ timestamp: nowIso(), type: 'runtime-event-sample', event })))] }, null, 2) + '\n');
-    await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, replay: replayResult.name, steps: replayResult.steps, objective_flag_sequence: replayResult.objective_flag_sequence, diagnostics: replayResult.diagnostics }, null, 2) + '\n');
+    await writeFile(path.join(bundleDir, 'input-replay.json'), JSON.stringify({ schema_version: SCHEMA_VERSION, replay: replayResult.name, steps: replayResult.steps, objective_flag_sequence: replayResult.objective_flag_sequence, checkpoint_screenshots: replayResult.checkpoint_screenshots ?? [], diagnostics: replayResult.diagnostics }, null, 2) + '\n');
     await writeFile(path.join(bundleDir, 'verdict.md'), `# Live observability verdict stub\n\nTarget: ${targetUrl}\n\nStatus: contract-pass / product-observed-pending\n\nArtifacts captured: console, frame stats, world sample, events, input replay, start/final screenshots when replay is enabled.\n`);
     consoleStream.end();
     await new Promise(resolve => consoleStream.on('finish', resolve));

@@ -113,7 +113,7 @@ Its verdict is intentionally `contract-pass` / `product-observed FAIL`: replay r
 
 ## Signal Gate Relay replay
 
-Use `--replay signal-gate-relay` for the M130 Signal Gate Relay first-playable path. The replay drives the local runtime through start, relay activation, key/gate, and terminal win-exit checkpoints, then captures `screenshots/final.png` at the win state. This replay is browser evidence only: it does not grant browser trusted writes, command bridges, self-approval, auto-apply, or auto-merge.
+Use `--replay signal-gate-relay` for the M130 Signal Gate Relay first-playable path. The replay drives the local runtime through start, relay activation, key/gate, and terminal win-exit checkpoints, then captures progress screenshots (`screenshots/progress-relay-1.png`, `screenshots/progress-key-gate.png`) plus `screenshots/final.png` at the win state. This replay is browser evidence only: it does not grant browser trusted writes, command bridges, self-approval, auto-apply, or auto-merge.
 
 Example:
 
